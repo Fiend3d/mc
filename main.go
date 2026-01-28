@@ -130,21 +130,26 @@ func (m model) View() string {
 		}
 
 		if i == current_tab.cursor {
-			s.WriteString(" > ")
+			s.WriteString("> ")
 		} else {
-			s.WriteString("   ")
+			s.WriteString("  ")
 		}
 
 		var symlinkPath string
 		info, _ := item.entry.Info()
 		isSymlink := info.Mode()&os.ModeSymlink != 0
-		size := strings.Replace(humanize.Bytes(uint64(info.Size())), " ", "", 1) //nolint:gosec
+		size := strings.Replace(humanize.Bytes(uint64(info.Size())), " ", "", 1)
 		name := item.entry.Name()
 
 		if isSymlink {
 			symlinkPath, _ = filepath.EvalSymlinks(filepath.Join(current_tab.dir, name))
 		}
 
+		isDir := info.IsDir()
+
+		if isDir {
+			s.WriteRune('\\')
+		}
 		s.WriteString(name)
 		s.WriteRune(' ')
 		if isSymlink {
@@ -152,7 +157,11 @@ func (m model) View() string {
 			s.WriteString(symlinkPath)
 			s.WriteRune(' ')
 		}
-		s.WriteString(size)
+
+		if !isDir {
+			s.WriteString(size)
+		}
+
 		s.WriteRune('\n')
 	}
 
