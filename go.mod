@@ -2,7 +2,10 @@ module mc
 
 go 1.25.1
 
-require github.com/charmbracelet/bubbletea v1.3.10
+require (
+	github.com/charmbracelet/bubbletea v1.3.10
+	github.com/dustin/go-humanize v1.0.1
+)
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
