@@ -32,7 +32,11 @@ type item struct {
 }
 
 type tab struct {
-	dir    string
+	dir string
+}
+
+type page struct {
+	title  string
 	items  []item
 	cursor int
 }
@@ -40,22 +44,22 @@ type tab struct {
 type model struct {
 	tabs       []tab
 	currentTab int
+	pages      map[string]page
 	mode       mode
 	width      int
 	height     int
 }
 
-func newTab(dir string) tab {
-	result := tab{dir: dir}
-	return result
-}
-
 func initialModel(path string) model {
+	pages := make(map[string]page)
+	pages[path] = page{title: path}
+
 	return model{
 		tabs: []tab{
-			newTab(path),
+			{dir: path},
 		},
 		currentTab: 0,
+		pages:      pages,
 		mode:       normal,
 	}
 }
@@ -66,10 +70,10 @@ type errorMsg struct {
 
 type readDirMsg struct {
 	entries []os.DirEntry
-	tab     int
+	dir     string
 }
 
-func (m model) readDir(dir string, tab int) tea.Cmd {
+func (m model) readDir(dir string) tea.Cmd {
 	return func() tea.Msg {
 		entries, err := os.ReadDir(dir)
 
@@ -84,22 +88,25 @@ func (m model) readDir(dir string, tab int) tea.Cmd {
 			return entries[i].IsDir()
 		})
 
-		return readDirMsg{entries: entries, tab: tab}
+		return readDirMsg{entries: entries, dir: dir}
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return m.readDir(m.tabs[0].dir, 0)
+
+	return m.readDir(m.tabs[0].dir)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case readDirMsg:
-		m.tabs[msg.tab].items = nil
+		page := m.pages[msg.dir]
+		page.items = nil
 		for _, entry := range msg.entries {
-			m.tabs[msg.tab].items = append(m.tabs[msg.tab].items, item{entry: entry})
+			page.items = append(page.items, item{entry: entry})
 		}
+		m.pages[msg.dir] = page
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -120,16 +127,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	var s strings.Builder
 
-	current_tab := &m.tabs[m.currentTab]
-	s.WriteString(current_tab.dir)
+	tab := m.tabs[m.currentTab]
+	page := m.pages[tab.dir]
+	s.WriteString(page.title)
 	s.WriteRune('\n')
 
-	for i, item := range m.tabs[m.currentTab].items {
+	for i, item := range page.items {
 		if i+1 > m.height-3 {
 			break
 		}
 
-		if i == current_tab.cursor {
+		if i == page.cursor {
 			s.WriteString("> ")
 		} else {
 			s.WriteString("  ")
@@ -142,7 +150,7 @@ func (m model) View() string {
 		name := item.entry.Name()
 
 		if isSymlink {
-			symlinkPath, _ = filepath.EvalSymlinks(filepath.Join(current_tab.dir, name))
+			symlinkPath, _ = filepath.EvalSymlinks(filepath.Join(page.title, name)) // HUHUEHUEHUEHUHE
 		}
 
 		isDir := info.IsDir()
