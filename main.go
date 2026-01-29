@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -8,6 +10,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
 )
 
@@ -42,6 +45,7 @@ type page struct {
 }
 
 type model struct {
+	err        error
 	tabs       []tab
 	currentTab int
 	pages      map[string]page
@@ -73,6 +77,12 @@ type readDirMsg struct {
 	dir     string
 }
 
+func newErr(msg string) tea.Cmd {
+	return func() tea.Msg {
+		return errorMsg{errors.New(msg)}
+	}
+}
+
 func (m model) readDir(dir string) tea.Cmd {
 	return func() tea.Msg {
 		entries, err := os.ReadDir(dir)
@@ -100,6 +110,10 @@ func (m model) Init() tea.Cmd {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
+	case errorMsg:
+		m.err = msg.err
+		return m, nil
+
 	case readDirMsg:
 		page := m.pages[msg.dir]
 		page.items = nil
@@ -107,10 +121,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			page.items = append(page.items, item{entry: entry})
 		}
 		m.pages[msg.dir] = page
+		return m, nil
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		return m, nil
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -118,6 +134,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.mode == normal {
 				return m, tea.Quit
 			}
+		case "d":
+			return m, newErr("EPIC FAIL")
 		}
 	}
 
@@ -125,6 +143,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	if m.err != nil {
+		msg := fmt.Sprintf("Error: %s", m.err)
+		block := lipgloss.PlaceHorizontal(m.width, lipgloss.Center, msg)
+		return lipgloss.PlaceVertical(m.height, lipgloss.Center, block)
+	}
+
 	var s strings.Builder
 
 	tab := m.tabs[m.currentTab]
