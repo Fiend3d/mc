@@ -44,6 +44,26 @@ type page struct {
 	cursor int
 }
 
+type theme struct {
+	baseStyle   lipgloss.Style
+	cursorStyle lipgloss.Style
+
+	cursorColor   lipgloss.Color
+	dirColor      lipgloss.Color
+	grayTextColor lipgloss.Color
+}
+
+func newTheme() theme {
+	return theme{
+		baseStyle:   lipgloss.NewStyle(),
+		cursorStyle: lipgloss.NewStyle().Background(lipgloss.Color("#333333")),
+
+		cursorColor:   lipgloss.Color("#438a2c"),
+		dirColor:      lipgloss.Color("#3b7bb8"),
+		grayTextColor: lipgloss.Color("#8f8f8f"),
+	}
+}
+
 type model struct {
 	err        error
 	tabs       []tab
@@ -52,6 +72,13 @@ type model struct {
 	mode       mode
 	width      int
 	height     int
+
+	theme theme
+}
+
+func (m *model) getPage() (string, page) {
+	dir := m.tabs[m.currentTab].dir
+	return dir, m.pages[dir]
 }
 
 func initialModel(path string) model {
@@ -65,6 +92,7 @@ func initialModel(path string) model {
 		currentTab: 0,
 		pages:      pages,
 		mode:       normal,
+		theme:      newTheme(),
 	}
 }
 
@@ -136,6 +164,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "d":
 			return m, newErr("EPIC FAIL")
+		case "j", "down":
+			dir, page := m.getPage()
+			if len(page.items)-1 >= page.cursor {
+				page.cursor += 1
+			}
+			m.pages[dir] = page
+			return m, nil
+		case "k", "up":
+			dir, page := m.getPage()
+			if page.cursor > 0 {
+				page.cursor -= 1
+			}
+			m.pages[dir] = page
+			return m, nil
 		}
 	}
 
@@ -161,10 +203,13 @@ func (m model) View() string {
 			break
 		}
 
+		style := &m.theme.baseStyle
+
 		if i == page.cursor {
-			s.WriteString("> ")
+			style = &m.theme.cursorStyle
+			s.WriteString(style.Foreground(m.theme.cursorColor).Render("> "))
 		} else {
-			s.WriteString("  ")
+			s.WriteString(style.Render("  "))
 		}
 
 		var symlinkPath string
@@ -179,22 +224,48 @@ func (m model) View() string {
 
 		isDir := info.IsDir()
 
+		name_block := ""
+
 		if isDir {
-			s.WriteRune('\\')
+			name_block += style.Foreground(m.theme.dirColor).Render(name)
+			name_block += style.Render("/")
+		} else {
+			name_block += style.Render(name)
 		}
-		s.WriteString(name)
-		s.WriteRune(' ')
+
 		if isSymlink {
-			s.WriteString("-> ")
-			s.WriteString(symlinkPath)
-			s.WriteRune(' ')
+			name_block += style.Render(" ")
+			name_block += style.Render("-> ")
+			name_block += style.Render(symlinkPath)
+			name_block += style.Render(" ")
 		}
+
+		info_block := ""
 
 		if !isDir {
-			s.WriteString(size)
+			info_block += style.Render(size)
 		}
 
-		s.WriteRune('\n')
+		name_width := m.width - 4 - lipgloss.Width(info_block)
+		name_block_len := lipgloss.Width(name_block)
+		if name_block_len > name_width {
+			name_block = name_block[:name_width]
+			name_runes := []rune(name_block)
+			name_runes[name_block_len-1] = '…'
+			name_block = string(name_runes)
+			s.WriteString(name_block)
+		} else {
+			len_padding := name_width - name_block_len
+			padding_str := style.Render(" ")
+			s.WriteString(name_block)
+			for range len_padding {
+				s.WriteString(padding_str)
+			}
+		}
+
+		s.WriteString(info_block)
+
+		s.WriteString(style.Render("\n"))
 	}
 
 	return s.String()
