@@ -39,13 +39,14 @@ type tab struct {
 }
 
 type page struct {
-	title  string
+	dir    string
 	items  []item
 	cursor int
 }
 
 type theme struct {
 	baseStyle   lipgloss.Style
+	emptyStyle  lipgloss.Style
 	cursorStyle lipgloss.Style
 
 	cursorColor   lipgloss.Color
@@ -55,11 +56,12 @@ type theme struct {
 
 func newTheme() theme {
 	return theme{
-		baseStyle:   lipgloss.NewStyle(),
-		cursorStyle: lipgloss.NewStyle().Background(lipgloss.Color("#333333")),
+		baseStyle:   lipgloss.NewStyle().Background(lipgloss.Color("#222222")),
+		emptyStyle:  lipgloss.NewStyle().Background(lipgloss.Color("#1a1a1a")),
+		cursorStyle: lipgloss.NewStyle().Background(lipgloss.Color("#3a3a3a")),
 
 		cursorColor:   lipgloss.Color("#438a2c"),
-		dirColor:      lipgloss.Color("#3b7bb8"),
+		dirColor:      lipgloss.Color("#579ddf"),
 		grayTextColor: lipgloss.Color("#8f8f8f"),
 	}
 }
@@ -76,18 +78,34 @@ type model struct {
 	theme theme
 }
 
-func (m *model) getPage() (string, page) {
+func (m *model) getPage() page {
 	dir := m.tabs[m.currentTab].dir
-	return dir, m.pages[dir]
+	return m.pages[dir]
 }
 
-func initialModel(path string) model {
+func (m *model) cursorDown() {
+	page := m.getPage()
+	if len(page.items)-2 >= page.cursor {
+		page.cursor += 1
+	}
+	m.pages[page.dir] = page
+}
+
+func (m *model) cursorUp() {
+	page := m.getPage()
+	if page.cursor > 0 {
+		page.cursor -= 1
+	}
+	m.pages[page.dir] = page
+}
+
+func initialModel(dir string) model {
 	pages := make(map[string]page)
-	pages[path] = page{title: path}
+	pages[dir] = page{dir: dir}
 
 	return model{
 		tabs: []tab{
-			{dir: path},
+			{dir: dir},
 		},
 		currentTab: 0,
 		pages:      pages,
@@ -165,18 +183,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "d":
 			return m, newErr("EPIC FAIL")
 		case "j", "down":
-			dir, page := m.getPage()
-			if len(page.items)-1 >= page.cursor {
-				page.cursor += 1
-			}
-			m.pages[dir] = page
+			m.cursorDown()
 			return m, nil
 		case "k", "up":
-			dir, page := m.getPage()
-			if page.cursor > 0 {
-				page.cursor -= 1
-			}
-			m.pages[dir] = page
+			m.cursorUp()
 			return m, nil
 		}
 	}
@@ -193,9 +203,12 @@ func (m model) View() string {
 
 	var s strings.Builder
 
-	tab := m.tabs[m.currentTab]
-	page := m.pages[tab.dir]
-	s.WriteString(page.title)
+	style := &m.theme.baseStyle
+	emptyStyle := &m.theme.emptyStyle
+
+	page := m.getPage()
+	dir := lipgloss.PlaceHorizontal(m.width, lipgloss.Left, page.dir)
+	s.WriteString(emptyStyle.Bold(true).Render(dir))
 	s.WriteRune('\n')
 
 	for i, item := range page.items {
@@ -203,13 +216,16 @@ func (m model) View() string {
 			break
 		}
 
-		style := &m.theme.baseStyle
+		style = &m.theme.baseStyle
 
 		if i == page.cursor {
 			style = &m.theme.cursorStyle
-			s.WriteString(style.Foreground(m.theme.cursorColor).Render("> "))
+			s.WriteString(style.
+				Bold(true).
+				Foreground(m.theme.cursorColor).
+				Render(" ▶ "))
 		} else {
-			s.WriteString(style.Render("  "))
+			s.WriteString(style.Render("   "))
 		}
 
 		var symlinkPath string
@@ -219,7 +235,7 @@ func (m model) View() string {
 		name := item.entry.Name()
 
 		if isSymlink {
-			symlinkPath, _ = filepath.EvalSymlinks(filepath.Join(page.title, name)) // HUHUEHUEHUEHUHE
+			symlinkPath, _ = filepath.EvalSymlinks(filepath.Join(page.dir, name)) // HUHUEHUEHUEHUHE
 		}
 
 		isDir := info.IsDir()
@@ -246,7 +262,7 @@ func (m model) View() string {
 			info_block += style.Render(size)
 		}
 
-		name_width := m.width - 4 - lipgloss.Width(info_block)
+		name_width := m.width - 3 - lipgloss.Width(info_block)
 		name_block_len := lipgloss.Width(name_block)
 		if name_block_len > name_width {
 			name_block = name_block[:name_width]
@@ -265,7 +281,7 @@ func (m model) View() string {
 
 		s.WriteString(info_block)
 
-		s.WriteString(style.Render("\n"))
+		s.WriteString("\n")
 	}
 
 	return s.String()
