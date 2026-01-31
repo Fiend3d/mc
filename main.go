@@ -33,6 +33,48 @@ const (
 type item struct {
 	entry    os.DirEntry
 	selected bool
+
+	isDir     bool
+	isSymlink bool
+	name      string
+	symlink   string
+	modTime   string
+	size      string
+}
+
+func newItem(entry os.DirEntry, dir string) (*item, error) {
+	info, err := entry.Info()
+	if err != nil {
+		return nil, err
+	}
+
+	item := &item{entry: entry, selected: false}
+
+	item.name = entry.Name()
+	item.isDir = info.IsDir()
+	item.isSymlink = info.Mode()&os.ModeSymlink != 0
+
+	if item.isSymlink {
+		target, err := filepath.EvalSymlinks(filepath.Join(dir, item.name))
+		if err != nil {
+			return nil, err
+		}
+		item.symlink = target
+	}
+
+	item.size = ""
+	if !item.isDir {
+		item.size = strings.Replace(
+			humanize.Bytes(uint64(info.Size())),
+			" ",
+			"",
+			1,
+		)
+	}
+
+	item.modTime = info.ModTime().Format("02-01-2006 15:04")
+
+	return item, nil
 }
 
 type tab struct {
@@ -62,7 +104,7 @@ type theme struct {
 
 func newTheme() theme {
 	white := lipgloss.Color("#ffffff")
-	gray := lipgloss.Color("#979bb3")
+	gray := lipgloss.Color("#6272a4")
 	accent1 := lipgloss.Color("#ff79c6")
 	accent2 := lipgloss.Color("#bd93f9")
 	accent3 := lipgloss.Color("#8be9fd")
@@ -143,28 +185,78 @@ type readDirMsg struct {
 	dir     string
 }
 
-func newErr(msg string) tea.Cmd {
+func newErr(err error) tea.Cmd {
 	return func() tea.Msg {
-		return errorMsg{errors.New(msg)}
+		return errorMsg{err}
 	}
 }
 
 func (m model) readDir(dir string) tea.Cmd {
 	return func() tea.Msg {
 		entries, err := os.ReadDir(dir)
-
 		if err != nil {
 			return errorMsg{err}
 		}
 
-		sort.Slice(entries, func(i, j int) bool {
-			if entries[i].IsDir() == entries[j].IsDir() {
-				return entries[i].Name() < entries[j].Name()
+		filteredEntries := make([]os.DirEntry, 0, len(entries))
+		for _, entry := range entries {
+			name := entry.Name()
+			lowerName := strings.ToLower(name)
+
+			// Skip Windows/system files and folders
+			switch lowerName {
+			// System files
+			case "thumbs.db":
+				continue
+			case "desktop.ini":
+				continue
+			case "dumpstack.log.tmp":
+				continue
+
+			// System folders (legacy and modern)
+			case "$recycle.bin":
+				continue
+			case "system volume information":
+				continue
+			case "documents and settings": // XP legacy junction
+				continue
+			case "recovery": // Windows Recovery folder
+				continue
+			case "config.msi": // Windows Installer temp
+				continue
+
+			// Windows system files
+			case "pagefile.sys":
+				continue
+			case "hiberfil.sys":
+				continue
+			case "swapfile.sys":
+				continue
+			case "bootmgr":
+				continue
+			case "bootnxt":
+				continue
 			}
-			return entries[i].IsDir()
+
+			filteredEntries = append(filteredEntries, entry)
+		}
+
+		// Sort: directories first, then by name (case-insensitive)
+		sort.Slice(filteredEntries, func(i, j int) bool {
+			iIsDir := filteredEntries[i].IsDir()
+			jIsDir := filteredEntries[j].IsDir()
+
+			if iIsDir && !jIsDir {
+				return true
+			}
+			if !iIsDir && jIsDir {
+				return false
+			}
+
+			return strings.ToLower(filteredEntries[i].Name()) < strings.ToLower(filteredEntries[j].Name())
 		})
 
-		return readDirMsg{entries: entries, dir: dir}
+		return readDirMsg{entries: filteredEntries, dir: dir}
 	}
 }
 
@@ -184,7 +276,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		page := m.pages[msg.dir]
 		page.items = nil
 		for i := range msg.entries {
-			page.items = append(page.items, item{entry: msg.entries[i]})
+			item, err := newItem(msg.entries[i], page.dir)
+			if err != nil {
+				return m, newErr(err)
+			}
+			page.items = append(page.items, *item)
 		}
 		m.pages[msg.dir] = page
 		return m, nil
@@ -201,7 +297,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			}
 		case "d":
-			return m, newErr("EPIC FAIL")
+			return m, newErr(errors.New("EPIC FAIL"))
 		case "j", "down":
 			m.cursorDown()
 			return m, nil
@@ -263,89 +359,56 @@ func (m model) View() string {
 			s.WriteString(style.Render("   "))
 		}
 
-		entry := page.items[i].entry
-		info, err := entry.Info()
-		if err != nil {
-			s.WriteString("\n")
-			continue
-		}
-
-		name := entry.Name()
-		isDir := info.IsDir()
-		isSymlink := info.Mode()&os.ModeSymlink != 0
+		item := &page.items[i]
 
 		// --- name block ---
 		var nameBlock strings.Builder
 
-		if isDir {
+		if item.isDir {
 			nameBlock.WriteString(
-				style.Foreground(m.theme.accentColor4).Render(name),
+				style.Foreground(m.theme.accentColor4).Render(item.name),
 			)
 			nameBlock.WriteString(style.Bold(true).Render("/"))
 		} else {
 			nameBlock.WriteString(
-				style.Foreground(m.theme.whiteColor).Render(name),
+				style.Foreground(m.theme.whiteColor).Render(item.name),
 			)
 		}
 
-		if isSymlink {
-			target, _ := filepath.EvalSymlinks(filepath.Join(page.dir, name))
+		if item.isSymlink {
 			nameBlock.WriteString(style.Render(" -> "))
-			nameBlock.WriteString(style.Render(target))
+			nameBlock.WriteString(style.Render(item.symlink))
 		}
 
-		nameStr := nameBlock.String()
+		nameWidth := max(
+			m.width-cursorWidth-sizeWidth-timeWidth-colGap*2+1, 1)
 
-		// --- size ---
-		sizeStr := ""
-		if !isDir {
-			sizeStr = strings.Replace(
-				humanize.Bytes(uint64(info.Size())),
-				" ",
-				"",
-				1,
-			)
-		}
+		name := nameBlock.String()
 
-		// --- modified time ---
-		modTime := info.ModTime().Format("02-01-2006 15:04")
-
-		// --- layout ---
-		nameWidth := max(m.width-
-			cursorWidth-
-			sizeWidth-
-			timeWidth-
-			colGap*2, 0)
-
-		if lipgloss.Width(nameStr) > nameWidth {
-			nameStr = truncate.StringWithTail(
-				nameStr,
+		if lipgloss.Width(name) > nameWidth {
+			name = truncate.StringWithTail(
+				name,
 				uint(nameWidth),
 				"…",
 			)
 		}
 
-		s.WriteString(nameStr)
-		s.WriteString(
-			style.Render(strings.Repeat(
-				" ",
-				nameWidth-lipgloss.Width(nameStr),
-			)),
-		)
+		s.WriteString(name)
+		nameLen := lipgloss.Width(name)
+		if nameLen < nameWidth {
+			s.WriteString(style.Render(strings.Repeat(" ", nameWidth-nameLen)))
+		}
 
 		// time column
 		timeStyle := style.Foreground(m.theme.grayColor)
-		s.WriteString(timeStyle.Render(modTime))
+		s.WriteString(timeStyle.Render(item.modTime))
 
-		// gap
 		s.WriteString(style.Render(" "))
 
-		// size column (right-aligned)
-		s.WriteString(style.Render(strings.Repeat(
-			" ",
-			sizeWidth-lipgloss.Width(sizeStr),
-		)))
-		s.WriteString(style.Render(sizeStr))
+		// size column
+		s.WriteString(style.Render(
+			lipgloss.PlaceHorizontal(sizeWidth, lipgloss.Center, item.size)))
+		s.WriteString(style.Render(item.size))
 
 		s.WriteRune('\n')
 	}
