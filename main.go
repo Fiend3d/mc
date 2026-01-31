@@ -333,19 +333,19 @@ func (m model) View() string {
 			)),
 		)
 
+		// time column
+		timeStyle := style.Foreground(m.theme.grayColor)
+		s.WriteString(timeStyle.Render(modTime))
+
+		// gap
+		s.WriteString(style.Render(" "))
+
 		// size column (right-aligned)
 		s.WriteString(style.Render(strings.Repeat(
 			" ",
 			sizeWidth-lipgloss.Width(sizeStr),
 		)))
 		s.WriteString(style.Render(sizeStr))
-
-		// gap
-		s.WriteString(style.Render(" "))
-
-		// time column
-		timeStyle := style.Foreground(m.theme.accentColor2)
-		s.WriteString(timeStyle.Render(modTime))
 
 		s.WriteRune('\n')
 	}
