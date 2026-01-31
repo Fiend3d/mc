@@ -12,6 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/dustin/go-humanize"
+	"github.com/muesli/reflow/truncate"
 )
 
 type mode int
@@ -49,20 +50,39 @@ type theme struct {
 	emptyStyle  lipgloss.Style
 	cursorStyle lipgloss.Style
 
-	cursorColor   lipgloss.Color
-	dirColor      lipgloss.Color
-	grayTextColor lipgloss.Color
+	whiteColor lipgloss.Color
+	grayColor  lipgloss.Color
+
+	accentColor1 lipgloss.Color
+	accentColor2 lipgloss.Color
+	accentColor3 lipgloss.Color
+	accentColor4 lipgloss.Color
+	accentColor5 lipgloss.Color
 }
 
 func newTheme() theme {
-	return theme{
-		baseStyle:   lipgloss.NewStyle().Background(lipgloss.Color("#222222")),
-		emptyStyle:  lipgloss.NewStyle().Background(lipgloss.Color("#1a1a1a")),
-		cursorStyle: lipgloss.NewStyle().Background(lipgloss.Color("#3a3a3a")),
+	white := lipgloss.Color("#ffffff")
+	gray := lipgloss.Color("#979bb3")
+	accent1 := lipgloss.Color("#ff79c6")
+	accent2 := lipgloss.Color("#bd93f9")
+	accent3 := lipgloss.Color("#8be9fd")
+	accent4 := lipgloss.Color("#f1fa8c")
+	accent5 := lipgloss.Color("#ffb86c")
 
-		cursorColor:   lipgloss.Color("#438a2c"),
-		dirColor:      lipgloss.Color("#579ddf"),
-		grayTextColor: lipgloss.Color("#8f8f8f"),
+	defaultStyle := lipgloss.NewStyle().Foreground(white)
+	return theme{
+		baseStyle:   defaultStyle.Background(lipgloss.Color("#282a36")),
+		emptyStyle:  defaultStyle.Background(lipgloss.Color("#222430")),
+		cursorStyle: defaultStyle.Background(lipgloss.Color("#44475a")),
+
+		whiteColor: white,
+		grayColor:  gray,
+
+		accentColor1: accent1,
+		accentColor2: accent2,
+		accentColor3: accent3,
+		accentColor4: accent4,
+		accentColor5: accent5,
 	}
 }
 
@@ -163,8 +183,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case readDirMsg:
 		page := m.pages[msg.dir]
 		page.items = nil
-		for _, entry := range msg.entries {
-			page.items = append(page.items, item{entry: entry})
+		for i := range msg.entries {
+			page.items = append(page.items, item{entry: msg.entries[i]})
 		}
 		m.pages[msg.dir] = page
 		return m, nil
@@ -197,91 +217,137 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() string {
 	if m.err != nil {
 		msg := fmt.Sprintf("Error: %s", m.err)
-		block := lipgloss.PlaceHorizontal(m.width, lipgloss.Center, msg)
-		return lipgloss.PlaceVertical(m.height, lipgloss.Center, block)
+		return lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			msg,
+		)
 	}
 
 	var s strings.Builder
 
-	style := &m.theme.baseStyle
-	emptyStyle := &m.theme.emptyStyle
+	base := &m.theme.baseStyle
+	empty := &m.theme.emptyStyle
 
 	page := m.getPage()
-	dir := lipgloss.PlaceHorizontal(m.width, lipgloss.Left, page.dir)
-	s.WriteString(emptyStyle.Bold(true).Render(dir))
+
+	// Header (directory)
+	dirLine := lipgloss.PlaceHorizontal(m.width, lipgloss.Left, page.dir)
+	s.WriteString(empty.Bold(true).Render(dirLine))
 	s.WriteRune('\n')
 
-	for i, item := range page.items {
+	const (
+		cursorWidth = 3
+		sizeWidth   = 8  // "123.4KB"
+		timeWidth   = 16 // "YYYY-MM-DD HH:MM"
+		colGap      = 1
+	)
+
+	for i := range page.items {
 		if i+1 > m.height-3 {
 			break
 		}
 
-		style = &m.theme.baseStyle
-
+		style := base
 		if i == page.cursor {
 			style = &m.theme.cursorStyle
-			s.WriteString(style.
-				Bold(true).
-				Foreground(m.theme.cursorColor).
-				Render(" ▶ "))
+			s.WriteString(
+				style.
+					Bold(true).
+					Foreground(m.theme.accentColor1).
+					Render(" > "),
+			)
 		} else {
 			s.WriteString(style.Render("   "))
 		}
 
-		var symlinkPath string
-		info, _ := item.entry.Info()
-		isSymlink := info.Mode()&os.ModeSymlink != 0
-		size := strings.Replace(humanize.Bytes(uint64(info.Size())), " ", "", 1)
-		name := item.entry.Name()
-
-		if isSymlink {
-			symlinkPath, _ = filepath.EvalSymlinks(filepath.Join(page.dir, name)) // HUHUEHUEHUEHUHE
+		entry := page.items[i].entry
+		info, err := entry.Info()
+		if err != nil {
+			s.WriteString("\n")
+			continue
 		}
 
+		name := entry.Name()
 		isDir := info.IsDir()
+		isSymlink := info.Mode()&os.ModeSymlink != 0
 
-		name_block := ""
+		// --- name block ---
+		var nameBlock strings.Builder
 
 		if isDir {
-			name_block += style.Foreground(m.theme.dirColor).Render(name)
-			name_block += style.Render("/")
+			nameBlock.WriteString(
+				style.Foreground(m.theme.accentColor4).Render(name),
+			)
+			nameBlock.WriteString(style.Bold(true).Render("/"))
 		} else {
-			name_block += style.Render(name)
+			nameBlock.WriteString(
+				style.Foreground(m.theme.whiteColor).Render(name),
+			)
 		}
 
 		if isSymlink {
-			name_block += style.Render(" ")
-			name_block += style.Render("-> ")
-			name_block += style.Render(symlinkPath)
-			name_block += style.Render(" ")
+			target, _ := filepath.EvalSymlinks(filepath.Join(page.dir, name))
+			nameBlock.WriteString(style.Render(" -> "))
+			nameBlock.WriteString(style.Render(target))
 		}
 
-		info_block := ""
+		nameStr := nameBlock.String()
 
+		// --- size ---
+		sizeStr := ""
 		if !isDir {
-			info_block += style.Render(size)
+			sizeStr = strings.Replace(
+				humanize.Bytes(uint64(info.Size())),
+				" ",
+				"",
+				1,
+			)
 		}
 
-		name_width := m.width - 3 - lipgloss.Width(info_block)
-		name_block_len := lipgloss.Width(name_block)
-		if name_block_len > name_width {
-			name_block = name_block[:name_width]
-			name_runes := []rune(name_block)
-			name_runes[name_block_len-1] = '…'
-			name_block = string(name_runes)
-			s.WriteString(name_block)
-		} else {
-			len_padding := name_width - name_block_len
-			padding_str := style.Render(" ")
-			s.WriteString(name_block)
-			for range len_padding {
-				s.WriteString(padding_str)
-			}
+		// --- modified time ---
+		modTime := info.ModTime().Format("02-01-2006 15:04")
+
+		// --- layout ---
+		nameWidth := max(m.width-
+			cursorWidth-
+			sizeWidth-
+			timeWidth-
+			colGap*2, 0)
+
+		if lipgloss.Width(nameStr) > nameWidth {
+			nameStr = truncate.StringWithTail(
+				nameStr,
+				uint(nameWidth),
+				"…",
+			)
 		}
 
-		s.WriteString(info_block)
+		s.WriteString(nameStr)
+		s.WriteString(
+			style.Render(strings.Repeat(
+				" ",
+				nameWidth-lipgloss.Width(nameStr),
+			)),
+		)
 
-		s.WriteString("\n")
+		// size column (right-aligned)
+		s.WriteString(style.Render(strings.Repeat(
+			" ",
+			sizeWidth-lipgloss.Width(sizeStr),
+		)))
+		s.WriteString(style.Render(sizeStr))
+
+		// gap
+		s.WriteString(style.Render(" "))
+
+		// time column
+		timeStyle := style.Foreground(m.theme.accentColor2)
+		s.WriteString(timeStyle.Render(modTime))
+
+		s.WriteRune('\n')
 	}
 
 	return s.String()
