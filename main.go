@@ -164,6 +164,16 @@ func (m model) View() string {
 		s.WriteRune('\n')
 	}
 
+	num_items := len(page.items)
+	for i := num_items; i < m.height-3; i++ {
+		s.WriteString(empty.Render(strings.Repeat(" ", m.width)))
+		s.WriteRune('\n')
+	}
+
+	mode_str := "normal"
+
+	s.WriteString(base.Background(m.theme.accentColor2).Render(mode_str))
+
 	return s.String()
 }
 
