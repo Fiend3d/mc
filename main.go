@@ -31,7 +31,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err != nil {
 				return m, newErr(err)
 			}
-			page.items = append(page.items, *item)
+			page.items = append(page.items, item)
 		}
 		m.pages[msg.dir] = page
 		return m, nil
@@ -103,14 +103,14 @@ func (m model) View() string {
 			s.WriteString(
 				style.
 					Bold(true).
-					Foreground(m.theme.accentColor1).
+					Foreground(m.theme.whiteColor).
 					Render(" > "),
 			)
 		} else {
 			s.WriteString(style.Render("   "))
 		}
 
-		item := &page.items[i]
+		item := page.items[i]
 
 		// --- name block ---
 		var nameBlock strings.Builder
@@ -147,7 +147,7 @@ func (m model) View() string {
 		s.WriteString(name)
 		nameLen := lipgloss.Width(name)
 		if nameLen < nameWidth {
-			s.WriteString(style.Render(strings.Repeat(" ", nameWidth-nameLen)))
+			s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
 		}
 
 		// time column
@@ -164,15 +164,75 @@ func (m model) View() string {
 		s.WriteRune('\n')
 	}
 
-	num_items := len(page.items)
-	for i := num_items; i < m.height-3; i++ {
-		s.WriteString(empty.Render(strings.Repeat(" ", m.width)))
+	// render empty lines
+	for i := len(page.items); i < m.height-3; i++ {
+		s.WriteString(empty.Width(m.width).Render(" "))
 		s.WriteRune('\n')
 	}
 
-	mode_str := "normal"
+	// status bar
+	var modeStr string
+	padded := base.Padding(0, 1, 0, 1)
+	mode_style := padded.
+		Background(m.theme.accentColor5).
+		Foreground(m.theme.blackColor).
+		Bold(true)
 
-	s.WriteString(base.Background(m.theme.accentColor2).Render(mode_str))
+	switch m.mode {
+	case normal:
+		modeStr = "NORMAL"
+	case visual:
+		mode_style = mode_style.Foreground(m.theme.accentColor4)
+		modeStr = "VISUAL"
+	default:
+		mode_style = mode_style.Foreground(m.theme.whiteColor)
+		modeStr = "NONE"
+	}
+
+	modeBlock := mode_style.Render(modeStr)
+	modeWidth := lipgloss.Width(modeBlock)
+
+	var itemName string
+	if page.cursor < len(page.items) {
+		selected_item := page.items[page.cursor]
+		itemName = selected_item.name
+	}
+
+	rightStr := fmt.Sprintf("[%d/%d]", page.cursor+1, len(page.items))
+	rightStyle := base.Padding(0, 1)
+	rightBlock := rightStyle.Render(rightStr)
+	rightWidth := lipgloss.Width(rightBlock)
+
+	nameWidth := max(1, m.width-modeWidth-rightWidth)
+	itemName = truncate.StringWithTail(
+		itemName,
+		uint(nameWidth-2),
+		"…",
+	)
+
+	nameBlock := base.
+		Padding(0, 1).
+		Width(nameWidth).
+		Render(itemName)
+
+	statusBar := lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		modeBlock,
+		nameBlock,
+		rightBlock,
+	)
+
+	statusBar = lipgloss.NewStyle().
+		Width(m.width).
+		MaxWidth(m.width).
+		MaxHeight(1).
+		Render(statusBar)
+
+	s.WriteString(statusBar)
+	s.WriteRune('\n')
+
+	messageBar := empty.Width(m.width).Render()
+	s.WriteString(messageBar)
 
 	return s.String()
 }

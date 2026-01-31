@@ -8,6 +8,7 @@ type theme struct {
 	cursorStyle lipgloss.Style
 
 	whiteColor lipgloss.Color
+	blackColor lipgloss.Color
 	grayColor  lipgloss.Color
 
 	accentColor1 lipgloss.Color
@@ -19,6 +20,7 @@ type theme struct {
 
 func newTheme() theme {
 	white := lipgloss.Color("#ffffff")
+	black := lipgloss.Color("#000000")
 	gray := lipgloss.Color("#6272a4")
 	accent1 := lipgloss.Color("#ff79c6")
 	accent2 := lipgloss.Color("#bd93f9")
@@ -33,6 +35,7 @@ func newTheme() theme {
 		cursorStyle: defaultStyle.Background(lipgloss.Color("#44475a")),
 
 		whiteColor: white,
+		blackColor: black,
 		grayColor:  gray,
 
 		accentColor1: accent1,

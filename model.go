@@ -14,15 +14,15 @@ type tab struct {
 
 type page struct {
 	dir    string
-	items  []item
+	items  []*item
 	cursor int
 }
 
 type model struct {
 	err        error
-	tabs       []tab
+	tabs       []*tab
 	currentTab int
-	pages      map[string]page
+	pages      map[string]*page
 	mode       mode
 	width      int
 	height     int
@@ -30,7 +30,7 @@ type model struct {
 	theme theme
 }
 
-func (m *model) getPage() page {
+func (m *model) getPage() *page {
 	dir := m.tabs[m.currentTab].dir
 	return m.pages[dir]
 }
@@ -40,7 +40,6 @@ func (m *model) cursorDown() {
 	if len(page.items)-2 >= page.cursor {
 		page.cursor += 1
 	}
-	m.pages[page.dir] = page
 }
 
 func (m *model) cursorUp() {
@@ -48,15 +47,14 @@ func (m *model) cursorUp() {
 	if page.cursor > 0 {
 		page.cursor -= 1
 	}
-	m.pages[page.dir] = page
 }
 
 func initialModel(dir string) model {
-	pages := make(map[string]page)
-	pages[dir] = page{dir: dir}
+	pages := make(map[string]*page)
+	pages[dir] = &page{dir: dir}
 
 	return model{
-		tabs: []tab{
+		tabs: []*tab{
 			{dir: dir},
 		},
 		currentTab: 0,
