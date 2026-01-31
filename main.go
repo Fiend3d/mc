@@ -172,7 +172,7 @@ func (m model) View() string {
 
 	// status bar
 	var modeStr string
-	padded := base.Padding(0, 1, 0, 1)
+	padded := base.Padding(0, 1)
 	mode_style := padded.
 		Background(m.theme.accentColor5).
 		Foreground(m.theme.blackColor).
@@ -199,8 +199,7 @@ func (m model) View() string {
 	}
 
 	rightStr := fmt.Sprintf("[%d/%d]", page.cursor+1, len(page.items))
-	rightStyle := base.Padding(0, 1)
-	rightBlock := rightStyle.Render(rightStr)
+	rightBlock := padded.Render(rightStr)
 	rightWidth := lipgloss.Width(rightBlock)
 
 	nameWidth := max(1, m.width-modeWidth-rightWidth)
@@ -210,8 +209,7 @@ func (m model) View() string {
 		"…",
 	)
 
-	nameBlock := base.
-		Padding(0, 1).
+	nameBlock := padded.
 		Width(nameWidth).
 		Render(itemName)
 
