@@ -87,6 +87,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.pages[parent] = &page{dir: parent}
 			return m, m.readDir(parent)
+		case "l", "right":
+			tab := m.tabs[m.currentTab]
+			currentPage := m.getPage()
+			selectedItem := currentPage.items[currentPage.cursor]
+			if !selectedItem.isDir {
+				return m, nil
+			}
+			dir := filepath.Join(tab.dir, selectedItem.name)
+			tab.dir = dir
+			_, exists := m.pages[dir] // not gonna update
+			if exists {
+				return m, nil
+			}
+			m.pages[dir] = &page{dir: dir}
+			return m, m.readDir(dir)
 		}
 	}
 
