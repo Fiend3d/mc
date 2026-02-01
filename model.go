@@ -16,6 +16,31 @@ type page struct {
 	dir    string
 	items  []*item
 	cursor int
+	start  int
+}
+
+func (p *page) length() int {
+	return len(p.items)
+}
+
+func (p *page) updateStart(height int) {
+	if p.cursor < p.start {
+		p.start = p.cursor
+	}
+	actualHeight := height - 4
+	if p.cursor > p.start+actualHeight {
+		p.start = p.cursor - actualHeight
+	}
+}
+
+func (p *page) moveCursor(move, height int) {
+	p.cursor += move
+	if p.cursor < 0 {
+		p.cursor = 0
+	} else if p.cursor > p.length()-1 {
+		p.cursor = p.length() - 1
+	}
+	p.updateStart(height)
 }
 
 type model struct {
@@ -35,28 +60,16 @@ func (m *model) getPage() *page {
 	return m.pages[dir]
 }
 
-func (m *model) cursorDown() {
-	page := m.getPage()
-	if len(page.items)-2 >= page.cursor {
-		page.cursor += 1
-	}
-}
-
-func (m *model) cursorUp() {
-	page := m.getPage()
-	if page.cursor > 0 {
-		page.cursor -= 1
-	}
-}
-
-func initialModel(dir string) model {
+func initialModel(dirs []string) model {
 	pages := make(map[string]*page)
-	pages[dir] = &page{dir: dir}
+	tabs := make([]*tab, len(dirs))
+	for i, dir := range dirs {
+		pages[dir] = &page{dir: dir}
+		tabs[i] = &tab{dir: dir}
+	}
 
 	return model{
-		tabs: []*tab{
-			{dir: dir},
-		},
+		tabs:       tabs,
 		currentTab: 0,
 		pages:      pages,
 		mode:       normal,

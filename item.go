@@ -18,6 +18,7 @@ type item struct {
 	symlink   string
 	modTime   string
 	size      string
+	mode      string
 }
 
 func newItem(entry os.DirEntry, dir string) (*item, error) {
@@ -50,7 +51,9 @@ func newItem(entry os.DirEntry, dir string) (*item, error) {
 		)
 	}
 
-	item.modTime = info.ModTime().Format("02-01-2006 15:04")
+	item.modTime = info.ModTime().Format("02.01.2006 15:04")
+
+	item.mode = info.Mode().String()
 
 	return item, nil
 }

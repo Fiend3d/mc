@@ -1,9 +1,10 @@
 package main
 
 import (
-	"errors"
+	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -47,13 +48,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.mode == normal {
 				return m, tea.Quit
 			}
-		case "d":
-			return m, newErr(errors.New("EPIC FAIL"))
+		// case "d":
+		// 	return m, newErr(errors.New("EPIC FAIL"))
 		case "j", "down":
-			m.cursorDown()
+			page := m.getPage()
+			page.moveCursor(1, m.height)
 			return m, nil
 		case "k", "up":
-			m.cursorUp()
+			page := m.getPage()
+			page.moveCursor(-1, m.height)
+			return m, nil
+		case "pgdown":
+			page := m.getPage()
+			page.moveCursor(3, m.height)
+			return m, nil
+		case "pgup":
+			page := m.getPage()
+			page.moveCursor(-3, m.height)
+			return m, nil
+		case "home":
+			page := m.getPage()
+			page.cursor = 0
+			page.updateStart(m.height)
+			return m, nil
+		case "end":
+			page := m.getPage()
+			page.cursor = page.length() - 1
+			page.updateStart(m.height)
 			return m, nil
 		}
 	}
@@ -98,7 +119,7 @@ func (m model) View() string {
 		}
 
 		style := base
-		if i == page.cursor {
+		if i+page.start == page.cursor {
 			style = &m.theme.cursorStyle
 			s.WriteString(
 				style.
@@ -110,7 +131,7 @@ func (m model) View() string {
 			s.WriteString(style.Render("   "))
 		}
 
-		item := page.items[i]
+		item := page.items[i+page.start]
 
 		// --- name block ---
 		var nameBlock strings.Builder
@@ -193,13 +214,18 @@ func (m model) View() string {
 	modeWidth := lipgloss.Width(modeBlock)
 
 	var itemName string
+	var modeBitsStr string
 	if page.cursor < len(page.items) {
 		selected_item := page.items[page.cursor]
 		itemName = selected_item.name
+		modeBitsStr = selected_item.mode
 	}
+
+	modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
 
 	rightStr := fmt.Sprintf("[%d/%d]", page.cursor+1, len(page.items))
 	rightBlock := padded.Render(rightStr)
+	rightBlock = lipgloss.JoinHorizontal(lipgloss.Center, modeBitsBlock, rightBlock)
 	rightWidth := lipgloss.Width(rightBlock)
 
 	nameWidth := max(1, m.width-modeWidth-rightWidth)
@@ -236,7 +262,17 @@ func (m model) View() string {
 }
 
 func main() {
-	p := tea.NewProgram(initialModel("C:\\"), tea.WithAltScreen())
+	flag.Parse()
+	dirs := flag.Args()
+	if len(dirs) == 0 {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("error: %s", err)
+		}
+		dirs = []string{wd}
+	}
+
+	p := tea.NewProgram(initialModel(dirs), tea.WithAltScreen())
 	_, err := p.Run()
 	if err != nil {
 		log.Fatalf("failed to launch the program: %s", err)
