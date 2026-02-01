@@ -26,6 +26,7 @@ func (p *page) length() int {
 func (p *page) updateStart(height int) {
 	if p.cursor < p.start {
 		p.start = p.cursor
+		return
 	}
 	actualHeight := height - 4
 	if p.cursor > p.start+actualHeight {

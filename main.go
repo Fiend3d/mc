@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -76,6 +77,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			page.cursor = page.length() - 1
 			page.updateStart(m.height)
 			return m, nil
+		case "h", "left":
+			tab := m.tabs[m.currentTab]
+			parent := filepath.Dir(tab.dir)
+			tab.dir = parent
+			_, exists := m.pages[parent] // not gonna update anything
+			if exists {
+				return m, nil
+			}
+			m.pages[parent] = &page{dir: parent}
+			return m, m.readDir(parent)
 		}
 	}
 
@@ -108,8 +119,8 @@ func (m model) View() string {
 
 	const (
 		cursorWidth = 3
-		sizeWidth   = 8  // "123.4KB"
-		timeWidth   = 16 // "YYYY-MM-DD HH:MM"
+		sizeWidth   = 8
+		timeWidth   = 16
 		colGap      = 1
 	)
 
