@@ -58,6 +58,8 @@ type model struct {
 	height     int
 
 	theme theme
+
+	result string
 }
 
 func (m *model) getTab() *tab {

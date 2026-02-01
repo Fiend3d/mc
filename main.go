@@ -48,6 +48,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "q":
 			if m.mode == normal {
+				m.result = m.getTab().dir
 				return m, tea.Quit
 			}
 		// case "d":
@@ -303,8 +304,11 @@ func main() {
 	}
 
 	p := tea.NewProgram(initialModel(dirs), tea.WithAltScreen())
-	_, err := p.Run()
+	m, err := p.Run()
 	if err != nil {
 		log.Fatalf("failed to launch the program: %s", err)
 	}
+
+	finalModel := m.(model)
+	fmt.Println(finalModel.result)
 }
