@@ -9,7 +9,12 @@ const (
 )
 
 type tab struct {
-	dir string
+	dir   string
+	pages map[string]*page
+}
+
+func (t *tab) getPage() *page {
+	return t.pages[t.dir]
 }
 
 type page struct {
@@ -48,7 +53,6 @@ type model struct {
 	err        error
 	tabs       []*tab
 	currentTab int
-	pages      map[string]*page
 	mode       mode
 	width      int
 	height     int
@@ -56,23 +60,26 @@ type model struct {
 	theme theme
 }
 
-func (m *model) getPage() *page {
-	dir := m.tabs[m.currentTab].dir
-	return m.pages[dir]
+func (m *model) getTab() *tab {
+	return m.tabs[m.currentTab]
+}
+
+func (m *model) getPage() *page { // probably redundant
+	tab := m.getTab()
+	return tab.pages[tab.dir]
 }
 
 func initialModel(dirs []string) model {
-	pages := make(map[string]*page)
 	tabs := make([]*tab, len(dirs))
 	for i, dir := range dirs {
+		pages := make(map[string]*page)
 		pages[dir] = &page{dir: dir}
-		tabs[i] = &tab{dir: dir}
+		tabs[i] = &tab{dir: dir, pages: pages}
 	}
 
 	return model{
 		tabs:       tabs,
 		currentTab: 0,
-		pages:      pages,
 		mode:       normal,
 		theme:      newTheme(),
 	}

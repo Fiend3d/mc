@@ -26,7 +26,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case readDirMsg:
-		page := m.pages[msg.dir]
+		tab := m.getTab()
+		page := tab.pages[msg.dir]
 		page.items = nil
 		for i := range msg.entries {
 			item, err := newItem(msg.entries[i], page.dir)
@@ -35,7 +36,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			page.items = append(page.items, item)
 		}
-		m.pages[msg.dir] = page
+		tab.pages[msg.dir] = page
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -78,29 +79,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			page.updateStart(m.height)
 			return m, nil
 		case "h", "left":
-			tab := m.tabs[m.currentTab]
+			tab := m.getTab()
 			parent := filepath.Dir(tab.dir)
 			tab.dir = parent
-			_, exists := m.pages[parent] // not gonna update anything
+			_, exists := tab.pages[parent] // not gonna update anything
 			if exists {
 				return m, nil
 			}
-			m.pages[parent] = &page{dir: parent}
+			tab.pages[parent] = &page{dir: parent}
 			return m, m.readDir(parent)
 		case "l", "right":
-			tab := m.tabs[m.currentTab]
-			currentPage := m.getPage()
+			tab := m.getTab()
+			currentPage := tab.getPage()
+			if currentPage.cursor > len(currentPage.items)-1 {
+				return m, nil
+			}
 			selectedItem := currentPage.items[currentPage.cursor]
 			if !selectedItem.isDir {
 				return m, nil
 			}
 			dir := filepath.Join(tab.dir, selectedItem.name)
 			tab.dir = dir
-			_, exists := m.pages[dir] // not gonna update
+			_, exists := tab.pages[dir] // not gonna update
 			if exists {
 				return m, nil
 			}
-			m.pages[dir] = &page{dir: dir}
+			tab.pages[dir] = &page{dir: dir}
 			return m, m.readDir(dir)
 		}
 	}
