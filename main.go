@@ -179,8 +179,10 @@ func (m model) View() string {
 		}
 
 		if item.isSymlink {
-			nameBlock.WriteString(style.Render(" -> "))
-			nameBlock.WriteString(style.Render(item.symlink))
+			nameBlock.WriteString(
+				style.Foreground(m.theme.accentColor2).Render(" -> "))
+			nameBlock.WriteString(
+				style.Foreground(m.theme.accentColor3).Render(item.symlink))
 		}
 
 		nameWidth := max(
@@ -293,8 +295,10 @@ func (m model) View() string {
 }
 
 func main() {
+	envFlag := flag.String("env", "MC_CD", "set environment variable name for the result")
 	flag.Parse()
 	dirs := flag.Args()
+	envCd := *envFlag
 	if len(dirs) == 0 {
 		wd, err := os.Getwd()
 		if err != nil {
@@ -310,5 +314,6 @@ func main() {
 	}
 
 	finalModel := m.(model)
-	fmt.Println(finalModel.result)
+	os.Setenv(envCd, finalModel.result)
+	fmt.Printf("env:%s is set to %s", envCd, finalModel.result)
 }

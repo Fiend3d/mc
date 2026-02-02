@@ -38,6 +38,11 @@ func newItem(entry os.DirEntry, dir string) (*item, error) {
 		if err != nil {
 			return nil, err
 		}
+		stat, err := os.Stat(target)
+		if err != nil {
+			return nil, err
+		}
+		item.isDir = stat.IsDir()
 		item.symlink = target
 	}
 
