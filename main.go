@@ -295,10 +295,13 @@ func (m model) View() string {
 }
 
 func main() {
-	envFlag := flag.String("env", "MC_CD", "set environment variable name for the result")
+	tempFileFlag := flag.String("tf", "output.tmp", "temp file for output")
+	outputFlag := flag.Bool("o", false, "enable temp file output")
 	flag.Parse()
 	dirs := flag.Args()
-	envCd := *envFlag
+	tempFile := *tempFileFlag
+	output := *outputFlag
+
 	if len(dirs) == 0 {
 		wd, err := os.Getwd()
 		if err != nil {
@@ -314,6 +317,13 @@ func main() {
 	}
 
 	finalModel := m.(model)
-	os.Setenv(envCd, finalModel.result)
-	fmt.Printf("env:%s is set to %s", envCd, finalModel.result)
+
+	if output {
+		err := os.WriteFile(tempFile, []byte(finalModel.result), 0644)
+		if err != nil {
+			log.Fatalf("error: %s\n", err)
+		}
+	} else {
+		fmt.Println(finalModel.result)
+	}
 }
