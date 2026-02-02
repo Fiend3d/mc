@@ -41,10 +41,11 @@ func (p *page) updateStart(height int) {
 
 func (p *page) moveCursor(move, height int) {
 	p.cursor += move
+	if p.cursor > p.length()-1 {
+		p.cursor = p.length() - 1
+	}
 	if p.cursor < 0 {
 		p.cursor = 0
-	} else if p.cursor > p.length()-1 {
-		p.cursor = p.length() - 1
 	}
 	p.updateStart(height)
 }
