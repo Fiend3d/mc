@@ -6,12 +6,44 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
 )
+
+func (m *model) left() (tea.Model, tea.Cmd) {
+	tab := m.getTab()
+	parent := filepath.Dir(tab.dir)
+	tab.dir = parent
+	_, exists := tab.pages[parent] // not gonna update anything
+	if exists {
+		return m, nil
+	}
+	tab.pages[parent] = &page{dir: parent}
+	return m, m.readDir(parent)
+}
+func (m *model) right() (tea.Model, tea.Cmd) {
+	tab := m.getTab()
+	currentPage := tab.getPage()
+	if currentPage.cursor > len(currentPage.items)-1 {
+		return m, nil
+	}
+	selectedItem := currentPage.items[currentPage.cursor]
+	if !selectedItem.isDir {
+		return m, nil
+	}
+	dir := filepath.Join(tab.dir, selectedItem.name)
+	tab.dir = dir
+	_, exists := tab.pages[dir] // not gonna update
+	if exists {
+		return m, nil
+	}
+	tab.pages[dir] = &page{dir: dir}
+	return m, m.readDir(dir)
+}
 
 func (m model) Init() tea.Cmd {
 
@@ -45,68 +77,86 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "q":
-			if m.mode == normal {
-				m.result = m.getTab().dir
-				return m, tea.Quit
-			}
-		// case "d":
-		// 	return m, newErr(errors.New("EPIC FAIL"))
-		case "j", "down":
-			page := m.getPage()
-			page.moveCursor(1, m.height)
-			return m, nil
-		case "k", "up":
-			page := m.getPage()
-			page.moveCursor(-1, m.height)
-			return m, nil
-		case "pgdown":
-			page := m.getPage()
-			page.moveCursor(3, m.height)
-			return m, nil
-		case "pgup":
-			page := m.getPage()
-			page.moveCursor(-3, m.height)
-			return m, nil
-		case "home":
-			page := m.getPage()
-			page.cursor = 0
-			page.updateStart(m.height)
-			return m, nil
-		case "end":
-			page := m.getPage()
-			page.cursor = page.length() - 1
-			page.updateStart(m.height)
-			return m, nil
-		case "h", "left":
-			tab := m.getTab()
-			parent := filepath.Dir(tab.dir)
-			tab.dir = parent
-			_, exists := tab.pages[parent] // not gonna update anything
-			if exists {
+		switch m.mode {
+		case normal:
+			switch msg.String() {
+			case "q":
+				if m.mode == normal {
+					m.result = m.getTab().dir
+					return m, tea.Quit
+				}
+			// case "d":
+			// 	return m, newErr(errors.New("EPIC FAIL"))
+			case "j", "down":
+				page := m.getPage()
+				page.moveCursor(1, m.height)
+				return m, nil
+			case "k", "up":
+				page := m.getPage()
+				page.moveCursor(-1, m.height)
+				return m, nil
+			case "pgdown":
+				page := m.getPage()
+				page.moveCursor(3, m.height)
+				return m, nil
+			case "pgup":
+				page := m.getPage()
+				page.moveCursor(-3, m.height)
+				return m, nil
+			case "home":
+				page := m.getPage()
+				page.cursor = 0
+				page.updateStart(m.height)
+				return m, nil
+			case "end":
+				page := m.getPage()
+				page.cursor = page.length() - 1
+				page.updateStart(m.height)
+				return m, nil
+			case "h", "left":
+				return m.left()
+			case "l", "right":
+				return m.right()
+			case "tab":
+				m.mode = dash
 				return m, nil
 			}
-			tab.pages[parent] = &page{dir: parent}
-			return m, m.readDir(parent)
-		case "l", "right":
-			tab := m.getTab()
-			currentPage := tab.getPage()
-			if currentPage.cursor > len(currentPage.items)-1 {
+		case dash:
+			switch msg.String() {
+			case "esc", "tab":
+				m.mode = normal
+				return m, nil
+			case "left":
+				return m.left()
+			case "right":
+				return m.right()
+			default:
+				if len(msg.Runes) > 0 { // just in case, I dunno
+					r := msg.Runes[0]
+					page := m.getPage()
+					var matches []int
+					for i := range page.items {
+						runes := []rune(page.items[i].name)
+						if len(runes) == 0 {
+							continue
+						}
+						if runes[0] == r {
+							matches = append(matches, i)
+						}
+					}
+
+					if len(matches) > 0 {
+						if slices.Contains(matches, page.cursor) {
+							index := slices.Index(matches, page.cursor)
+							next := (index + 1) % len(matches)
+							page.cursor = matches[next]
+						} else {
+							page.cursor = matches[0]
+						}
+					}
+				}
 				return m, nil
 			}
-			selectedItem := currentPage.items[currentPage.cursor]
-			if !selectedItem.isDir {
-				return m, nil
-			}
-			dir := filepath.Join(tab.dir, selectedItem.name)
-			tab.dir = dir
-			_, exists := tab.pages[dir] // not gonna update
-			if exists {
-				return m, nil
-			}
-			tab.pages[dir] = &page{dir: dir}
-			return m, m.readDir(dir)
 		}
 	}
 
@@ -236,10 +286,13 @@ func (m model) View() string {
 	case normal:
 		modeStr = "NORMAL"
 	case visual:
-		mode_style = mode_style.Foreground(m.theme.accentColor4)
+		mode_style = mode_style.Background(m.theme.accentColor4)
 		modeStr = "VISUAL"
+	case dash:
+		mode_style = mode_style.Background(m.theme.accentColor1)
+		modeStr = "DASH"
 	default:
-		mode_style = mode_style.Foreground(m.theme.whiteColor)
+		mode_style = mode_style.Background(m.theme.whiteColor)
 		modeStr = "NONE"
 	}
 

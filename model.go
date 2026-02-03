@@ -5,6 +5,7 @@ type mode int
 const (
 	normal mode = iota
 	visual
+	dash
 	shell
 )
 
