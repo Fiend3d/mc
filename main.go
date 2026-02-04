@@ -12,7 +12,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/muesli/reflow/truncate"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func (m *model) left() (tea.Model, tea.Cmd) {
@@ -233,6 +233,9 @@ func (m model) View() string {
 		// --- name block ---
 		var nameBlock strings.Builder
 
+		nameWidth := max(
+			m.width-cursorWidth-sizeWidth-timeWidth-colGap*2+1, 1)
+
 		if item.isDir {
 			nameBlock.WriteString(
 				style.Foreground(m.theme.accentColor4).Render(item.name),
@@ -251,17 +254,10 @@ func (m model) View() string {
 				style.Foreground(m.theme.accentColor3).Render(item.symlink))
 		}
 
-		nameWidth := max(
-			m.width-cursorWidth-sizeWidth-timeWidth-colGap*2+1, 1)
-
 		name := nameBlock.String()
 
 		if lipgloss.Width(name) > nameWidth {
-			name = truncate.StringWithTail(
-				name,
-				uint(nameWidth),
-				"…",
-			)
+			name = ansi.Truncate(name, nameWidth, "…")
 		}
 
 		s.WriteString(name)
@@ -331,11 +327,7 @@ func (m model) View() string {
 	rightWidth := lipgloss.Width(rightBlock)
 
 	nameWidth := max(1, m.width-modeWidth-rightWidth)
-	itemName = truncate.StringWithTail(
-		itemName,
-		uint(nameWidth-2),
-		"…",
-	)
+	itemName = ansi.Truncate(itemName, nameWidth-2, "…")
 
 	nameBlock := padded.
 		Width(nameWidth).
