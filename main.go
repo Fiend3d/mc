@@ -256,9 +256,7 @@ func (m model) View() string {
 
 		name := nameBlock.String()
 
-		if lipgloss.Width(name) > nameWidth {
-			name = ansi.Truncate(name, nameWidth, "…")
-		}
+		name = ansi.Truncate(name, nameWidth, "…")
 
 		s.WriteString(name)
 		nameLen := lipgloss.Width(name)
