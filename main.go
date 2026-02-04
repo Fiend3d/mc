@@ -200,8 +200,7 @@ func (m model) View() string {
 	page := m.getPage()
 
 	// Header (directory)
-	dirLine := lipgloss.PlaceHorizontal(m.width, lipgloss.Left, page.dir)
-	s.WriteString(empty.Bold(true).Render(dirLine))
+	s.WriteString(empty.Width(m.width).Bold(true).Render(page.dir))
 	s.WriteRune('\n')
 
 	const (
