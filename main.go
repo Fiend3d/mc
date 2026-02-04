@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -78,20 +79,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch m.mode {
-		case normal:
+		case normal, jump:
 			switch msg.String() {
-			case "q":
-				if m.mode == normal {
-					m.result = m.getTab().dir
-					return m, tea.Quit
-				}
-			// case "d":
-			// 	return m, newErr(errors.New("EPIC FAIL"))
-			case "j", "down":
+			case "down":
 				page := m.getPage()
 				page.moveCursor(1, m.height)
 				return m, nil
-			case "k", "up":
+			case "up":
 				page := m.getPage()
 				page.moveCursor(-1, m.height)
 				return m, nil
@@ -113,26 +107,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				page.cursor = page.length() - 1
 				page.updateStart(m.height)
 				return m, nil
-			case "h", "left":
-				return m.left()
-			case "l", "right":
-				return m.right()
-			case "tab":
-				m.mode = dash
-				return m, nil
-			}
-		case dash:
-			switch msg.String() {
-			case "esc", "tab":
-				m.mode = normal
-				return m, nil
 			case "left":
 				return m.left()
 			case "right":
 				return m.right()
+			}
+		}
+
+		switch m.mode {
+		case normal:
+			switch msg.String() {
+			case "q":
+				if m.mode == normal {
+					m.result = m.getTab().dir
+					return m, tea.Quit
+				}
+			// case "d":
+			// 	return m, newErr(errors.New("EPIC FAIL"))
+			case "j":
+				page := m.getPage()
+				page.moveCursor(1, m.height)
+				return m, nil
+			case "k":
+				page := m.getPage()
+				page.moveCursor(-1, m.height)
+				return m, nil
+			case "h":
+				return m.left()
+			case "l":
+				return m.right()
+			case "tab":
+				m.mode = jump
+				return m, nil
+			}
+		case jump:
+			switch msg.String() {
+			case "esc", "tab":
+				m.mode = normal
+				return m, nil
 			default:
 				if len(msg.Runes) > 0 { // just in case, I dunno
-					r := msg.Runes[0]
+					r := unicode.ToUpper(msg.Runes[0])
 					page := m.getPage()
 					var matches []int
 					for i := range page.items {
@@ -140,7 +155,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if len(runes) == 0 {
 							continue
 						}
-						if runes[0] == r {
+						if unicode.ToUpper(runes[0]) == r {
 							matches = append(matches, i)
 						}
 					}
@@ -153,6 +168,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						} else {
 							page.cursor = matches[0]
 						}
+						page.updateStart(m.height)
 					}
 				}
 				return m, nil
@@ -288,9 +304,9 @@ func (m model) View() string {
 	case visual:
 		mode_style = mode_style.Background(m.theme.accentColor4)
 		modeStr = "VISUAL"
-	case dash:
+	case jump:
 		mode_style = mode_style.Background(m.theme.accentColor1)
-		modeStr = "DASH"
+		modeStr = "JUMP"
 	default:
 		mode_style = mode_style.Background(m.theme.whiteColor)
 		modeStr = "NONE"
