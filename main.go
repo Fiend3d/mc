@@ -26,6 +26,7 @@ func (m *model) left() (tea.Model, tea.Cmd) {
 	tab.pages[parent] = &page{dir: parent}
 	return m, m.readDir(parent)
 }
+
 func (m *model) right() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
 	currentPage := tab.getPage()
@@ -109,7 +110,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "left":
 				return m.left()
-			case "right":
+			case "right", "enter":
 				return m.right()
 			}
 		}
@@ -117,11 +118,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case normal:
 			switch msg.String() {
+			case "Q":
+				return m, tea.Quit
 			case "q":
-				if m.mode == normal {
-					m.result = m.getTab().dir
-					return m, tea.Quit
-				}
+				m.result = m.getTab().dir
+				return m, tea.Quit
 			// case "d":
 			// 	return m, newErr(errors.New("EPIC FAIL"))
 			case "j":
@@ -388,9 +389,11 @@ func main() {
 	finalModel := m.(model)
 
 	if output {
-		err := os.WriteFile(tempFile, []byte(finalModel.result), 0644)
-		if err != nil {
-			log.Fatalf("error: %s\n", err)
+		if finalModel.result != "" {
+			err := os.WriteFile(tempFile, []byte(finalModel.result), 0644)
+			if err != nil {
+				log.Fatalf("error: %s\n", err)
+			}
 		}
 	} else {
 		fmt.Println(finalModel.result)
