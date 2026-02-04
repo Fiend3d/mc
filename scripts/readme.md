@@ -1,5 +1,7 @@
 # edit powershell's config
 
+I like using Helix for this. You should use whatever you prefer.
+
 ```powershell
 hx $profile
 ````
@@ -20,7 +22,7 @@ function m {
 }
 ```
 
-And it doesn't work! You need to enable powershell for some reason:
+And it doesn't work `¯\_(ツ)_/¯` You need to enable powershell for some reason:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
