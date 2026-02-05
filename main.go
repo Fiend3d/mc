@@ -116,6 +116,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				page := m.getPage()
 				selectedItem := page.items[page.cursor]
 				selectedItem.selected = !selectedItem.selected
+				page.moveCursor(1, m.height)
 				return m, nil
 			}
 		}
