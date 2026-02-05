@@ -8,9 +8,18 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
+type itemAction int
+
+const (
+	none itemAction = iota
+	copy
+	cut
+)
+
 type item struct {
 	entry    os.DirEntry
 	selected bool
+	action   itemAction
 
 	isDir     bool
 	isSymlink bool

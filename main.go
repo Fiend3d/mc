@@ -112,6 +112,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.left()
 			case "right", "enter":
 				return m.right()
+			case " ":
+				page := m.getPage()
+				selectedItem := page.items[page.cursor]
+				selectedItem.selected = !selectedItem.selected
+				return m, nil
 			}
 		}
 
@@ -216,19 +221,31 @@ func (m model) View() string {
 		}
 
 		style := base
-		if i+page.start == page.cursor {
+
+		current := i+page.start == page.cursor
+		cursor := " "
+		if current {
 			style = &m.theme.cursorStyle
-			s.WriteString(
-				style.
-					Bold(true).
-					Foreground(m.theme.whiteColor).
-					Render(" > "),
-			)
-		} else {
-			s.WriteString(style.Render("   "))
+			cursor = ">"
 		}
 
 		item := page.items[i+page.start]
+		switch item.action {
+		case none:
+			s.WriteString(style.Render(" "))
+		case copy:
+			s.WriteString(m.theme.copiedStyle.Render(" "))
+		case cut:
+			s.WriteString(m.theme.cutStyle.Render(" "))
+		}
+
+		s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
+
+		if item.selected {
+			s.WriteString(m.theme.selectedStyle.Render(" "))
+		} else {
+			s.WriteString(style.Render(" "))
+		}
 
 		// --- name block ---
 		var nameBlock strings.Builder
