@@ -43,7 +43,7 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 	if exists {
 		return m, nil
 	}
-	tab.pages[dir] = &page{dir: dir}
+	tab.pages[dir] = newPage(dir)
 	return m, m.readDir(dir)
 }
 
@@ -80,7 +80,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch m.mode {
-		case normal, jump:
+		case normal, jump, visual:
+			switch msg.Type {
+			case tea.KeyCtrlA:
+				page := m.getPage()
+				for i := range page.items {
+					page.items[i].selected = true
+				}
+				return m, nil
+			case tea.KeyCtrlR:
+				page := m.getPage()
+				for i := range page.items {
+					page.items[i].selected = !page.items[i].selected
+				}
+				return m, nil
+			}
 			switch msg.String() {
 			case "down":
 				page := m.getPage()
@@ -108,16 +122,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				page.cursor = page.length() - 1
 				page.updateStart(m.height)
 				return m, nil
+			case " ":
+				page := m.getPage()
+				if m.mode == visual {
+					start, end := page.getStartEnd()
+					for i := start; i <= end; i++ {
+						item := page.items[i]
+						item.selected = !item.selected
+					}
+				} else {
+					selectedItem := page.items[page.cursor]
+					selectedItem.selected = !selectedItem.selected
+					page.moveCursor(1, m.height)
+				}
+				return m, nil
+			}
+		}
+
+		switch m.mode {
+		case normal, jump:
+			switch msg.String() {
 			case "left":
 				return m.left()
 			case "right", "enter":
 				return m.right()
-			case " ":
-				page := m.getPage()
-				selectedItem := page.items[page.cursor]
-				selectedItem.selected = !selectedItem.selected
-				page.moveCursor(1, m.height)
-				return m, nil
 			}
 		}
 
@@ -146,7 +174,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "tab":
 				m.mode = jump
 				return m, nil
+			case "v":
+				page := m.getPage()
+				page.visual = page.cursor
+				m.mode = visual
+				return m, nil
+			case "f":
+				m.mode = filter
+				return m, nil
 			}
+
 		case jump:
 			switch msg.String() {
 			case "esc", "tab":
@@ -178,6 +215,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						page.updateStart(m.height)
 					}
 				}
+				return m, nil
+			}
+
+		case visual:
+			switch msg.String() {
+			case "esc":
+				m.mode = normal
+				return m, nil
+			case "v":
+				m.mode = normal
+				return m, nil
+			}
+
+		case filter:
+			switch msg.String() {
+			case "esc":
+				m.mode = normal
 				return m, nil
 			}
 		}
@@ -223,11 +277,20 @@ func (m model) View() string {
 
 		style := base
 
-		current := i+page.start == page.cursor
+		index := i + page.start
+		current := index == page.cursor
 		cursor := " "
-		if current {
-			style = &m.theme.cursorStyle
-			cursor = ">"
+		if m.mode == visual {
+			start, end := page.getStartEnd()
+			if index >= start && index <= end {
+				style = &m.theme.cursorStyle
+				cursor = "="
+			}
+		} else {
+			if current {
+				style = &m.theme.cursorStyle
+				cursor = ">"
+			}
 		}
 
 		item := page.items[i+page.start]
@@ -240,8 +303,11 @@ func (m model) View() string {
 			s.WriteString(m.theme.cutStyle.Render(" "))
 		}
 
-		s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
-
+		if m.mode == visual && current {
+			s.WriteString(style.Bold(true).Foreground(m.theme.accentColor1).Render(cursor))
+		} else {
+			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
+		}
 		if item.selected {
 			s.WriteString(m.theme.selectedStyle.Render(" "))
 		} else {
@@ -319,6 +385,9 @@ func (m model) View() string {
 	case jump:
 		mode_style = mode_style.Background(m.theme.accentColor1)
 		modeStr = "JUMP"
+	case filter:
+		mode_style = mode_style.Background(m.theme.accentColor2)
+		modeStr = "FILTER"
 	default:
 		mode_style = mode_style.Background(m.theme.whiteColor)
 		modeStr = "NONE"

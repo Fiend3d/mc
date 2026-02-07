@@ -6,7 +6,7 @@ const (
 	normal mode = iota
 	visual
 	jump
-	shell
+	filter
 )
 
 type tab struct {
@@ -22,7 +22,18 @@ type page struct {
 	dir    string
 	items  []*item
 	cursor int
+	visual int
 	start  int
+}
+
+func newPage(dir string) *page {
+	return &page{dir: dir}
+}
+
+func (p *page) getStartEnd() (int, int) {
+	start := min(p.cursor, p.visual)
+	end := max(p.cursor, p.visual)
+	return start, end
 }
 
 func (p *page) length() int {
