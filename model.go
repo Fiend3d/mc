@@ -1,5 +1,10 @@
 package main
 
+import (
+	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/lipgloss"
+)
+
 type mode int
 
 const (
@@ -70,6 +75,8 @@ type model struct {
 	width      int
 	height     int
 
+	filterInput textinput.Model
+
 	theme theme
 
 	result string
@@ -84,6 +91,20 @@ func (m *model) getPage() *page { // probably redundant
 	return tab.pages[tab.dir]
 }
 
+func newTextinput(placeholder string, style lipgloss.Style, grayColor lipgloss.Color) textinput.Model {
+	input := textinput.New()
+	input.Placeholder = placeholder
+	input.CharLimit = 256 // hello, windows!
+	input.Width = 0
+	input.PlaceholderStyle = style.Foreground(grayColor)
+	input.TextStyle = style
+	input.PromptStyle = style
+	input.CompletionStyle = style
+	input.Cursor.Style = style
+	input.Cursor.TextStyle = style
+	return input
+}
+
 func initialModel(dirs []string) model {
 	tabs := make([]*tab, len(dirs))
 	for i, dir := range dirs {
@@ -92,10 +113,14 @@ func initialModel(dirs []string) model {
 		tabs[i] = &tab{dir: dir, pages: pages}
 	}
 
+	theme := newTheme()
+	filterInput := newTextinput("Enter text to filter", theme.emptyStyle, theme.grayColor)
+
 	return model{
-		tabs:       tabs,
-		currentTab: 0,
-		mode:       normal,
-		theme:      newTheme(),
+		tabs:        tabs,
+		currentTab:  0,
+		mode:        normal,
+		theme:       theme,
+		filterInput: filterInput,
 	}
 }

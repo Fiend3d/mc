@@ -10,6 +10,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -181,7 +182,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "f":
 				m.mode = filter
-				return m, nil
+				m.filterInput.Reset()
+				m.filterInput.Focus()
+				return m, textinput.Blink
 			}
 
 		case jump:
@@ -237,7 +240,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	return m, nil
+	var cmds []tea.Cmd
+
+	switch m.mode {
+	case filter:
+		var cmd tea.Cmd
+		m.filterInput, cmd = m.filterInput.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
@@ -284,7 +296,12 @@ func (m model) View() string {
 			start, end := page.getStartEnd()
 			if index >= start && index <= end {
 				style = &m.theme.cursorStyle
-				cursor = "="
+				switch index {
+				case start, end:
+					cursor = "="
+				default:
+					cursor = "|"
+				}
 			}
 		} else {
 			if current {
@@ -304,7 +321,7 @@ func (m model) View() string {
 		}
 
 		if m.mode == visual && current {
-			s.WriteString(style.Bold(true).Foreground(m.theme.accentColor1).Render(cursor))
+			s.WriteString(style.Bold(true).Foreground(m.theme.accentColor3).Render(cursor))
 		} else {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
 		}
@@ -434,8 +451,16 @@ func (m model) View() string {
 	s.WriteString(statusBar)
 	s.WriteRune('\n')
 
-	messageBar := empty.Width(m.width).Render()
-	s.WriteString(messageBar)
+	switch m.mode {
+	case filter:
+		widget := m.filterInput.View()
+		text := empty.Width(m.width).Render(widget)
+		s.WriteString(text)
+
+	default:
+		messageBar := empty.Width(m.width).Render()
+		s.WriteString(messageBar)
+	}
 
 	return s.String()
 }
