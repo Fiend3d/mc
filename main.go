@@ -13,7 +13,9 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/charmbracelet/x/ansi"
+	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
 func (m *model) left() (tea.Model, tea.Cmd) {
@@ -80,111 +82,126 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch m.mode {
-		case normal, jump, visual:
-			switch msg.Type {
-			case tea.KeyCtrlA:
-				page := m.getPage()
-				for i := range page.items {
-					page.items[i].selected = true
-				}
-				return m, nil
-			case tea.KeyCtrlR:
-				page := m.getPage()
-				for i := range page.items {
-					page.items[i].selected = !page.items[i].selected
-				}
-				return m, nil
-			}
-			switch msg.String() {
-			case "down":
-				page := m.getPage()
-				page.moveCursor(1, m.height)
-				return m, nil
-			case "up":
-				page := m.getPage()
-				page.moveCursor(-1, m.height)
-				return m, nil
-			case "pgdown":
-				page := m.getPage()
-				page.moveCursor(3, m.height)
-				return m, nil
-			case "pgup":
-				page := m.getPage()
-				page.moveCursor(-3, m.height)
-				return m, nil
-			case "home":
-				page := m.getPage()
-				page.cursor = 0
-				page.updateStart(m.height)
-				return m, nil
-			case "end":
-				page := m.getPage()
-				page.cursor = page.length() - 1
-				page.updateStart(m.height)
-				return m, nil
-			case " ":
-				page := m.getPage()
-				if m.mode == visual {
-					start, end := page.getStartEnd()
-					for i := start; i <= end; i++ {
-						item := page.items[i]
-						item.selected = !item.selected
+		if m.submode == noSubmode {
+			switch m.mode {
+			case normal, jump, visual:
+				switch msg.Type {
+				case tea.KeyCtrlA:
+					page := m.getPage()
+					for i := range page.items {
+						page.items[i].selected = true
 					}
-				} else {
-					selectedItem := page.items[page.cursor]
-					selectedItem.selected = !selectedItem.selected
-					page.moveCursor(1, m.height)
+					return m, nil
+				case tea.KeyCtrlR:
+					page := m.getPage()
+					for i := range page.items {
+						page.items[i].selected = !page.items[i].selected
+					}
+					return m, nil
 				}
-				return m, nil
+				switch msg.String() {
+				case "down":
+					page := m.getPage()
+					page.moveCursor(1, m.height)
+					return m, nil
+				case "up":
+					page := m.getPage()
+					page.moveCursor(-1, m.height)
+					return m, nil
+				case "pgdown":
+					page := m.getPage()
+					page.moveCursor(3, m.height)
+					return m, nil
+				case "pgup":
+					page := m.getPage()
+					page.moveCursor(-3, m.height)
+					return m, nil
+				case "home":
+					page := m.getPage()
+					page.cursor = 0
+					page.updateStart(m.height)
+					return m, nil
+				case "end":
+					page := m.getPage()
+					page.cursor = page.length() - 1
+					page.updateStart(m.height)
+					return m, nil
+				case " ":
+					page := m.getPage()
+					if m.mode == visual {
+						start, end := page.getStartEnd()
+						for i := start; i <= end; i++ {
+							item := page.items[i]
+							item.selected = !item.selected
+						}
+					} else {
+						selectedItem := page.items[page.cursor]
+						selectedItem.selected = !selectedItem.selected
+						page.moveCursor(1, m.height)
+					}
+					return m, nil
+				}
 			}
-		}
 
-		switch m.mode {
-		case normal, jump:
-			switch msg.String() {
-			case "left":
-				return m.left()
-			case "right", "enter":
-				return m.right()
+			switch m.mode {
+			case normal, jump:
+				switch msg.String() {
+				case "left":
+					return m.left()
+				case "right", "enter":
+					return m.right()
+				}
 			}
 		}
 
 		switch m.mode {
 		case normal:
-			switch msg.String() {
-			case "Q":
-				return m, tea.Quit
-			case "q":
-				m.result = m.getTab().dir
-				return m, tea.Quit
-			// case "d":
-			// 	return m, newErr(errors.New("EPIC FAIL"))
-			case "j":
-				page := m.getPage()
-				page.moveCursor(1, m.height)
-				return m, nil
-			case "k":
-				page := m.getPage()
-				page.moveCursor(-1, m.height)
-				return m, nil
-			case "h":
-				return m.left()
-			case "l":
-				return m.right()
-			case "tab":
-				m.mode = jump
-				return m, nil
-			case "v":
-				page := m.getPage()
-				page.visual = page.cursor
-				m.mode = visual
-				return m, nil
-			case "f":
-				m.mode = filter
-				m.filterInput.Reset()
-				m.filterInput.Focus()
-				return m, textinput.Blink
+			switch m.submode {
+			case goMode:
+				switch msg.String() {
+				case "esc":
+					m.submode = noSubmode
+					return m, nil
+				}
+
+			case noSubmode:
+				switch msg.String() {
+				case "Q":
+					return m, tea.Quit
+				case "q":
+					m.result = m.getTab().dir
+					return m, tea.Quit
+				case "g":
+					m.submode = goMode
+					return m, nil
+				// case "d":
+				// 	return m, newErr(errors.New("EPIC FAIL"))
+				case "j":
+					page := m.getPage()
+					page.moveCursor(1, m.height)
+					return m, nil
+				case "k":
+					page := m.getPage()
+					page.moveCursor(-1, m.height)
+					return m, nil
+				case "h":
+					return m.left()
+				case "l":
+					return m.right()
+				case "tab":
+					m.mode = jump
+					return m, nil
+				case "v":
+					page := m.getPage()
+					page.visual = page.cursor
+					m.mode = visual
+					return m, nil
+				case "f":
+					m.mode = filter
+					m.filterInput.Reset()
+					m.filterInput.Focus()
+					return m, textinput.Blink
+				}
 			}
 
 		case jump:
@@ -462,7 +479,42 @@ func (m model) View() string {
 		s.WriteString(messageBar)
 	}
 
-	return s.String()
+	ui := s.String()
+
+	switch m.submode {
+	case goMode:
+		headers := []string{"Button", "Description"}
+		rows := [][]string{
+			{"g", "Go to path"},
+			{"b", "Go to bookmarks"},
+		}
+
+		tStyle := m.theme.baseStyle
+
+		t := table.New().
+			Border(lipgloss.NormalBorder()).
+			BorderStyle(tStyle.Foreground(m.theme.grayColor)).
+			Headers(headers...).
+			Rows(rows...).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				if row == table.HeaderRow {
+					return tStyle.Foreground(m.theme.grayColor)
+				}
+
+				if col == 0 {
+					return tStyle.
+						Foreground(m.theme.accentColor2).
+						Align(lipgloss.Center)
+				} else {
+					return tStyle
+				}
+
+			})
+
+		ui = overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
+	}
+
+	return ui
 }
 
 func main() {

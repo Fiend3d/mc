@@ -14,6 +14,13 @@ const (
 	filter
 )
 
+type submode int
+
+const (
+	noSubmode submode = iota
+	goMode
+)
+
 type tab struct {
 	dir   string
 	pages map[string]*page
@@ -72,6 +79,7 @@ type model struct {
 	tabs       []*tab
 	currentTab int
 	mode       mode
+	submode    submode
 	width      int
 	height     int
 
