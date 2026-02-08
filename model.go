@@ -1,7 +1,12 @@
 package main
 
 import (
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -12,6 +17,9 @@ const (
 	visual
 	jump
 	filter
+	path
+	bookmark
+	bookmarkSelect
 )
 
 type submode int
@@ -83,11 +91,85 @@ type model struct {
 	width      int
 	height     int
 
+	pathInput   textinput.Model
 	filterInput textinput.Model
+
+	log   []string
+	ticks int
 
 	theme theme
 
 	result string
+}
+
+type msgType int
+
+const (
+	msgTxt msgType = iota
+	msgInfo
+	msgWarning
+	msgError
+)
+
+type tickMsg struct{}
+
+func tick() tea.Cmd {
+	return tea.Tick(time.Second, func(time.Time) tea.Msg {
+		return tickMsg{}
+	})
+}
+
+func (m *model) addMessage(msgType msgType, msg string) (tea.Model, tea.Cmd) {
+	var s strings.Builder
+	style := &m.theme.emptyStyle
+	switch msgType {
+	case msgTxt:
+		s.WriteString(style.Render(msg))
+	case msgInfo:
+		s.WriteString(style.Foreground(m.theme.accentColor3).Render("[info]"))
+		s.WriteString(style.Render(msg))
+	case msgWarning:
+		s.WriteString(style.Foreground(m.theme.accentColor4).Render("[warning] "))
+		s.WriteString(style.Render(msg))
+	case msgError:
+		s.WriteString(style.Foreground(m.theme.accentColor1).Render("[error] "))
+		s.WriteString(style.Render(msg))
+	}
+	m.log = append(m.log, s.String())
+	m.ticks = 6
+	return m, tick()
+}
+
+func (m *model) left() (tea.Model, tea.Cmd) {
+	tab := m.getTab()
+	parent := filepath.Dir(tab.dir)
+	tab.dir = parent
+	_, exists := tab.pages[parent] // not gonna update anything
+	if exists {
+		return m, nil
+	}
+	tab.pages[parent] = &page{dir: parent}
+	return m, m.readDir(parent)
+}
+
+func (m *model) right() (tea.Model, tea.Cmd) {
+	tab := m.getTab()
+	currentPage := tab.getPage()
+	if currentPage.cursor > len(currentPage.items)-1 {
+		return m, nil
+	}
+	selectedItem := currentPage.items[currentPage.cursor]
+	if !selectedItem.isDir {
+		return m, nil
+	}
+	dir := filepath.Join(tab.dir, selectedItem.name)
+	tab.dir = dir
+	_, exists := tab.pages[dir] // not gonna update
+	if exists {
+		return m, nil
+	}
+	tab.pages[dir] = newPage(dir)
+	return m, m.readDir(dir)
 }
 
 func (m *model) getTab() *tab {
@@ -123,6 +205,7 @@ func initialModel(dirs []string) model {
 
 	theme := newTheme()
 	filterInput := newTextinput("Enter text to filter", theme.emptyStyle, theme.grayColor)
+	pathInput := newTextinput("", theme.emptyStyle, theme.grayColor)
 
 	return model{
 		tabs:        tabs,
@@ -130,5 +213,6 @@ func initialModel(dirs []string) model {
 		mode:        normal,
 		theme:       theme,
 		filterInput: filterInput,
+		pathInput:   pathInput,
 	}
 }

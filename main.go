@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"unicode"
@@ -18,40 +17,7 @@ import (
 	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
-func (m *model) left() (tea.Model, tea.Cmd) {
-	tab := m.getTab()
-	parent := filepath.Dir(tab.dir)
-	tab.dir = parent
-	_, exists := tab.pages[parent] // not gonna update anything
-	if exists {
-		return m, nil
-	}
-	tab.pages[parent] = &page{dir: parent}
-	return m, m.readDir(parent)
-}
-
-func (m *model) right() (tea.Model, tea.Cmd) {
-	tab := m.getTab()
-	currentPage := tab.getPage()
-	if currentPage.cursor > len(currentPage.items)-1 {
-		return m, nil
-	}
-	selectedItem := currentPage.items[currentPage.cursor]
-	if !selectedItem.isDir {
-		return m, nil
-	}
-	dir := filepath.Join(tab.dir, selectedItem.name)
-	tab.dir = dir
-	_, exists := tab.pages[dir] // not gonna update
-	if exists {
-		return m, nil
-	}
-	tab.pages[dir] = newPage(dir)
-	return m, m.readDir(dir)
-}
-
 func (m model) Init() tea.Cmd {
-
 	return m.readDir(m.tabs[0].dir)
 }
 
@@ -61,6 +27,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errorMsg:
 		m.err = msg.err
 		return m, nil
+
+	case tickMsg:
+		if m.ticks > 0 {
+			m.ticks--
+			return m, tick()
+		}
 
 	case readDirMsg:
 		tab := m.getTab()
@@ -162,6 +134,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "esc":
 					m.submode = noSubmode
 					return m, nil
+				case "g":
+					m.submode = noSubmode
+					m.mode = path
+					page := m.getPage()
+					m.pathInput.Reset()
+					m.pathInput.SetValue(page.dir)
+					m.pathInput.Focus()
+					return m, textinput.Blink
 				}
 
 			case noSubmode:
@@ -254,6 +234,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			}
+
+		case path:
+			switch msg.String() {
+			case "esc":
+				m.mode = normal
+				return m, nil
+			case "enter":
+				dir := m.pathInput.Value()
+				if !dirExists(dir) {
+					return m.addMessage(msgError, fmt.Sprintf("\"%s\" directory doesn't exit", dir))
+				}
+				tab := m.getTab()
+				m.mode = normal
+				if tab.dir == dir {
+					return m, nil
+				}
+				tab.dir = dir
+				_, exists := tab.pages[dir]
+				if exists {
+					return m, nil
+				}
+				tab.pages[dir] = &page{dir: dir}
+				return m, m.readDir(dir)
+			}
 		}
 	}
 
@@ -263,6 +267,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case filter:
 		var cmd tea.Cmd
 		m.filterInput, cmd = m.filterInput.Update(msg)
+		cmds = append(cmds, cmd)
+	case path:
+		var cmd tea.Cmd
+		m.pathInput, cmd = m.pathInput.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
@@ -289,8 +297,14 @@ func (m model) View() string {
 	page := m.getPage()
 
 	// Header (directory)
-	s.WriteString(empty.Width(m.width).Bold(true).Render(page.dir))
-	s.WriteRune('\n')
+	if m.mode != path {
+		s.WriteString(empty.Width(m.width).Bold(true).Render(page.dir))
+		s.WriteRune('\n')
+	} else {
+		widget := m.pathInput.View()
+		s.WriteString(empty.Width(m.width).Render(widget))
+		s.WriteRune('\n')
+	}
 
 	const (
 		cursorWidth = 3
@@ -348,7 +362,7 @@ func (m model) View() string {
 			s.WriteString(style.Render(" "))
 		}
 
-		// --- name block ---
+		// name block
 		var nameBlock strings.Builder
 
 		nameWidth := max(
@@ -422,6 +436,9 @@ func (m model) View() string {
 	case filter:
 		mode_style = mode_style.Background(m.theme.accentColor2)
 		modeStr = "FILTER"
+	case path:
+		mode_style = mode_style.Background(m.theme.grayColor)
+		modeStr = "PATH"
 	default:
 		mode_style = mode_style.Background(m.theme.whiteColor)
 		modeStr = "NONE"
@@ -475,8 +492,11 @@ func (m model) View() string {
 		s.WriteString(text)
 
 	default:
-		messageBar := empty.Width(m.width).Render()
-		s.WriteString(messageBar)
+		if m.ticks > 0 {
+			s.WriteString(empty.Width(m.width).Render(m.log[len(m.log)-1]))
+		} else {
+			s.WriteString(empty.Width(m.width).Render())
+		}
 	}
 
 	ui := s.String()
