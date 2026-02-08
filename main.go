@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode"
@@ -242,6 +243,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter":
 				dir := m.pathInput.Value()
+				if strings.HasSuffix(dir, ":") {
+					dir += "\\" // windows...
+				}
+				dir = filepath.Clean(dir)
 				if !dirExists(dir) {
 					return m.addMessage(msgError, fmt.Sprintf("\"%s\" directory doesn't exit", dir))
 				}
