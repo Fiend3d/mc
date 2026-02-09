@@ -247,6 +247,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "enter":
+				// TODO: handle ~ and env vars
 				dir := m.pathInput.Value()
 				if strings.TrimSpace(dir) == "" {
 					return m.addMessage(msgError, "empty path")
@@ -270,6 +271,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				tab.pages[dir] = &page{dir: dir}
 				return m, m.readDir(dir)
+			case "ctrl+w":
+				path := m.pathInput.Value()
+				parent := filepath.Dir(path)
+				m.pathInput.SetValue(parent)
+				return m, nil
+			case "ctrl+a":
+				m.pathInput.SetValue("")
+				return m, nil
 			}
 
 		case messages:
@@ -318,6 +327,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case path:
 		var cmd tea.Cmd
 		m.pathInput, cmd = m.pathInput.Update(msg)
+		fillAutocomplete(&m)
 		cmds = append(cmds, cmd)
 	}
 

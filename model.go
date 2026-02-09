@@ -124,8 +124,9 @@ type model struct {
 	width      int
 	height     int
 
-	pathInput   textinput.Model
-	filterInput textinput.Model
+	pathInput    textinput.Model
+	pathInputDir string // to optimize autocomplete
+	filterInput  textinput.Model
 
 	log      []message
 	logStart int
@@ -207,7 +208,7 @@ func newTextinput(placeholder string, style lipgloss.Style, grayColor lipgloss.C
 	input.PlaceholderStyle = style.Foreground(grayColor)
 	input.TextStyle = style
 	input.PromptStyle = style
-	input.CompletionStyle = style
+	input.CompletionStyle = style.Foreground(grayColor)
 	input.Cursor.Style = style
 	input.Cursor.TextStyle = style
 	return input
