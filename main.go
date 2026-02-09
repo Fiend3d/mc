@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -182,6 +183,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.filterInput.Reset()
 					m.filterInput.Focus()
 					return m, textinput.Blink
+				case "`":
+					m.mode = messages
+					m.logStart = 0
+					return m, nil
 				}
 			}
 
@@ -243,12 +248,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter":
 				dir := m.pathInput.Value()
+				if strings.TrimSpace(dir) == "" {
+					return m.addMessage(msgError, "empty path")
+				}
 				if strings.HasSuffix(dir, ":") {
 					dir += "\\" // windows...
 				}
 				dir = filepath.Clean(dir)
 				if !dirExists(dir) {
-					return m.addMessage(msgError, fmt.Sprintf("\"%s\" directory doesn't exit", dir))
+					return m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
 				}
 				tab := m.getTab()
 				m.mode = normal
@@ -262,6 +270,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				tab.pages[dir] = &page{dir: dir}
 				return m, m.readDir(dir)
+			}
+
+		case messages:
+			switch msg.String() {
+			case "esc", "`":
+				m.mode = normal
+				return m, nil
+			case "j", "down":
+				m.logStart += 1
+				m.logStart = min(len(m.log)-1, m.logStart)
+				return m, nil
+			case "k", "up":
+				m.logStart -= 1
+				m.logStart = max(m.logStart, 0)
+				return m, nil
+			case "pgdown":
+				m.logStart += 3
+				m.logStart = min(len(m.log)-1, m.logStart)
+				return m, nil
+			case "pgup":
+				m.logStart -= 3
+				m.logStart = max(m.logStart, 0)
+				return m, nil
+			case "home":
+				m.logStart = 0
+				return m, nil
+			case "end":
+				m.logStart = len(m.log) - 1
+				return m, nil
+			case "Q":
+				return m, tea.Quit
+			case "q":
+				m.result = m.getTab().dir
+				return m, tea.Quit
 			}
 		}
 	}
@@ -298,6 +340,30 @@ func (m model) View() string {
 
 	base := &m.theme.baseStyle
 	empty := &m.theme.emptyStyle
+
+	if m.mode == messages {
+		length := len(m.log)
+		last := length - 1 - m.logStart
+		numbersLength := numberOfDigits(min(m.height, length)+m.logStart) + 1
+
+		for i := 0; i < m.height; i++ {
+			if last >= 0 && last < length {
+				s.WriteString(base.Width(numbersLength).Foreground(m.theme.accentColor4).Render(
+					strconv.Itoa(i + 1 + m.logStart)))
+				s.WriteString(
+					empty.Width(m.width - numbersLength).Render(
+						m.log[last].render(&m.theme, true)))
+			} else {
+				s.WriteString(base.Width(numbersLength).Render())
+				s.WriteString(empty.Width(m.width - numbersLength).Render())
+			}
+			if i != m.height-1 {
+				s.WriteRune('\n')
+			}
+			last--
+		}
+		return s.String()
+	}
 
 	page := m.getPage()
 
@@ -498,7 +564,7 @@ func (m model) View() string {
 
 	default:
 		if m.ticks > 0 {
-			s.WriteString(empty.Width(m.width).Render(m.log[len(m.log)-1]))
+			s.WriteString(empty.Width(m.width).Render(m.log[len(m.log)-1].render(&m.theme, false)))
 		} else {
 			s.WriteString(empty.Width(m.width).Render())
 		}

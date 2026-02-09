@@ -16,6 +16,7 @@ const (
 	normal mode = iota
 	visual
 	jump
+	messages
 	filter
 	path
 	bookmark
@@ -82,6 +83,38 @@ func (p *page) moveCursor(move, height int) {
 	p.updateStart(height)
 }
 
+type msgType int
+
+type message struct {
+	time        time.Time
+	messageType msgType
+	message     string
+}
+
+func (m *message) render(theme *theme, renderTime bool) string {
+	var s strings.Builder
+	if renderTime {
+		timeStyle := theme.emptyStyle.Foreground(theme.grayColor)
+		s.WriteString(timeStyle.Render(m.time.Format("02.01.2006 15:04")))
+		s.WriteString(timeStyle.Render(" "))
+	}
+	style := &theme.emptyStyle
+	switch m.messageType {
+	case msgTxt:
+		s.WriteString(style.Render(m.message))
+	case msgInfo:
+		s.WriteString(style.Foreground(theme.accentColor3).Render("[info]"))
+		s.WriteString(style.Render(m.message))
+	case msgWarning:
+		s.WriteString(style.Foreground(theme.accentColor4).Render("[warning] "))
+		s.WriteString(style.Render(m.message))
+	case msgError:
+		s.WriteString(style.Foreground(theme.accentColor1).Render("[error] "))
+		s.WriteString(style.Render(m.message))
+	}
+	return s.String()
+}
+
 type model struct {
 	err        error
 	tabs       []*tab
@@ -94,15 +127,14 @@ type model struct {
 	pathInput   textinput.Model
 	filterInput textinput.Model
 
-	log   []string
-	ticks int
+	log      []message
+	logStart int
+	ticks    int
 
 	theme theme
 
 	result string
 }
-
-type msgType int
 
 const (
 	msgTxt msgType = iota
@@ -120,22 +152,8 @@ func tick() tea.Cmd {
 }
 
 func (m *model) addMessage(msgType msgType, msg string) (tea.Model, tea.Cmd) {
-	var s strings.Builder
-	style := &m.theme.emptyStyle
-	switch msgType {
-	case msgTxt:
-		s.WriteString(style.Render(msg))
-	case msgInfo:
-		s.WriteString(style.Foreground(m.theme.accentColor3).Render("[info]"))
-		s.WriteString(style.Render(msg))
-	case msgWarning:
-		s.WriteString(style.Foreground(m.theme.accentColor4).Render("[warning] "))
-		s.WriteString(style.Render(msg))
-	case msgError:
-		s.WriteString(style.Foreground(m.theme.accentColor1).Render("[error] "))
-		s.WriteString(style.Render(msg))
-	}
-	m.log = append(m.log, s.String())
+	message := message{time: time.Now(), messageType: msgType, message: msg}
+	m.log = append(m.log, message)
 	m.ticks = 6
 	return m, tick()
 }
