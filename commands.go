@@ -32,41 +32,7 @@ func (m model) readDir(dir string) tea.Cmd {
 
 		filteredEntries := make([]os.DirEntry, 0, len(entries))
 		for _, entry := range entries {
-			name := entry.Name()
-			lowerName := strings.ToLower(name)
-
-			// Skip Windows/system files and folders
-			switch lowerName {
-			// System files
-			case "thumbs.db":
-				continue
-			case "desktop.ini":
-				continue
-			case "dumpstack.log.tmp":
-				continue
-
-			// System folders (legacy and modern)
-			case "$recycle.bin":
-				continue
-			case "system volume information":
-				continue
-			case "documents and settings": // XP legacy junction
-				continue
-			case "recovery": // Windows Recovery folder
-				continue
-			case "config.msi": // Windows Installer temp
-				continue
-
-			// Windows system files
-			case "pagefile.sys":
-				continue
-			case "hiberfil.sys":
-				continue
-			case "swapfile.sys":
-				continue
-			case "bootmgr":
-				continue
-			case "bootnxt":
+			if !checkName(entry.Name()) {
 				continue
 			}
 
