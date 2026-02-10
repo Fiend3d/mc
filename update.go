@@ -244,6 +244,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if strings.HasSuffix(dir, ":") {
 					dir += "\\" // windows...
 				}
+				dir, err := expandWindowsEnv(dir)
+				if err != nil {
+					return m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
+				}
 				dir = filepath.Clean(dir)
 				if !dirExists(dir) {
 					return m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
@@ -267,6 +271,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "ctrl+a":
 				m.pathInput.SetValue("")
+				return m, nil
+			case "ctrl+e":
+				dir := m.pathInput.Value()
+				dir, err := expandWindowsEnv(dir)
+				if err != nil {
+					return m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
+				}
+				m.pathInput.Reset()
+				m.pathInput.SetValue(dir)
 				return m, nil
 			}
 

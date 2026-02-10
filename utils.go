@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/sys/windows"
 )
 
 // DirExists checks if a path exists and is a directory
@@ -56,7 +58,6 @@ func fillAutocomplete(m *model) {
 		m.pathInput.ShowSuggestions = false
 		return
 	}
-
 	var suggestions []string
 	for i := range entries {
 		if entries[i].IsDir() {
@@ -68,7 +69,6 @@ func fillAutocomplete(m *model) {
 		}
 	}
 	m.pathInput.ShowSuggestions = true
-
 	m.pathInput.SetSuggestions(suggestions)
 }
 
@@ -112,4 +112,34 @@ func checkName(name string) bool {
 	}
 
 	return true
+}
+
+func expandWindowsEnv(path string) (string, error) {
+	if strings.ContainsRune(path, '~') {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			path = strings.ReplaceAll(path, "~", home+"\\")
+		}
+	}
+	src, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return "", err
+	}
+
+	// First call: get required size (includes null terminator)
+	n, err := windows.ExpandEnvironmentStrings(src, nil, 0)
+	if err != nil {
+		return "", err
+	}
+
+	buf := make([]uint16, n)
+
+	// Second call: expand into buffer
+	_, err = windows.ExpandEnvironmentStrings(src, &buf[0], n)
+	if err != nil {
+		return "", err
+	}
+
+	// Trim trailing null
+	return windows.UTF16ToString(buf[:n-1]), nil
 }
