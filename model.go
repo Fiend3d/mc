@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
@@ -118,10 +119,26 @@ func (m *message) render(theme *theme, renderTime bool) string {
 type action int
 
 const (
-	none action = iota
+	noAction action = iota
 	copy
 	cut
 )
+
+func (m *model) addAction(action action, txt string) (tea.Model, tea.Cmd) {
+	page := m.getPage()
+	var actionPaths []string
+	for i := range page.items {
+		if page.items[i].selected {
+			actionPaths = append(actionPaths, page.items[i].fullPath)
+		}
+	}
+	if len(actionPaths) == 0 {
+		actionPaths = append(actionPaths, page.items[page.cursor].fullPath)
+	}
+	m.action = action
+	m.actionPaths = actionPaths
+	return m.addMessage(msgInfo, fmt.Sprintf("%d paths %s", len(m.actionPaths), txt))
+}
 
 type model struct {
 	err        error

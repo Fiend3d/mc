@@ -60,6 +60,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						page.items[i].selected = !page.items[i].selected
 					}
 					return m, nil
+				case tea.KeyCtrlD:
+					page := m.getPage()
+					for i := range page.items {
+						page.items[i].selected = false
+					}
 				}
 				switch msg.String() {
 				case "down":
@@ -177,19 +182,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logStart = 0
 					return m, nil
 				case "y":
-					page := m.getPage()
-					var actionPaths []string
-					for i := range page.items {
-						if page.items[i].selected {
-							actionPaths = append(actionPaths, page.items[i].fullPath)
-						}
-					}
-					if len(actionPaths) == 0 {
-						return m.addMessage(msgInfo, "nothing to copy")
-					}
-					m.action = copy
-					m.actionPaths = actionPaths
-					return m.addMessage(msgInfo, fmt.Sprintf("%d paths copied", len(m.actionPaths)))
+					return m.addAction(copy, "copied")
+				case "x":
+					return m.addAction(cut, "cut")
 				}
 			}
 

@@ -81,7 +81,7 @@ func (m model) View() string {
 
 		item := page.items[i+page.start]
 		switch m.action {
-		case none:
+		case noAction:
 			s.WriteString(style.Render(" "))
 		case copy:
 			if slices.Contains(m.actionPaths, item.fullPath) {
@@ -193,43 +193,56 @@ func (m model) View() string {
 	modeBlock := mode_style.Render(modeStr)
 	modeWidth := lipgloss.Width(modeBlock)
 
-	var itemName string
-	var modeBitsStr string
-	if page.cursor < len(page.items) {
-		selected_item := page.items[page.cursor]
-		itemName = selected_item.name
-		modeBitsStr = selected_item.mode
+	switch m.action {
+	case noAction:
+		var itemName string
+		var modeBitsStr string
+		if page.cursor < len(page.items) {
+			selected_item := page.items[page.cursor]
+			itemName = selected_item.name
+			modeBitsStr = selected_item.mode
+		}
+
+		modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
+
+		rightStr := fmt.Sprintf("[%d/%d]", page.cursor+1, len(page.items))
+		rightBlock := padded.Render(rightStr)
+		rightBlock = lipgloss.JoinHorizontal(lipgloss.Center, modeBitsBlock, rightBlock)
+		rightWidth := lipgloss.Width(rightBlock)
+
+		nameWidth := max(1, m.width-modeWidth-rightWidth)
+		itemName = ansi.Truncate(itemName, nameWidth-2, "…")
+
+		nameBlock := padded.
+			Width(nameWidth).
+			Render(itemName)
+
+		statusBar := lipgloss.JoinHorizontal(
+			lipgloss.Left,
+			modeBlock,
+			nameBlock,
+			rightBlock,
+		)
+
+		statusBar = lipgloss.NewStyle().
+			Width(m.width).
+			MaxWidth(m.width).
+			MaxHeight(1).
+			Render(statusBar)
+
+		s.WriteString(statusBar)
+		s.WriteRune('\n')
+	case copy:
+		s.WriteString(modeBlock)
+		statusMsg := fmt.Sprintf(" %d paths copied", len(m.actionPaths))
+		s.WriteString(base.Width(m.width - modeWidth).Foreground(m.theme.accentColor3).Render(statusMsg))
+		s.WriteRune('\n')
+	case cut:
+		s.WriteString(modeBlock)
+		statusMsg := fmt.Sprintf(" %d paths cut", len(m.actionPaths))
+		s.WriteString(base.Width(m.width - modeWidth).Foreground(m.theme.accentColor1).Render(statusMsg))
+		s.WriteRune('\n')
 	}
-
-	modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
-
-	rightStr := fmt.Sprintf("[%d/%d]", page.cursor+1, len(page.items))
-	rightBlock := padded.Render(rightStr)
-	rightBlock = lipgloss.JoinHorizontal(lipgloss.Center, modeBitsBlock, rightBlock)
-	rightWidth := lipgloss.Width(rightBlock)
-
-	nameWidth := max(1, m.width-modeWidth-rightWidth)
-	itemName = ansi.Truncate(itemName, nameWidth-2, "…")
-
-	nameBlock := padded.
-		Width(nameWidth).
-		Render(itemName)
-
-	statusBar := lipgloss.JoinHorizontal(
-		lipgloss.Left,
-		modeBlock,
-		nameBlock,
-		rightBlock,
-	)
-
-	statusBar = lipgloss.NewStyle().
-		Width(m.width).
-		MaxWidth(m.width).
-		MaxHeight(1).
-		Render(statusBar)
-
-	s.WriteString(statusBar)
-	s.WriteRune('\n')
 
 	switch m.mode {
 	case filter:
