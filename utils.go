@@ -54,6 +54,7 @@ func fillAutocomplete(m *model) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		m.pathInput.ShowSuggestions = false
+		return
 	}
 
 	var suggestions []string

@@ -131,6 +131,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pathInput.Reset()
 					m.pathInput.SetValue(page.dir)
 					m.pathInput.Focus()
+					m.pathInputDir = "nope"
 					return m, textinput.Blink
 				}
 
