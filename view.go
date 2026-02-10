@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -79,13 +80,21 @@ func (m model) View() string {
 		}
 
 		item := page.items[i+page.start]
-		switch item.action {
+		switch m.action {
 		case none:
 			s.WriteString(style.Render(" "))
 		case copy:
-			s.WriteString(m.theme.copiedStyle.Render(" "))
+			if slices.Contains(m.actionPaths, item.fullPath) {
+				s.WriteString(m.theme.copiedStyle.Render(" "))
+			} else {
+				s.WriteString(style.Render(" "))
+			}
 		case cut:
-			s.WriteString(m.theme.cutStyle.Render(" "))
+			if slices.Contains(m.actionPaths, item.fullPath) {
+				s.WriteString(m.theme.cutStyle.Render(" "))
+			} else {
+				s.WriteString(style.Render(" "))
+			}
 		}
 
 		if m.mode == visual && current {

@@ -103,7 +103,7 @@ func (m *message) render(theme *theme, renderTime bool) string {
 	case msgTxt:
 		s.WriteString(style.Render(m.message))
 	case msgInfo:
-		s.WriteString(style.Foreground(theme.accentColor3).Render("[info]"))
+		s.WriteString(style.Foreground(theme.accentColor3).Render("[info] "))
 		s.WriteString(style.Render(m.message))
 	case msgWarning:
 		s.WriteString(style.Foreground(theme.accentColor4).Render("[warning] "))
@@ -115,6 +115,14 @@ func (m *message) render(theme *theme, renderTime bool) string {
 	return s.String()
 }
 
+type action int
+
+const (
+	none action = iota
+	copy
+	cut
+)
+
 type model struct {
 	err        error
 	tabs       []*tab
@@ -123,6 +131,9 @@ type model struct {
 	submode    submode
 	width      int
 	height     int
+
+	action      action
+	actionPaths []string
 
 	pathInput    textinput.Model
 	pathInputDir string // to optimize autocomplete

@@ -176,6 +176,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = messages
 					m.logStart = 0
 					return m, nil
+				case "y":
+					page := m.getPage()
+					var actionPaths []string
+					for i := range page.items {
+						if page.items[i].selected {
+							actionPaths = append(actionPaths, page.items[i].fullPath)
+						}
+					}
+					if len(actionPaths) == 0 {
+						return m.addMessage(msgInfo, "nothing to copy")
+					}
+					m.action = copy
+					m.actionPaths = actionPaths
+					return m.addMessage(msgInfo, fmt.Sprintf("%d paths copied", len(m.actionPaths)))
 				}
 			}
 

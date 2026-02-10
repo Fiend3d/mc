@@ -8,18 +8,10 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-type itemAction int
-
-const (
-	none itemAction = iota
-	copy
-	cut
-)
-
 type item struct {
 	entry    os.DirEntry
+	fullPath string
 	selected bool
-	action   itemAction
 
 	isDir     bool
 	isSymlink bool
@@ -39,6 +31,7 @@ func newItem(entry os.DirEntry, dir string) (*item, error) {
 	item := &item{entry: entry, selected: false}
 
 	item.name = entry.Name()
+	item.fullPath = filepath.Join(dir, item.name)
 	item.isDir = info.IsDir()
 	item.isSymlink = info.Mode()&os.ModeSymlink != 0
 
