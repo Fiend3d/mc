@@ -252,6 +252,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !dirExists(dir) {
 					return m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
 				}
+				dir, err = realWindowsPath(dir)
+				if err != nil {
+					return m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
+				}
 				tab := m.getTab()
 				m.mode = normal
 				if tab.dir == dir {

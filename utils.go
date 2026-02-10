@@ -143,3 +143,50 @@ func expandWindowsEnv(path string) (string, error) {
 	// Trim trailing null
 	return windows.UTF16ToString(buf[:n-1]), nil
 }
+
+func realWindowsPath(path string) (string, error) {
+	p, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return "", err
+	}
+
+	handle, err := windows.CreateFile(
+		p,
+		0, // query only
+		windows.FILE_SHARE_READ|
+			windows.FILE_SHARE_WRITE|
+			windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS,
+		0,
+	)
+	if err != nil {
+		return "", err
+	}
+	defer windows.CloseHandle(handle)
+
+	// First call: get required size
+	n, err := windows.GetFinalPathNameByHandle(handle, nil, 0, 0)
+	if err != nil {
+		return "", err
+	}
+
+	buf := make([]uint16, n)
+
+	// Second call: get the path
+	_, err = windows.GetFinalPathNameByHandle(handle, &buf[0], n, 0)
+	if err != nil {
+		return "", err
+	}
+
+	result := windows.UTF16ToString(buf)
+
+	// Strip \\?\ prefix if present
+	const prefix = `\\?\`
+	if len(result) >= len(prefix) && result[:len(prefix)] == prefix {
+		result = result[len(prefix):]
+	}
+
+	return result, nil
+}
