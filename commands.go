@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -55,5 +56,16 @@ func (m model) readDir(dir string) tea.Cmd {
 		})
 
 		return readDirMsg{entries: filteredEntries, dir: dir}
+	}
+}
+
+type commandDoneMsg struct {
+	message string
+}
+
+func (m model) newCommandr(cmd command) tea.Cmd {
+	return func() tea.Msg {
+		m.cm.execute(cmd)
+		return commandDoneMsg{fmt.Sprintf("%s", cmd)}
 	}
 }

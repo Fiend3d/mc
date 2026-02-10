@@ -127,13 +127,22 @@ const (
 func (m *model) addAction(action action, txt string) (tea.Model, tea.Cmd) {
 	page := m.getPage()
 	var actionPaths []string
-	for i := range page.items {
-		if page.items[i].selected {
+	switch m.mode {
+	case visual:
+		start, end := page.getStartEnd()
+		for i := start; i <= end; i++ {
 			actionPaths = append(actionPaths, page.items[i].fullPath)
 		}
-	}
-	if len(actionPaths) == 0 {
-		actionPaths = append(actionPaths, page.items[page.cursor].fullPath)
+		m.mode = normal
+	default:
+		for i := range page.items {
+			if page.items[i].selected {
+				actionPaths = append(actionPaths, page.items[i].fullPath)
+			}
+		}
+		if len(actionPaths) == 0 {
+			actionPaths = append(actionPaths, page.items[page.cursor].fullPath)
+		}
 	}
 	m.action = action
 	m.actionPaths = actionPaths
@@ -151,6 +160,8 @@ type model struct {
 
 	action      action
 	actionPaths []string
+
+	cm *commandManager
 
 	pathInput    textinput.Model
 	pathInputDir string // to optimize autocomplete
@@ -261,5 +272,6 @@ func initialModel(dirs []string) model {
 		theme:       theme,
 		filterInput: filterInput,
 		pathInput:   pathInput,
+		cm:          newCommandManager(),
 	}
 }

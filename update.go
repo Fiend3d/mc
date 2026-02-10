@@ -24,6 +24,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tick()
 		}
 
+	case commandDoneMsg:
+		return m.addMessage(msgInfo, msg.message)
+
 	case readDirMsg:
 		tab := m.getTab()
 		page := tab.pages[msg.dir]
@@ -185,6 +188,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.addAction(copy, "copied")
 				case "x":
 					return m.addAction(cut, "cut")
+				case "p":
+					page := m.getPage()
+					copyCmd := &copyCommand{src: m.actionPaths[0], dst: page.dir + "\\fff.txt", isDir: false}
+					return m, m.newCommandr(copyCmd)
 				}
 			}
 
@@ -230,6 +237,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "v":
 				m.mode = normal
 				return m, nil
+			case "y":
+				return m.addAction(copy, "copied")
+			case "x":
+				return m.addAction(copy, "cut")
 			}
 
 		case filter:
