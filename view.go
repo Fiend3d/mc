@@ -51,8 +51,10 @@ func (m model) View() string {
 		colGap      = 1
 	)
 
+	countItems := 0
+
 	for i := range page.items {
-		if i+1 > m.height-3 {
+		if i+1 > m.height-3 || i+page.start >= len(page.items) {
 			break
 		}
 
@@ -79,7 +81,8 @@ func (m model) View() string {
 			}
 		}
 
-		item := page.items[i+page.start]
+		item := page.items[i+page.start] // it might crash here
+
 		switch m.action {
 		case noAction:
 			s.WriteString(style.Render(" "))
@@ -154,10 +157,11 @@ func (m model) View() string {
 		s.WriteString(style.Render(item.size))
 
 		s.WriteRune('\n')
+		countItems++
 	}
 
 	// render empty lines
-	for i := len(page.items); i < m.height-3; i++ {
+	for i := countItems; i < m.height-3; i++ {
 		s.WriteString(empty.Width(m.width).Render(" "))
 		s.WriteRune('\n')
 	}
