@@ -131,7 +131,7 @@ const (
 	cut
 )
 
-func (m *model) addAction(action action, txt string) (tea.Model, tea.Cmd) {
+func (m *model) addAction(action action, txt string) tea.Cmd {
 	page := m.getPage()
 	var actionPaths []string
 	switch m.mode {
@@ -202,11 +202,11 @@ func tick() tea.Cmd {
 	})
 }
 
-func (m *model) addMessage(msgType msgType, msg string) (tea.Model, tea.Cmd) {
+func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
 	message := message{time: time.Now(), messageType: msgType, message: msg}
 	m.log = append(m.log, message)
 	m.ticks = 6
-	return m, tick()
+	return tick()
 }
 
 func (m *model) left() (tea.Model, tea.Cmd) {

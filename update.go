@@ -27,11 +27,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case commandDoneMsg:
 		m.jobs--
 		if msg.err != nil {
-			return m.addMessage(
+			return m, m.addMessage(
 				msgFail,
 				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.message))
 		} else {
-			return m.addMessage(msgDone, msg.message)
+			return m, m.addMessage(msgDone, msg.message)
 		}
 	case readDirMsg:
 		tab := m.getTab()
@@ -196,14 +196,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logStart = 0
 					return m, nil
 				case "y":
-					return m.addAction(copy, "copied")
+					return m, m.addAction(copy, "copied")
 				case "x":
-					return m.addAction(cut, "cut")
+					return m, m.addAction(cut, "cut")
 				case "p":
+					if m.action == noAction {
+						return m, m.addMessage(msgWarning, "nothing to paste")
+					}
 					m.jobs++
 					page := m.getPage()
 					copyCmd := &copyCommand{paths: m.actionPaths, dst: page.dir}
-					return m, tea.Batch(m.spinner.Tick, m.newCommand(copyCmd))
+					return m, tea.Batch(m.addMessage(msgInfo, fmt.Sprintf("command: %s", copyCmd)), m.spinner.Tick, m.newCommand(copyCmd))
 				}
 			}
 
@@ -250,9 +253,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "y":
-				return m.addAction(copy, "copied")
+				return m, m.addAction(copy, "copied")
 			case "x":
-				return m.addAction(copy, "cut")
+				return m, m.addAction(copy, "cut")
 			}
 
 		case filter:
@@ -271,22 +274,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// TODO: handle ~ and env vars
 				dir := m.pathInput.Value()
 				if strings.TrimSpace(dir) == "" {
-					return m.addMessage(msgError, "empty path")
+					return m, m.addMessage(msgError, "empty path")
 				}
 				if strings.HasSuffix(dir, ":") {
 					dir += "\\" // windows...
 				}
 				dir, err := expandWindowsEnv(dir)
 				if err != nil {
-					return m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
 				}
 				dir = filepath.Clean(dir)
 				if !dirExists(dir) {
-					return m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
+					return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
 				}
 				dir, err = realWindowsPath(dir)
 				if err != nil {
-					return m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
 				}
 				tab := m.getTab()
 				m.mode = normal
@@ -312,7 +315,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				dir := m.pathInput.Value()
 				dir, err := expandWindowsEnv(dir)
 				if err != nil {
-					return m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
 				}
 				m.pathInput.Reset()
 				m.pathInput.SetValue(dir)
