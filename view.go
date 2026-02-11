@@ -164,34 +164,38 @@ func (m model) View() string {
 
 	// status bar
 	var modeStr string
-	padded := base.Padding(0, 1)
-	mode_style := padded.
+	modeStyle := base.
 		Background(m.theme.accentColor5).
 		Foreground(m.theme.blackColor).
 		Bold(true)
 
 	switch m.mode {
 	case normal:
-		modeStr = "NORMAL"
+		modeStr = " NORMAL "
 	case visual:
-		mode_style = mode_style.Background(m.theme.accentColor4)
-		modeStr = "VISUAL"
+		modeStyle = modeStyle.Background(m.theme.accentColor4)
+		modeStr = " VISUAL "
 	case jump:
-		mode_style = mode_style.Background(m.theme.accentColor1)
-		modeStr = "JUMP"
+		modeStyle = modeStyle.Background(m.theme.accentColor1)
+		modeStr = " JUMP "
 	case filter:
-		mode_style = mode_style.Background(m.theme.accentColor2)
-		modeStr = "FILTER"
+		modeStyle = modeStyle.Background(m.theme.accentColor2)
+		modeStr = " FILTER "
 	case path:
-		mode_style = mode_style.Background(m.theme.grayColor)
-		modeStr = "PATH"
+		modeStyle = modeStyle.Background(m.theme.grayColor)
+		modeStr = " PATH "
 	default:
-		mode_style = mode_style.Background(m.theme.whiteColor)
-		modeStr = "NONE"
+		modeStyle = modeStyle.Background(m.theme.whiteColor)
+		modeStr = " NONE "
 	}
 
-	modeBlock := mode_style.Render(modeStr)
-	modeWidth := lipgloss.Width(modeBlock)
+	modeBlock := modeStyle.Render(modeStr)
+	modeWidth := lipgloss.Width(modeBlock) + 2
+	if m.jobs > 0 {
+		modeBlock += m.spinner.View()
+	} else {
+		modeBlock += base.Render("  ")
+	}
 
 	switch m.action {
 	case noAction:
@@ -205,41 +209,32 @@ func (m model) View() string {
 
 		modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
 
-		rightStr := fmt.Sprintf("[%d/%d]", page.cursor+1, len(page.items))
-		rightBlock := padded.Render(rightStr)
-		rightBlock = lipgloss.JoinHorizontal(lipgloss.Center, modeBitsBlock, rightBlock)
+		rightStr := fmt.Sprintf(" [%d/%d] ", page.cursor+1, len(page.items))
+		rightBlock := m.theme.baseStyle.Render(rightStr)
+		rightBlock = modeBitsBlock + rightBlock
 		rightWidth := lipgloss.Width(rightBlock)
 
 		nameWidth := max(1, m.width-modeWidth-rightWidth)
-		itemName = ansi.Truncate(itemName, nameWidth-2, "…")
+		itemName = ansi.Truncate(itemName, nameWidth, "…")
 
-		nameBlock := padded.
+		nameBlock := base.
 			Width(nameWidth).
 			Render(itemName)
 
-		statusBar := lipgloss.JoinHorizontal(
-			lipgloss.Left,
-			modeBlock,
-			nameBlock,
-			rightBlock,
-		)
-
-		statusBar = lipgloss.NewStyle().
-			Width(m.width).
-			MaxWidth(m.width).
-			MaxHeight(1).
-			Render(statusBar)
+		statusBar := modeBlock + nameBlock + rightBlock
 
 		s.WriteString(statusBar)
 		s.WriteRune('\n')
+
 	case copy:
 		s.WriteString(modeBlock)
-		statusMsg := fmt.Sprintf(" %d paths copied", len(m.actionPaths))
+		statusMsg := fmt.Sprintf("%d paths copied", len(m.actionPaths))
 		s.WriteString(base.Width(m.width - modeWidth).Foreground(m.theme.accentColor3).Render(statusMsg))
 		s.WriteRune('\n')
+
 	case cut:
 		s.WriteString(modeBlock)
-		statusMsg := fmt.Sprintf(" %d paths cut", len(m.actionPaths))
+		statusMsg := fmt.Sprintf("%d paths cut", len(m.actionPaths))
 		s.WriteString(base.Width(m.width - modeWidth).Foreground(m.theme.accentColor1).Render(statusMsg))
 		s.WriteRune('\n')
 	}
@@ -266,6 +261,7 @@ func (m model) View() string {
 		rows := [][]string{
 			{"g", "Go to path"},
 			{"b", "Go to bookmarks"},
+			{"r", "Reset action"},
 		}
 
 		tStyle := m.theme.baseStyle
@@ -295,6 +291,7 @@ func (m model) View() string {
 
 	return ui
 }
+
 func viewMessages(m *model) string {
 	var s strings.Builder
 

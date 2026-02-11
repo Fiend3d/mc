@@ -25,8 +25,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case commandDoneMsg:
-		return m.addMessage(msgInfo, msg.message)
-
+		m.jobs--
+		if msg.err != nil {
+			return m.addMessage(
+				msgFail,
+				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.message))
+		} else {
+			return m.addMessage(msgDone, msg.message)
+		}
 	case readDirMsg:
 		tab := m.getTab()
 		page := tab.pages[msg.dir]
@@ -141,6 +147,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pathInput.Focus()
 					m.pathInputDir = "nope"
 					return m, textinput.Blink
+				case "r":
+					m.submode = noSubmode
+					m.action = noAction
+					m.actionPaths = nil
+					return m, nil
 				}
 
 			case noSubmode:
@@ -189,9 +200,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "x":
 					return m.addAction(cut, "cut")
 				case "p":
+					m.jobs++
 					page := m.getPage()
-					copyCmd := &copyCommand{src: m.actionPaths[0], dst: page.dir + "\\fff.txt", isDir: false}
-					return m, m.newCommandr(copyCmd)
+					copyCmd := &copyCommand{paths: m.actionPaths, dst: page.dir}
+					return m, tea.Batch(m.spinner.Tick, m.newCommand(copyCmd))
 				}
 			}
 
@@ -344,6 +356,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	var cmds []tea.Cmd
+
+	if m.jobs > 0 {
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 
 	switch m.mode {
 	case filter:

@@ -61,11 +61,12 @@ func (m model) readDir(dir string) tea.Cmd {
 
 type commandDoneMsg struct {
 	message string
+	err     error
 }
 
-func (m model) newCommandr(cmd command) tea.Cmd {
+func (m model) newCommand(cmd command) tea.Cmd {
 	return func() tea.Msg {
-		m.cm.execute(cmd)
-		return commandDoneMsg{fmt.Sprintf("%s", cmd)}
+		err := m.cm.execute(cmd)
+		return commandDoneMsg{fmt.Sprintf("%s", cmd), err}
 	}
 }

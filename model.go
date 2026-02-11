@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
-	"strings"
-	"time"
-
+	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 type mode int
@@ -112,6 +112,13 @@ func (m *message) render(theme *theme, renderTime bool) string {
 	case msgError:
 		s.WriteString(style.Foreground(theme.accentColor1).Render("[error] "))
 		s.WriteString(style.Render(m.message))
+	case msgDone:
+		s.WriteString(style.Foreground(theme.greenColor).Render("[done] "))
+		s.WriteString(style.Render(m.message))
+	case msgFail:
+		s.WriteString(style.Foreground(theme.redColor).Render("[fail] "))
+		s.WriteString(style.Render(m.message))
+
 	}
 	return s.String()
 }
@@ -160,6 +167,8 @@ type model struct {
 
 	action      action
 	actionPaths []string
+	jobs        int
+	spinner     spinner.Model
 
 	cm *commandManager
 
@@ -181,6 +190,8 @@ const (
 	msgInfo
 	msgWarning
 	msgError
+	msgDone
+	msgFail
 )
 
 type tickMsg struct{}
@@ -264,6 +275,9 @@ func initialModel(dirs []string) model {
 	theme := newTheme()
 	filterInput := newTextinput("Enter text to filter", theme.emptyStyle, theme.grayColor)
 	pathInput := newTextinput("", theme.emptyStyle, theme.grayColor)
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = theme.baseStyle.Foreground(theme.accentColor1)
 
 	return model{
 		tabs:        tabs,
@@ -272,6 +286,7 @@ func initialModel(dirs []string) model {
 		theme:       theme,
 		filterInput: filterInput,
 		pathInput:   pathInput,
+		spinner:     s,
 		cm:          newCommandManager(),
 	}
 }

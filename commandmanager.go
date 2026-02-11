@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/go-pkgz/fileutils"
 )
 
 type command interface {
-	execute()
-	undo()
+	execute() error
+	undo() error
 	String() string
 }
 
@@ -23,22 +25,24 @@ func newCommandManager() *commandManager {
 	}
 }
 
-func (cm *commandManager) execute(cmd command) {
-	cmd.execute()
+func (cm *commandManager) execute(cmd command) error {
+	err := cmd.execute()
 	cm.history = append(cm.history, cmd)
 	cm.redoStack = cm.redoStack[:0]
+	return err
 }
 
-func (cm *commandManager) undo() {
+func (cm *commandManager) undo() error {
 	if len(cm.history) == 0 {
-		return
+		return nil
 	}
 
 	lastCmd := cm.history[len(cm.history)-1]
-	lastCmd.undo()
+	err := lastCmd.undo()
 
 	cm.history = cm.history[:len(cm.history)-1]
 	cm.redoStack = append(cm.redoStack, lastCmd)
+	return err
 }
 
 func (cm *commandManager) redo() {
@@ -62,23 +66,22 @@ func (cm *commandManager) canRedo() bool {
 }
 
 type copyCommand struct {
-	src   string
+	paths []string
 	dst   string
-	isDir bool
 }
 
 func (c *copyCommand) String() string {
-	return fmt.Sprintf("copy src:%s dst:%s isDir:%v", c.src, c.dst, c.isDir)
+	return fmt.Sprintf("copy paths:%d dst:%s", len(c.paths), c.dst)
 }
 
-func (c *copyCommand) execute() {
-	if c.isDir {
-		fileutils.CopyDir(c.src, c.dst)
-	} else {
-		fileutils.CopyFile(c.src, c.dst)
+func (c *copyCommand) execute() error {
+	time.Sleep(5 * time.Second)
+	for i := range c.paths {
+		_ = fileutils.IsDir(c.paths[i])
 	}
+	return nil
 }
 
-func (c *copyCommand) undo() {
-
+func (c *copyCommand) undo() error {
+	return nil
 }

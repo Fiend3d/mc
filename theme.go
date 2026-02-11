@@ -13,6 +13,8 @@ type theme struct {
 	whiteColor lipgloss.Color
 	blackColor lipgloss.Color
 	grayColor  lipgloss.Color
+	greenColor lipgloss.Color
+	redColor   lipgloss.Color
 
 	accentColor1 lipgloss.Color
 	accentColor2 lipgloss.Color
@@ -25,6 +27,8 @@ func newTheme() theme {
 	white := lipgloss.Color("#ffffff")
 	black := lipgloss.Color("#000000")
 	gray := lipgloss.Color("#6272a4")
+	green := lipgloss.Color("#94d716")
+	red := lipgloss.Color("#ea1212")
 	accent1 := lipgloss.Color("#ff79c6")
 	accent2 := lipgloss.Color("#bd93f9")
 	accent3 := lipgloss.Color("#8be9fd")
@@ -43,6 +47,8 @@ func newTheme() theme {
 		whiteColor: white,
 		blackColor: black,
 		grayColor:  gray,
+		greenColor: green,
+		redColor:   red,
 
 		accentColor1: accent1,
 		accentColor2: accent2,
