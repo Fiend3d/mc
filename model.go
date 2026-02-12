@@ -130,7 +130,7 @@ const (
 	cutAction
 )
 
-func (m *model) doAction(action action, txt string) tea.Cmd {
+func (m *model) doAction(action action) tea.Cmd {
 	page := m.getPage()
 	var paths []string
 	switch m.mode {
@@ -150,11 +150,15 @@ func (m *model) doAction(action action, txt string) tea.Cmd {
 			paths = append(paths, page.items[page.cursor].fullPath)
 		}
 	}
+
+	var txt string
 	switch action {
 	case copyAction:
 		setClipboardFiles(paths, OpCopy)
+		txt = "copied"
 	case cutAction:
 		setClipboardFiles(paths, OpCut)
+		txt = "cut"
 	}
 	return m.addMessage(msgInfo, fmt.Sprintf("%d paths %s", len(paths), txt))
 }

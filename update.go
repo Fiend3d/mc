@@ -191,9 +191,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logStart = 0
 					return m, nil
 				case "y":
-					return m, m.doAction(copyAction, "copied")
+					return m, m.doAction(copyAction)
 				case "x":
-					return m, m.doAction(cutAction, "cut")
+					return m, m.doAction(cutAction)
 				case "p":
 					paths, op, err := getClipboardFiles()
 					if err != nil {
@@ -256,9 +256,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "y":
-				return m, m.doAction(copyAction, "copied")
+				return m, m.doAction(copyAction)
 			case "x":
-				return m, m.doAction(cutAction, "cut")
+				return m, m.doAction(cutAction)
 			}
 
 		case filter:
