@@ -33,18 +33,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			return m, m.addMessage(msgDone, msg.message)
 		}
+
 	case readDirMsg:
-		tab := m.getTab()
-		page := tab.pages[msg.dir]
-		page.items = nil
-		for i := range msg.entries {
-			item, err := newItem(msg.entries[i], page.dir)
-			if err != nil {
-				return m, newErr(err)
-			}
-			page.items = append(page.items, item)
+		err := m.fillPage(msg.tab, msg.entries, msg.dir, 0)
+		if err != nil {
+			return m, newErr(err)
 		}
-		tab.pages[msg.dir] = page
+		return m, nil
+
+	case updateDirMsg:
+		err := m.fillPage(msg.tab, msg.entries, msg.dir, msg.cursor)
+		if err != nil {
+			return m, newErr(err)
+		}
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -190,10 +191,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = messages
 					m.logStart = 0
 					return m, nil
+				case "f5":
+					return m, tea.Batch(
+						m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab)),
+						m.update(m.currentTab))
 				case "y":
-					return m, m.doAction(copyAction)
+					msg := m.copyCut(false)
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
 				case "x":
-					return m, m.doAction(cutAction)
+					msg := m.copyCut(true)
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
 				case "p":
 					paths, op, err := getClipboardFiles()
 					if err != nil {
@@ -256,9 +263,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "y":
-				return m, m.doAction(copyAction)
+				msg := m.copyCut(false)
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
 			case "x":
-				return m, m.doAction(cutAction)
+				msg := m.copyCut(true)
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
 			}
 
 		case filter:
@@ -305,7 +314,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				tab.pages[dir] = &page{dir: dir}
-				return m, m.readDir(dir)
+				return m, m.readDir(m.currentTab, dir)
 			case "ctrl+w":
 				path := m.pathInput.Value()
 				parent := filepath.Dir(path)

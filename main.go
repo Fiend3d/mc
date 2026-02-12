@@ -10,7 +10,7 @@ import (
 )
 
 func (m model) Init() tea.Cmd {
-	return m.readDir(m.tabs[0].dir)
+	return m.readDir(0, m.tabs[0].dir)
 }
 
 func main() {

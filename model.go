@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 type mode int
@@ -123,14 +125,7 @@ func (m *message) render(theme *theme, renderTime bool) string {
 	return s.String()
 }
 
-type action int
-
-const (
-	copyAction action = iota
-	cutAction
-)
-
-func (m *model) doAction(action action) tea.Cmd {
+func (m *model) copyCut(cut bool) string {
 	page := m.getPage()
 	var paths []string
 	switch m.mode {
@@ -152,15 +147,15 @@ func (m *model) doAction(action action) tea.Cmd {
 	}
 
 	var txt string
-	switch action {
-	case copyAction:
-		setClipboardFiles(paths, OpCopy)
-		txt = "copied"
-	case cutAction:
+	if cut {
 		setClipboardFiles(paths, OpCut)
 		txt = "cut"
+	} else {
+		setClipboardFiles(paths, OpCopy)
+		txt = "copied"
 	}
-	return m.addMessage(msgInfo, fmt.Sprintf("%d paths %s", len(paths), txt))
+
+	return fmt.Sprintf("%d paths %s", len(paths), txt)
 }
 
 type model struct {
@@ -207,6 +202,21 @@ func tick() tea.Cmd {
 	})
 }
 
+func (m *model) fillPage(tab int, entries []os.DirEntry, dir string, cursor int) error {
+	page := m.tabs[tab].pages[dir]
+	page.items = nil
+	for i := range entries {
+		item, err := newItem(entries[i], page.dir)
+		if err != nil {
+			return err
+		}
+		page.items = append(page.items, item)
+	}
+	page.cursor = cursor
+	m.tabs[tab].pages[dir] = page
+	return nil
+}
+
 func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
 	message := message{time: time.Now(), messageType: msgType, message: msg}
 	m.log = append(m.log, message)
@@ -223,7 +233,7 @@ func (m *model) left() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	tab.pages[parent] = &page{dir: parent}
-	return m, m.readDir(parent)
+	return m, m.readDir(m.currentTab, parent)
 }
 
 func (m *model) right() (tea.Model, tea.Cmd) {
@@ -243,7 +253,7 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	tab.pages[dir] = newPage(dir)
-	return m, m.readDir(dir)
+	return m, m.readDir(m.currentTab, dir)
 }
 
 func (m *model) getTab() *tab {

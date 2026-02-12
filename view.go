@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -83,19 +82,12 @@ func (m model) View() string {
 
 		item := page.items[i+page.start] // it might crash here
 
-		filepaths, op, err := getClipboardFiles()
-		if err == nil {
-			if slices.Contains(filepaths, item.fullPath) {
-				switch op {
-				case OpCopy:
-					s.WriteString(m.theme.copiedStyle.Render(" "))
-				case OpCut:
-					s.WriteString(m.theme.cutStyle.Render(" "))
-				}
-			} else {
-				s.WriteString(style.Render(" "))
-			}
-		} else {
+		switch item.action {
+		case itemActionCopy:
+			s.WriteString(m.theme.copiedStyle.Render(" "))
+		case itemActionCut:
+			s.WriteString(m.theme.cutStyle.Render(" "))
+		default:
 			s.WriteString(style.Render(" "))
 		}
 
@@ -249,7 +241,6 @@ func (m model) View() string {
 		rows := [][]string{
 			{"g", "Go to path"},
 			{"b", "Go to bookmarks"},
-			{"r", "Reset action"},
 		}
 
 		tStyle := m.theme.baseStyle

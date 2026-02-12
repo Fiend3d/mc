@@ -3,15 +3,25 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/dustin/go-humanize"
+)
+
+type itemAction int
+
+const (
+	itemActionNone itemAction = iota
+	itemActionCopy
+	itemActionCut
 )
 
 type item struct {
 	entry    os.DirEntry
 	fullPath string
 	selected bool
+	action   itemAction
 
 	isDir     bool
 	isSymlink bool
@@ -61,6 +71,18 @@ func newItem(entry os.DirEntry, dir string) (*item, error) {
 	item.modTime = info.ModTime().Format("02.01.2006 15:04")
 
 	item.mode = info.Mode().String()
+
+	paths, op, err := getClipboardFiles()
+	if err == nil {
+		if slices.Contains(paths, item.fullPath) {
+			switch op {
+			case OpCopy:
+				item.action = itemActionCopy
+			case OpCut:
+				item.action = itemActionCut
+			}
+		}
+	}
 
 	return item, nil
 }
