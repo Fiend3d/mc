@@ -114,15 +114,15 @@ func (m model) View() string {
 			)
 			nameBlock.WriteString(style.Bold(true).Render("/"))
 		} else {
-			var nameColor *lipgloss.Color
-			if item.exe {
-				nameColor = &m.theme.greenColor
+			if strings.HasSuffix(strings.ToLower(item.name), ".exe") {
+				nameBlock.WriteString(
+					style.Foreground(m.theme.greenColor).Render(item.name),
+				)
 			} else {
-				nameColor = &m.theme.whiteColor
+				nameBlock.WriteString(
+					style.Foreground(m.theme.whiteColor).Render(item.name),
+				)
 			}
-			nameBlock.WriteString(
-				style.Foreground(nameColor).Render(item.name),
-			)
 		}
 
 		if item.isSymlink {
