@@ -30,6 +30,8 @@ type item struct {
 	modTime   string
 	size      string
 	mode      string
+
+	exe bool
 }
 
 func newItem(entry os.DirEntry, dir string) (*item, error) {
@@ -82,6 +84,10 @@ func newItem(entry os.DirEntry, dir string) (*item, error) {
 				item.action = itemActionCut
 			}
 		}
+	}
+
+	if !item.isDir && strings.HasSuffix(strings.ToUpper(item.name), ".EXE") {
+		item.exe = true
 	}
 
 	return item, nil

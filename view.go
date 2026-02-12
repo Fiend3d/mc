@@ -114,8 +114,14 @@ func (m model) View() string {
 			)
 			nameBlock.WriteString(style.Bold(true).Render("/"))
 		} else {
+			var nameColor *lipgloss.Color
+			if item.exe {
+				nameColor = &m.theme.greenColor
+			} else {
+				nameColor = &m.theme.whiteColor
+			}
 			nameBlock.WriteString(
-				style.Foreground(m.theme.whiteColor).Render(item.name),
+				style.Foreground(nameColor).Render(item.name),
 			)
 		}
 
