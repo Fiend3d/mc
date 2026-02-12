@@ -83,21 +83,20 @@ func (m model) View() string {
 
 		item := page.items[i+page.start] // it might crash here
 
-		switch m.action {
-		case noAction:
+		filepaths, op, err := getClipboardFiles()
+		if err == nil {
+			if slices.Contains(filepaths, item.fullPath) {
+				switch op {
+				case OpCopy:
+					s.WriteString(m.theme.copiedStyle.Render(" "))
+				case OpCut:
+					s.WriteString(m.theme.cutStyle.Render(" "))
+				}
+			} else {
+				s.WriteString(style.Render(" "))
+			}
+		} else {
 			s.WriteString(style.Render(" "))
-		case copy:
-			if slices.Contains(m.actionPaths, item.fullPath) {
-				s.WriteString(m.theme.copiedStyle.Render(" "))
-			} else {
-				s.WriteString(style.Render(" "))
-			}
-		case cut:
-			if slices.Contains(m.actionPaths, item.fullPath) {
-				s.WriteString(m.theme.cutStyle.Render(" "))
-			} else {
-				s.WriteString(style.Render(" "))
-			}
 		}
 
 		if m.mode == visual && current {
@@ -201,47 +200,32 @@ func (m model) View() string {
 		modeBlock += base.Render("  ")
 	}
 
-	switch m.action {
-	case noAction:
-		var itemName string
-		var modeBitsStr string
-		if page.cursor < len(page.items) {
-			selected_item := page.items[page.cursor]
-			itemName = selected_item.name
-			modeBitsStr = selected_item.mode
-		}
-
-		modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
-
-		rightStr := fmt.Sprintf(" [%d/%d] ", page.cursor+1, len(page.items))
-		rightBlock := m.theme.baseStyle.Render(rightStr)
-		rightBlock = modeBitsBlock + rightBlock
-		rightWidth := lipgloss.Width(rightBlock)
-
-		nameWidth := max(1, m.width-modeWidth-rightWidth)
-		itemName = ansi.Truncate(itemName, nameWidth, "…")
-
-		nameBlock := base.
-			Width(nameWidth).
-			Render(itemName)
-
-		statusBar := modeBlock + nameBlock + rightBlock
-
-		s.WriteString(statusBar)
-		s.WriteRune('\n')
-
-	case copy:
-		s.WriteString(modeBlock)
-		statusMsg := fmt.Sprintf("%d paths copied", len(m.actionPaths))
-		s.WriteString(base.Width(m.width - modeWidth).Foreground(m.theme.accentColor3).Render(statusMsg))
-		s.WriteRune('\n')
-
-	case cut:
-		s.WriteString(modeBlock)
-		statusMsg := fmt.Sprintf("%d paths cut", len(m.actionPaths))
-		s.WriteString(base.Width(m.width - modeWidth).Foreground(m.theme.accentColor1).Render(statusMsg))
-		s.WriteRune('\n')
+	var itemName string
+	var modeBitsStr string
+	if page.cursor < len(page.items) {
+		selected_item := page.items[page.cursor]
+		itemName = selected_item.name
+		modeBitsStr = selected_item.mode
 	}
+
+	modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
+
+	rightStr := fmt.Sprintf(" [%d/%d] ", page.cursor+1, len(page.items))
+	rightBlock := m.theme.baseStyle.Render(rightStr)
+	rightBlock = modeBitsBlock + rightBlock
+	rightWidth := lipgloss.Width(rightBlock)
+
+	nameWidth := max(1, m.width-modeWidth-rightWidth)
+	itemName = ansi.Truncate(itemName, nameWidth, "…")
+
+	nameBlock := base.
+		Width(nameWidth).
+		Render(itemName)
+
+	statusBar := modeBlock + nameBlock + rightBlock
+
+	s.WriteString(statusBar)
+	s.WriteRune('\n')
 
 	switch m.mode {
 	case filter:

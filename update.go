@@ -147,11 +147,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pathInput.Focus()
 					m.pathInputDir = "nope"
 					return m, textinput.Blink
-				case "r":
-					m.submode = noSubmode
-					m.action = noAction
-					m.actionPaths = nil
-					return m, nil
 				}
 
 			case noSubmode:
@@ -196,17 +191,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logStart = 0
 					return m, nil
 				case "y":
-					return m, m.addAction(copy, "copied")
+					return m, m.doAction(copyAction, "copied")
 				case "x":
-					return m, m.addAction(cut, "cut")
+					return m, m.doAction(cutAction, "cut")
 				case "p":
-					if m.action == noAction {
+					paths, op, err := getClipboardFiles()
+					if err != nil {
 						return m, m.addMessage(msgWarning, "nothing to paste")
 					}
 					m.jobs++
 					page := m.getPage()
-					copyCmd := &copyCommand{paths: m.actionPaths, dst: page.dir}
-					return m, tea.Batch(m.addMessage(msgInfo, fmt.Sprintf("command: %s", copyCmd)), m.spinner.Tick, m.newCommand(copyCmd))
+					var cmd command
+					switch op {
+					case OpCopy:
+						cmd = &copyCommand{paths: paths, dst: page.dir}
+					}
+					return m, tea.Batch(
+						m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
+						m.spinner.Tick,
+						m.newCommand(cmd))
 				}
 			}
 
@@ -253,9 +256,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "y":
-				return m, m.addAction(copy, "copied")
+				return m, m.doAction(copyAction, "copied")
 			case "x":
-				return m, m.addAction(copy, "cut")
+				return m, m.doAction(cutAction, "cut")
 			}
 
 		case filter:

@@ -126,34 +126,37 @@ func (m *message) render(theme *theme, renderTime bool) string {
 type action int
 
 const (
-	noAction action = iota
-	copy
-	cut
+	copyAction action = iota
+	cutAction
 )
 
-func (m *model) addAction(action action, txt string) tea.Cmd {
+func (m *model) doAction(action action, txt string) tea.Cmd {
 	page := m.getPage()
-	var actionPaths []string
+	var paths []string
 	switch m.mode {
 	case visual:
 		start, end := page.getStartEnd()
 		for i := start; i <= end; i++ {
-			actionPaths = append(actionPaths, page.items[i].fullPath)
+			paths = append(paths, page.items[i].fullPath)
 		}
 		m.mode = normal
 	default:
 		for i := range page.items {
 			if page.items[i].selected {
-				actionPaths = append(actionPaths, page.items[i].fullPath)
+				paths = append(paths, page.items[i].fullPath)
 			}
 		}
-		if len(actionPaths) == 0 {
-			actionPaths = append(actionPaths, page.items[page.cursor].fullPath)
+		if len(paths) == 0 {
+			paths = append(paths, page.items[page.cursor].fullPath)
 		}
 	}
-	m.action = action
-	m.actionPaths = actionPaths
-	return m.addMessage(msgInfo, fmt.Sprintf("%d paths %s", len(m.actionPaths), txt))
+	switch action {
+	case copyAction:
+		setClipboardFiles(paths, OpCopy)
+	case cutAction:
+		setClipboardFiles(paths, OpCut)
+	}
+	return m.addMessage(msgInfo, fmt.Sprintf("%d paths %s", len(paths), txt))
 }
 
 type model struct {
@@ -165,10 +168,8 @@ type model struct {
 	width      int
 	height     int
 
-	action      action
-	actionPaths []string
-	jobs        int
-	spinner     spinner.Model
+	jobs    int
+	spinner spinner.Model
 
 	cm *commandManager
 

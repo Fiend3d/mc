@@ -1,6 +1,6 @@
 module mc
 
-go 1.25.4
+go 1.26.0
 
 require (
 	github.com/charmbracelet/bubbles v0.21.1
@@ -9,6 +9,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.5
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-pkgz/fileutils v0.4.0
+	github.com/gonutz/w32 v1.0.0
 	github.com/rmhubbert/bubbletea-overlay v0.6.4
 	golang.org/x/sys v0.38.0
 )
