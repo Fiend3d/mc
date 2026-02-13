@@ -1,8 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
+	"sort"
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/windows"
@@ -189,4 +194,72 @@ func realWindowsPath(path string) (string, error) {
 	}
 
 	return result, nil
+}
+
+// uniquePath returns the next available numbered path
+// Like Maya's naming: if test01, test02 exist, returns test03
+func uniquePath(path string) string {
+	// If exact path doesn't exist, use it
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path
+	}
+
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	name := strings.TrimSuffix(base, ext)
+
+	// Parse name into base and number
+	baseName, numWidth := parseName(name)
+
+	// Collect all existing numbers
+	existingNums := findExistingNumbers(dir, baseName, ext)
+
+	// Find next available (smallest positive integer not in existing)
+	nextNum := 1
+	for {
+		if !slices.Contains(existingNums, nextNum) {
+			break
+		}
+		nextNum++
+	}
+
+	return filepath.Join(dir,
+		fmt.Sprintf("%s%0*d%s", baseName, numWidth, nextNum, ext))
+}
+
+func parseName(name string) (baseName string, numWidth int) {
+	re := regexp.MustCompile(`^(.*?)(\d+)$`)
+	matches := re.FindStringSubmatch(name)
+
+	if len(matches) == 3 {
+		return matches[1], len(matches[2])
+	}
+	return name, 1
+}
+
+func findExistingNumbers(dir, baseName, ext string) []int {
+	var nums []int
+	pattern := regexp.MustCompile(`^` + regexp.QuoteMeta(baseName) + `(\d+)` + regexp.QuoteMeta(ext) + `$`)
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nums
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		matches := pattern.FindStringSubmatch(entry.Name())
+		if len(matches) == 2 {
+			num, _ := strconv.Atoi(matches[1])
+			if num > 0 {
+				nums = append(nums, num)
+			}
+		}
+	}
+
+	sort.Ints(nums)
+	return nums
 }

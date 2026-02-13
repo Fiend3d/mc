@@ -32,21 +32,45 @@ type updateDirMsg struct {
 	cursor  int
 }
 
-func (m *model) update(tab int) tea.Cmd {
-	return func() tea.Msg {
-		page := m.tabs[tab].getPage()
-		entries, err := readEntries(page.dir)
-		if err != nil {
-			return newErr(err)
+func (m *model) update(dir string) tea.Cmd {
+	var cmds []tea.Cmd
+
+	for i := range m.tabs {
+		tab := m.tabs[i]
+		page, ok := tab.pages[dir]
+		if !ok {
+			continue
 		}
 
-		cursor := page.cursor
-		if cursor >= len(entries) {
-			cursor = len(entries) - 1
-		}
+		// Create command for each page
+		cmd := func(dir string, tab int, cursor int) tea.Cmd {
+			return func() tea.Msg {
+				entries, err := readEntries(dir)
+				if err != nil {
+					return newErr(err)
+				}
+				if cursor >= len(entries) {
+					cursor = len(entries) - 1
+				}
+				return updateDirMsg{
+					tab:     tab,
+					dir:     dir,
+					entries: entries,
+					cursor:  cursor,
+				}
+			}
+		}(page.dir, i, page.cursor)
 
-		return updateDirMsg{dir: page.dir, entries: entries, cursor: cursor}
+		cmds = append(cmds, cmd)
 	}
+
+	if len(cmds) == 0 {
+		return nil
+	}
+	if len(cmds) == 1 {
+		return cmds[0]
+	}
+	return tea.Batch(cmds...)
 }
 
 func readEntries(dir string) ([]os.DirEntry, error) {
@@ -95,12 +119,20 @@ func (m model) readDir(tab int, dir string) tea.Cmd {
 
 type commandDoneMsg struct {
 	message string
+	dir     string
 	err     error
 }
 
-func (m model) newCommand(cmd command) tea.Cmd {
+func (m model) execute(cmd command, dir string) tea.Cmd {
 	return func() tea.Msg {
 		err := m.cm.execute(cmd)
-		return commandDoneMsg{fmt.Sprintf("%s", cmd), err}
+		return commandDoneMsg{fmt.Sprintf("%s", cmd), dir, err}
+	}
+}
+
+func (m model) undo() tea.Cmd {
+	return func() tea.Msg {
+		cmd, err := m.cm.undo()
+		return commandDoneMsg{fmt.Sprintf("undo: %s", cmd), cmd.getDir(), err}
 	}
 }

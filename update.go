@@ -31,7 +31,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				msgFail,
 				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.message))
 		} else {
-			return m, m.addMessage(msgDone, msg.message)
+			return m, tea.Batch(m.addMessage(msgDone, msg.message), m.update(msg.dir))
 		}
 
 	case readDirMsg:
@@ -192,15 +192,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logStart = 0
 					return m, nil
 				case "f5":
+					page := m.getPage()
 					return m, tea.Batch(
 						m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab)),
-						m.update(m.currentTab))
+						m.update(page.dir))
 				case "y":
+					page := m.getPage()
 					msg := m.copyCut(false)
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
 				case "x":
+					page := m.getPage()
 					msg := m.copyCut(true)
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
+				case "u":
+					if !m.cm.canUndo() {
+						return m, m.addMessage(msgWarning, "nothing to undo")
+					}
+					return m, tea.Batch(
+						m.addMessage(msgInfo, "undo"),
+						m.spinner.Tick,
+						m.undo())
+
 				case "p":
 					paths, op, err := getClipboardFiles()
 					if err != nil {
@@ -211,12 +223,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					var cmd command
 					switch op {
 					case OpCopy:
-						cmd = &copyCommand{paths: paths, dst: page.dir}
+						cmd = newCopyCommand(paths, page.dir, false)
 					}
 					return m, tea.Batch(
 						m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
 						m.spinner.Tick,
-						m.newCommand(cmd))
+						m.execute(cmd, page.dir))
 				}
 			}
 
@@ -263,11 +275,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "y":
+				page := m.getPage()
 				msg := m.copyCut(false)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
 			case "x":
+				page := m.getPage()
 				msg := m.copyCut(true)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.currentTab))
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
 			}
 
 		case filter:
