@@ -253,7 +253,7 @@ func (m *model) fillPage(tab int, entries []os.DirEntry) error {
 func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
 	message := message{time: time.Now(), messageType: msgType, message: msg}
 	m.log = append(m.log, message)
-	m.ticks = 6
+	m.ticks += 6
 	return tick()
 }
 

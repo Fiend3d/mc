@@ -60,7 +60,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, m.addMessage(
 				msgFail,
-				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.message))
+				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.err))
 		} else {
 			return m, tea.Batch(
 				m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.message)),
@@ -312,9 +312,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				case "y":
 					msg := m.copyCut(false)
+					m.mode = normal
 					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 				case "x":
 					msg := m.copyCut(true)
+					m.mode = normal
 					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 				case "d":
 					m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})

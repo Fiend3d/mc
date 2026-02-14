@@ -156,6 +156,9 @@ func (c *copyCutCommand) undo() error {
 		return fmt.Errorf("there's a collision")
 	}
 	for i := range c.pairs {
+		if !pathExists(c.pairs[i].dst) {
+			return fmt.Errorf("%s doesn't exist", c.pairs[i].dst)
+		}
 		err := os.RemoveAll(c.pairs[i].dst)
 		if err != nil {
 			return err
