@@ -274,7 +274,7 @@ func (m model) View() string {
 
 		ui = overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
 
-	case confirmDelete:
+	case confirmDialog:
 		cell := base.
 			Border(lipgloss.NormalBorder()).
 			BorderBackground(m.theme.baseStyle.GetBackground()).

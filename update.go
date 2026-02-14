@@ -11,6 +11,37 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc", "n":
+			m.mode = normal
+			m.submode = noSubmode
+			return m, nil
+		case "left", "right", "h", "l":
+			m.yes = !m.yes
+			return m, nil
+		case "enter":
+			if m.yes {
+				m.mode = normal
+				m.submode = noSubmode
+				return m, m.addCommand(m.cmd)
+			} else {
+				m.mode = normal
+				m.submode = noSubmode
+				return m, nil
+			}
+		case "y":
+			m.mode = normal
+			m.submode = noSubmode
+			return m, m.addCommand(m.cmd)
+		}
+	}
+
+	return m, nil
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -31,7 +62,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				msgFail,
 				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.message))
 		} else {
-			return m, tea.Batch(m.addMessage(msgDone, msg.message), m.update(msg.dir))
+			return m, tea.Batch(
+				m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.message)),
+				m.update(msg.dir))
 		}
 
 	case readDirMsg:
@@ -147,26 +180,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pathInputDir = "nope"
 					return m, textinput.Blink
 				}
-			case confirmDelete:
-				switch msg.String() {
-				case "esc", "n":
-					m.submode = noSubmode
-					return m, nil
-				case "left", "right", "h", "l":
-					m.yes = !m.yes
-					return m, nil
-				case "enter":
-					if m.yes {
-						m.submode = noSubmode
-						return m, m.addMessage(msgInfo, "delete")
-					} else {
-						m.submode = noSubmode
-						return m, nil
-					}
-				case "y":
-					m.submode = noSubmode
-					return m, m.addMessage(msgInfo, "delete")
-				}
+
+			case confirmDialog:
+				return m.handleConfirm(msg)
 
 			case noSubmode:
 				switch msg.String() {
@@ -179,8 +195,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.submode = goMode
 					return m, nil
 				case "d":
-					m.yes = false
-					m.submode = confirmDelete
+					m.confirm(&deleteCommand{m.getTab().dir, m.getPaths()})
 					return m, nil
 				// case "d":
 				// 	return m, newErr(errors.New("EPIC FAIL"))
@@ -237,15 +252,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.addMessage(msgWarning, "nothing to paste")
 					}
 					m.jobs++
-					var cmd command
+					var cmd *copyCutCommand
 					switch op {
 					case OpCopy:
-						cmd = newCopyCommand(paths, m.getTab().dir, false)
+						cmd = newCopyCutCommand(true, paths, m.getTab().dir, false)
 					}
-					return m, tea.Batch(
-						m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
-						m.spinner.Tick,
-						m.execute(cmd, m.getTab().dir))
+					if cmd.collision {
+						m.confirm(cmd)
+						return m, nil
+					}
+					return m, m.addCommand(cmd)
 				}
 			}
 
@@ -285,19 +301,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case visual:
-			switch msg.String() {
-			case "esc":
-				m.mode = normal
-				return m, nil
-			case "v":
-				m.mode = normal
-				return m, nil
-			case "y":
-				msg := m.copyCut(false)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-			case "x":
-				msg := m.copyCut(true)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+			switch m.submode {
+			case noSubmode:
+				switch msg.String() {
+				case "esc":
+					m.mode = normal
+					return m, nil
+				case "v":
+					m.mode = normal
+					return m, nil
+				case "y":
+					msg := m.copyCut(false)
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+				case "x":
+					msg := m.copyCut(true)
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+				case "d":
+					m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
+					return m, nil
+				}
+
+			case confirmDialog:
+				return m.handleConfirm(msg)
 			}
 
 		case filter:

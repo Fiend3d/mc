@@ -10,7 +10,7 @@ import (
 
 type command interface {
 	execute() error
-	undo() (command, error)
+	undo() error
 	String() string
 	getDir() string
 }
@@ -40,7 +40,7 @@ func (cm *commandManager) undo() (command, error) {
 	}
 
 	lastCmd := cm.history[len(cm.history)-1]
-	_, err := lastCmd.undo()
+	err := lastCmd.undo()
 
 	cm.history = cm.history[:len(cm.history)-1]
 	cm.redoStack = append(cm.redoStack, lastCmd)
@@ -96,13 +96,14 @@ type pathPair struct {
 	dst string
 }
 
-type copyCommand struct {
+type copyCutCommand struct {
+	copy      bool
 	dir       string
 	pairs     []pathPair
 	collision bool
 }
 
-func newCopyCommand(paths []string, dst string, override bool) *copyCommand {
+func newCopyCutCommand(copy bool, paths []string, dst string, override bool) *copyCutCommand {
 	var pairs []pathPair
 	collision := false
 	for i := range paths {
@@ -118,18 +119,22 @@ func newCopyCommand(paths []string, dst string, override bool) *copyCommand {
 		}
 	}
 
-	return &copyCommand{dst, pairs, collision}
+	return &copyCutCommand{copy, dst, pairs, collision}
 }
 
-func (c *copyCommand) String() string {
-	return fmt.Sprintf("copy paths:%d", len(c.pairs))
+func (c *copyCutCommand) String() string {
+	if c.copy {
+		return fmt.Sprintf("copy paths:%d", len(c.pairs))
+	} else {
+		return fmt.Sprintf("cut paths:%d", len(c.pairs))
+	}
 }
 
-func (c *copyCommand) getDir() string {
+func (c *copyCutCommand) getDir() string {
 	return c.dir
 }
 
-func (c *copyCommand) execute() error {
+func (c *copyCutCommand) execute() error {
 	for i := range c.pairs {
 		if fileutils.IsDir(c.pairs[i].src) {
 			err := fileutils.CopyDir(c.pairs[i].src, c.pairs[i].dst)
@@ -146,15 +151,15 @@ func (c *copyCommand) execute() error {
 	return nil
 }
 
-func (c *copyCommand) undo() (command, error) {
+func (c *copyCutCommand) undo() error {
 	if c.collision {
-		return nil, fmt.Errorf("there's a collision")
+		return fmt.Errorf("there's a collision")
 	}
 	for i := range c.pairs {
 		err := os.RemoveAll(c.pairs[i].dst)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return nil, nil
+	return nil
 }

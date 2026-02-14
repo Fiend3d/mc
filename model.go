@@ -31,7 +31,7 @@ type submode int
 const (
 	noSubmode submode = iota
 	goMode
-	confirmDelete
+	confirmDialog
 )
 
 type pageSettings struct {
@@ -139,7 +139,7 @@ func (m *message) render(theme *theme, renderTime bool) string {
 	return s.String()
 }
 
-func (m *model) copyCut(cut bool) string {
+func (m *model) getPaths() []string {
 	page := m.getPage()
 	var paths []string
 	switch m.mode {
@@ -148,7 +148,6 @@ func (m *model) copyCut(cut bool) string {
 		for i := start; i <= end; i++ {
 			paths = append(paths, page.items[i].fullPath)
 		}
-		m.mode = normal
 	default:
 		settings := m.getTab().getPageSettings()
 		for i := range page.items {
@@ -160,7 +159,11 @@ func (m *model) copyCut(cut bool) string {
 			paths = append(paths, page.items[settings.cursor].fullPath)
 		}
 	}
+	return paths
+}
 
+func (m *model) copyCut(cut bool) string {
+	paths := m.getPaths()
 	var txt string
 	if cut {
 		setClipboardFiles(paths, OpCut)
@@ -184,6 +187,7 @@ type model struct {
 	height     int
 
 	yes bool
+	cmd command
 
 	jobs    int
 	spinner spinner.Model
@@ -203,6 +207,12 @@ type model struct {
 	result string
 }
 
+func (m *model) confirm(cmd command) {
+	m.submode = confirmDialog
+	m.yes = false
+	m.cmd = cmd
+}
+
 const (
 	msgTxt msgType = iota
 	msgInfo
@@ -211,6 +221,13 @@ const (
 	msgDone
 	msgFail
 )
+
+func (m *model) addCommand(cmd command) tea.Cmd {
+	return tea.Batch(
+		m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
+		m.spinner.Tick,
+		m.execute(cmd, m.getTab().dir))
+}
 
 type tickMsg struct{}
 
