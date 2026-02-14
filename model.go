@@ -31,6 +31,7 @@ type submode int
 const (
 	noSubmode submode = iota
 	goMode
+	confirmDelete
 )
 
 type pageSettings struct {
@@ -181,6 +182,8 @@ type model struct {
 	visual     int
 	width      int
 	height     int
+
+	yes bool
 
 	jobs    int
 	spinner spinner.Model

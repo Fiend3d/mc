@@ -67,6 +67,30 @@ func (cm *commandManager) canRedo() bool {
 	return len(cm.redoStack) > 0
 }
 
+type deleteCommand struct {
+	dir   string
+	paths []string
+}
+
+func (c *deleteCommand) String() string {
+	return fmt.Sprintf("delete %d paths", len(c.paths))
+}
+
+func (c *deleteCommand) getDir() string {
+	return c.dir
+}
+
+func (c *deleteCommand) execute() error {
+	for i := range c.paths {
+		os.RemoveAll(c.paths[i])
+	}
+	return nil
+}
+
+func (c *deleteCommand) undo() error {
+	return fmt.Errorf("can't be undone")
+}
+
 type pathPair struct {
 	src string
 	dst string

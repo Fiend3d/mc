@@ -273,6 +273,36 @@ func (m model) View() string {
 			})
 
 		ui = overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
+
+	case confirmDelete:
+		cell := base.
+			Border(lipgloss.NormalBorder()).
+			BorderBackground(m.theme.baseStyle.GetBackground()).
+			BorderForeground(m.theme.grayColor)
+
+		enable := base.Background(m.theme.greenColor).Foreground(m.theme.blackColor).Bold(true)
+		disable := empty.Foreground(m.theme.grayColor).Bold(true)
+
+		if m.yes {
+			enable, disable = disable, enable
+		}
+
+		header := " Are you sure? It can't be undone. "
+		yes := " Yes "
+		no := " No "
+
+		buttons := base.Render(strings.Repeat(" ",
+			len(header)/2-len(yes))) + disable.Render(yes) + base.Render(" ") + enable.Render(no) + base.Render(strings.Repeat(" ", len(header)/2-len(no)))
+
+		content := lipgloss.JoinVertical(
+			lipgloss.Center,
+			header,
+			buttons,
+		)
+
+		window := cell.Render(content)
+
+		ui = overlay.Composite(window, ui, overlay.Center, overlay.Center, 0, 0)
 	}
 
 	return ui

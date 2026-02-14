@@ -147,6 +147,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pathInputDir = "nope"
 					return m, textinput.Blink
 				}
+			case confirmDelete:
+				switch msg.String() {
+				case "esc", "n":
+					m.submode = noSubmode
+					return m, nil
+				case "left", "right", "h", "l":
+					m.yes = !m.yes
+					return m, nil
+				case "enter":
+					if m.yes {
+						m.submode = noSubmode
+						return m, m.addMessage(msgInfo, "delete")
+					} else {
+						m.submode = noSubmode
+						return m, nil
+					}
+				case "y":
+					m.submode = noSubmode
+					return m, m.addMessage(msgInfo, "delete")
+				}
 
 			case noSubmode:
 				switch msg.String() {
@@ -157,6 +177,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, tea.Quit
 				case "g":
 					m.submode = goMode
+					return m, nil
+				case "d":
+					m.yes = false
+					m.submode = confirmDelete
 					return m, nil
 				// case "d":
 				// 	return m, newErr(errors.New("EPIC FAIL"))
