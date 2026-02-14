@@ -25,41 +25,29 @@ type readDirMsg struct {
 	dir     string
 }
 
-type updateDirMsg struct {
-	tab     int
-	entries []os.DirEntry
-	dir     string
-	cursor  int
-}
-
 func (m *model) update(dir string) tea.Cmd {
 	var cmds []tea.Cmd
 
 	for i := range m.tabs {
 		tab := m.tabs[i]
-		page, ok := tab.pages[dir]
-		if !ok {
+		if tab.dir != dir {
 			continue
 		}
 
 		// Create command for each page
-		cmd := func(dir string, tab int, cursor int) tea.Cmd {
+		cmd := func(dir string, tab int) tea.Cmd {
 			return func() tea.Msg {
 				entries, err := readEntries(dir)
 				if err != nil {
 					return newErr(err)
 				}
-				if cursor >= len(entries) {
-					cursor = len(entries) - 1
-				}
-				return updateDirMsg{
+				return readDirMsg{
 					tab:     tab,
 					dir:     dir,
 					entries: entries,
-					cursor:  cursor,
 				}
 			}
-		}(page.dir, i, page.cursor)
+		}(tab.dir, i)
 
 		cmds = append(cmds, cmd)
 	}
@@ -67,7 +55,7 @@ func (m *model) update(dir string) tea.Cmd {
 	if len(cmds) == 0 {
 		return nil
 	}
-	if len(cmds) == 1 {
+	if len(cmds) == 1 { // is it faster, lol?
 		return cmds[0]
 	}
 	return tea.Batch(cmds...)

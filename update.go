@@ -35,16 +35,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case readDirMsg:
-		err := m.fillPage(msg.tab, msg.entries, msg.dir, 0)
+		err := m.fillPage(msg.tab, msg.entries)
 		if err != nil {
 			return m, newErr(err)
 		}
-		return m, nil
-
-	case updateDirMsg:
-		err := m.fillPage(msg.tab, msg.entries, msg.dir, msg.cursor)
-		if err != nil {
-			return m, newErr(err)
+		settings := m.tabs[msg.tab].getPageSettings()
+		length := len(msg.entries)
+		if settings.cursor >= length {
+			settings.cursor = length - 1
+		}
+		if settings.start >= length {
+			settings.start = length - 1
 		}
 		return m, nil
 
@@ -78,43 +79,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				switch msg.String() {
 				case "down":
-					page := m.getPage()
-					page.moveCursor(1, m.height)
+					m.moveCursor(1)
 					return m, nil
 				case "up":
-					page := m.getPage()
-					page.moveCursor(-1, m.height)
+					m.moveCursor(-1)
 					return m, nil
 				case "pgdown":
-					page := m.getPage()
-					page.moveCursor(3, m.height)
+					m.moveCursor(3)
 					return m, nil
 				case "pgup":
-					page := m.getPage()
-					page.moveCursor(-3, m.height)
+					m.moveCursor(-3)
 					return m, nil
 				case "home":
-					page := m.getPage()
-					page.cursor = 0
-					page.updateStart(m.height)
+					settings := m.getTab().getPageSettings()
+					settings.cursor = 0
+					m.updateStart()
 					return m, nil
 				case "end":
-					page := m.getPage()
-					page.cursor = page.length() - 1
-					page.updateStart(m.height)
+					tab := m.getTab()
+					settings := tab.getPageSettings()
+					settings.cursor = tab.page.length() - 1
+					m.updateStart()
 					return m, nil
 				case " ":
-					page := m.getPage()
+					tab := m.getTab()
 					if m.mode == visual {
-						start, end := page.getStartEnd()
+						start, end := m.getStartEnd()
 						for i := start; i <= end; i++ {
-							item := page.items[i]
+							item := tab.page.items[i]
 							item.selected = !item.selected
 						}
 					} else {
-						selectedItem := page.items[page.cursor]
+						settings := tab.getPageSettings()
+						selectedItem := tab.page.items[settings.cursor]
 						selectedItem.selected = !selectedItem.selected
-						page.moveCursor(1, m.height)
+						m.moveCursor(1)
 					}
 					return m, nil
 				}
@@ -142,9 +141,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "g":
 					m.submode = noSubmode
 					m.mode = path
-					page := m.getPage()
 					m.pathInput.Reset()
-					m.pathInput.SetValue(page.dir)
+					m.pathInput.SetValue(m.getTab().dir)
 					m.pathInput.Focus()
 					m.pathInputDir = "nope"
 					return m, textinput.Blink
@@ -163,12 +161,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// case "d":
 				// 	return m, newErr(errors.New("EPIC FAIL"))
 				case "j":
-					page := m.getPage()
-					page.moveCursor(1, m.height)
+					m.moveCursor(1)
 					return m, nil
 				case "k":
-					page := m.getPage()
-					page.moveCursor(-1, m.height)
+					m.moveCursor(-1)
 					return m, nil
 				case "h":
 					return m.left()
@@ -178,8 +174,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = jump
 					return m, nil
 				case "v":
-					page := m.getPage()
-					page.visual = page.cursor
+					settings := m.getTab().getPageSettings()
+					m.visual = settings.cursor
 					m.mode = visual
 					return m, nil
 				case "f":
@@ -192,22 +188,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.logStart = 0
 					return m, nil
 				case "f5":
-					page := m.getPage()
 					return m, tea.Batch(
 						m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab)),
-						m.update(page.dir))
+						m.update(m.getTab().dir))
 				case "y":
-					page := m.getPage()
 					msg := m.copyCut(false)
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 				case "x":
-					page := m.getPage()
 					msg := m.copyCut(true)
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
+					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 				case "u":
 					if !m.cm.canUndo() {
 						return m, m.addMessage(msgWarning, "nothing to undo")
 					}
+					m.jobs++
 					return m, tea.Batch(
 						m.addMessage(msgInfo, "undo"),
 						m.spinner.Tick,
@@ -219,16 +213,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.addMessage(msgWarning, "nothing to paste")
 					}
 					m.jobs++
-					page := m.getPage()
 					var cmd command
 					switch op {
 					case OpCopy:
-						cmd = newCopyCommand(paths, page.dir, false)
+						cmd = newCopyCommand(paths, m.getTab().dir, false)
 					}
 					return m, tea.Batch(
 						m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
 						m.spinner.Tick,
-						m.execute(cmd, page.dir))
+						m.execute(cmd, m.getTab().dir))
 				}
 			}
 
@@ -253,14 +246,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 
 					if len(matches) > 0 {
-						if slices.Contains(matches, page.cursor) {
-							index := slices.Index(matches, page.cursor)
+						settings := m.getTab().getPageSettings()
+						if slices.Contains(matches, settings.cursor) {
+							index := slices.Index(matches, settings.cursor)
 							next := (index + 1) % len(matches)
-							page.cursor = matches[next]
+							settings.cursor = matches[next]
 						} else {
-							page.cursor = matches[0]
+							settings.cursor = matches[0]
 						}
-						page.updateStart(m.height)
+						m.updateStart()
 					}
 				}
 				return m, nil
@@ -275,13 +269,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "y":
-				page := m.getPage()
 				msg := m.copyCut(false)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 			case "x":
-				page := m.getPage()
 				msg := m.copyCut(true)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(page.dir))
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 			}
 
 		case filter:
@@ -297,7 +289,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normal
 				return m, nil
 			case "enter":
-				// TODO: handle ~ and env vars
 				dir := m.pathInput.Value()
 				if strings.TrimSpace(dir) == "" {
 					return m, m.addMessage(msgError, "empty path")
@@ -323,11 +314,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 				tab.dir = dir
-				_, exists := tab.pages[dir]
-				if exists {
-					return m, nil
-				}
-				tab.pages[dir] = &page{dir: dir}
+				tab.page = &page{}
 				return m, m.readDir(m.currentTab, dir)
 			case "ctrl+w":
 				path := m.pathInput.Value()

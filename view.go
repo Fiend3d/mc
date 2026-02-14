@@ -32,10 +32,11 @@ func (m model) View() string {
 	var s strings.Builder
 
 	page := m.getPage()
+	settings := m.getTab().getPageSettings()
 
 	// Header (directory)
 	if m.mode != path {
-		s.WriteString(empty.Width(m.width).Bold(true).Render(page.dir))
+		s.WriteString(empty.Width(m.width).Bold(true).Render(m.getTab().dir))
 		s.WriteRune('\n')
 	} else {
 		widget := m.pathInput.View()
@@ -53,17 +54,17 @@ func (m model) View() string {
 	countItems := 0
 
 	for i := range page.items {
-		if i+1 > m.height-3 || i+page.start >= len(page.items) {
+		if i+1 > m.height-3 || i+settings.start >= len(page.items) {
 			break
 		}
 
 		style := base
 
-		index := i + page.start
-		current := index == page.cursor
+		index := i + settings.start
+		current := index == settings.cursor
 		cursor := " "
 		if m.mode == visual {
-			start, end := page.getStartEnd()
+			start, end := m.getStartEnd()
 			if index >= start && index <= end {
 				style = &m.theme.cursorStyle
 				switch index {
@@ -80,7 +81,7 @@ func (m model) View() string {
 			}
 		}
 
-		item := page.items[i+page.start] // it might crash here
+		item := page.items[i+settings.start] // it might crash here
 
 		switch item.action {
 		case itemActionCopy:
@@ -200,15 +201,15 @@ func (m model) View() string {
 
 	var itemName string
 	var modeBitsStr string
-	if page.cursor < len(page.items) {
-		selected_item := page.items[page.cursor]
+	if settings.cursor < len(page.items) {
+		selected_item := page.items[settings.cursor]
 		itemName = selected_item.name
 		modeBitsStr = selected_item.mode
 	}
 
 	modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
 
-	rightStr := fmt.Sprintf(" [%d/%d] ", page.cursor+1, len(page.items))
+	rightStr := fmt.Sprintf(" [%d/%d] ", settings.cursor+1, len(page.items))
 	rightBlock := m.theme.baseStyle.Render(rightStr)
 	rightBlock = modeBitsBlock + rightBlock
 	rightWidth := lipgloss.Width(rightBlock)

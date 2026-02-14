@@ -33,30 +33,39 @@ const (
 	goMode
 )
 
-type tab struct {
-	dir   string
-	pages map[string]*page
+type pageSettings struct {
+	start  int
+	cursor int
 }
 
-func (t *tab) getPage() *page {
-	return t.pages[t.dir]
+type tab struct {
+	dir          string
+	page         *page
+	pageSettings map[string]*pageSettings
+}
+
+func newTab(dir string, page *page) *tab {
+	return &tab{dir: dir, page: page, pageSettings: make(map[string]*pageSettings)}
+}
+
+func (t *tab) getPageSettings() *pageSettings {
+	settings, ok := t.pageSettings[t.dir]
+	if !ok {
+		settings := &pageSettings{}
+		t.pageSettings[t.dir] = settings
+		return settings
+	}
+	return settings
 }
 
 type page struct {
-	dir    string
-	items  []*item
-	cursor int
-	visual int
-	start  int
+	items []*item
 }
 
-func newPage(dir string) *page {
-	return &page{dir: dir}
-}
-
-func (p *page) getStartEnd() (int, int) {
-	start := min(p.cursor, p.visual)
-	end := max(p.cursor, p.visual)
+func (m *model) getStartEnd() (int, int) {
+	settings := m.getTab().getPageSettings()
+	start := min(settings.cursor, m.visual)
+	end := max(settings.cursor, m.visual)
 	return start, end
 }
 
@@ -64,26 +73,30 @@ func (p *page) length() int {
 	return len(p.items)
 }
 
-func (p *page) updateStart(height int) {
-	if p.cursor < p.start {
-		p.start = p.cursor
+func (m *model) updateStart() {
+	settings := m.getTab().getPageSettings()
+	if settings.cursor < settings.start {
+		settings.start = settings.cursor
 		return
 	}
-	actualHeight := height - 4
-	if p.cursor > p.start+actualHeight {
-		p.start = p.cursor - actualHeight
+	actualHeight := m.height - 4
+	if settings.cursor > settings.start+actualHeight {
+		settings.start = settings.cursor - actualHeight
 	}
 }
 
-func (p *page) moveCursor(move, height int) {
-	p.cursor += move
-	if p.cursor > p.length()-1 {
-		p.cursor = p.length() - 1
+func (m *model) moveCursor(move int) {
+	tab := m.getTab()
+	settings := tab.getPageSettings()
+	settings.cursor += move
+	length := tab.page.length()
+	if settings.cursor > length-1 {
+		settings.cursor = length - 1
 	}
-	if p.cursor < 0 {
-		p.cursor = 0
+	if settings.cursor < 0 {
+		settings.cursor = 0
 	}
-	p.updateStart(height)
+	m.updateStart()
 }
 
 type msgType int
@@ -130,19 +143,20 @@ func (m *model) copyCut(cut bool) string {
 	var paths []string
 	switch m.mode {
 	case visual:
-		start, end := page.getStartEnd()
+		start, end := m.getStartEnd()
 		for i := start; i <= end; i++ {
 			paths = append(paths, page.items[i].fullPath)
 		}
 		m.mode = normal
 	default:
+		settings := m.getTab().getPageSettings()
 		for i := range page.items {
 			if page.items[i].selected {
 				paths = append(paths, page.items[i].fullPath)
 			}
 		}
 		if len(paths) == 0 {
-			paths = append(paths, page.items[page.cursor].fullPath)
+			paths = append(paths, page.items[settings.cursor].fullPath)
 		}
 	}
 
@@ -164,6 +178,7 @@ type model struct {
 	currentTab int
 	mode       mode
 	submode    submode
+	visual     int
 	width      int
 	height     int
 
@@ -202,18 +217,16 @@ func tick() tea.Cmd {
 	})
 }
 
-func (m *model) fillPage(tab int, entries []os.DirEntry, dir string, cursor int) error {
-	page := m.tabs[tab].pages[dir]
+func (m *model) fillPage(tab int, entries []os.DirEntry) error {
+	page := m.tabs[tab].page
 	page.items = nil
 	for i := range entries {
-		item, err := newItem(entries[i], page.dir)
+		item, err := newItem(entries[i], m.tabs[tab].dir)
 		if err != nil {
 			return err
 		}
 		page.items = append(page.items, item)
 	}
-	page.cursor = cursor
-	m.tabs[tab].pages[dir] = page
 	return nil
 }
 
@@ -228,31 +241,23 @@ func (m *model) left() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
 	parent := filepath.Dir(tab.dir)
 	tab.dir = parent
-	_, exists := tab.pages[parent] // not gonna update anything
-	if exists {
-		return m, nil
-	}
-	tab.pages[parent] = &page{dir: parent}
+	tab.page = &page{}
 	return m, m.readDir(m.currentTab, parent)
 }
 
 func (m *model) right() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
-	currentPage := tab.getPage()
-	if currentPage.cursor > len(currentPage.items)-1 {
+	settings := tab.getPageSettings()
+	if settings.cursor > len(tab.page.items)-1 {
 		return m, nil
 	}
-	selectedItem := currentPage.items[currentPage.cursor]
+	selectedItem := tab.page.items[settings.cursor]
 	if !selectedItem.isDir {
 		return m, nil
 	}
 	dir := filepath.Join(tab.dir, selectedItem.name)
 	tab.dir = dir
-	_, exists := tab.pages[dir] // not gonna update
-	if exists {
-		return m, nil
-	}
-	tab.pages[dir] = newPage(dir)
+	tab.page = &page{}
 	return m, m.readDir(m.currentTab, dir)
 }
 
@@ -262,7 +267,7 @@ func (m *model) getTab() *tab {
 
 func (m *model) getPage() *page { // probably redundant
 	tab := m.getTab()
-	return tab.pages[tab.dir]
+	return tab.page
 }
 
 func newTextinput(placeholder string, style lipgloss.Style, grayColor lipgloss.Color) textinput.Model {
@@ -282,9 +287,7 @@ func newTextinput(placeholder string, style lipgloss.Style, grayColor lipgloss.C
 func initialModel(dirs []string) model {
 	tabs := make([]*tab, len(dirs))
 	for i, dir := range dirs {
-		pages := make(map[string]*page)
-		pages[dir] = &page{dir: dir}
-		tabs[i] = &tab{dir: dir, pages: pages}
+		tabs[i] = newTab(dir, &page{})
 	}
 
 	theme := newTheme()
