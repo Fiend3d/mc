@@ -91,7 +91,7 @@ func (m *model) moveCursor(move int) {
 	settings := tab.getPageSettings()
 	settings.cursor += move
 	length := tab.page.length()
-	if settings.cursor > length-1 {
+	if settings.cursor >= length {
 		settings.cursor = length - 1
 	}
 	if settings.cursor < 0 {

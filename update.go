@@ -11,6 +11,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func (m *model) handleQuit(result bool) (tea.Model, tea.Cmd) {
+	if m.jobs > 0 {
+		return m, m.addMessage(msgError, "unfinished jobs")
+	}
+	if result {
+		m.result = m.getTab().dir
+	}
+	return m, tea.Quit
+}
+
 func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -40,6 +50,26 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
+	paths, op, err := getClipboardFiles()
+	if err != nil {
+		return m, m.addMessage(msgWarning, "nothing to paste")
+	}
+	var cmd *copyCutCommand
+	switch op {
+	case OpCopy:
+		cmd = newCopyCutCommand(true, paths, m.getTab().dir, override)
+	case OpCut:
+		cmd = newCopyCutCommand(false, paths, m.getTab().dir, override)
+	}
+	if cmd.collision {
+		m.confirm(cmd)
+		return m, nil
+	}
+	m.jobs++
+	return m, m.addCommand(cmd)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -77,8 +107,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if settings.cursor >= length {
 			settings.cursor = length - 1
 		}
+		if settings.cursor < 0 {
+			settings.cursor = 0
+		}
 		if settings.start >= length {
 			settings.start = length - 1
+		}
+		if settings.start < 0 {
+			settings.start = 0
 		}
 		return m, nil
 
@@ -187,10 +223,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case noSubmode:
 				switch msg.String() {
 				case "Q":
-					return m, tea.Quit
+					return m.handleQuit(false)
 				case "q":
-					m.result = m.getTab().dir
-					return m, tea.Quit
+					return m.handleQuit(true)
 				case "g":
 					m.submode = goMode
 					return m, nil
@@ -247,21 +282,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.undo())
 
 				case "p":
-					paths, op, err := getClipboardFiles()
-					if err != nil {
-						return m, m.addMessage(msgWarning, "nothing to paste")
-					}
-					m.jobs++
-					var cmd *copyCutCommand
-					switch op {
-					case OpCopy:
-						cmd = newCopyCutCommand(true, paths, m.getTab().dir, false)
-					}
-					if cmd.collision {
-						m.confirm(cmd)
-						return m, nil
-					}
-					return m, m.addCommand(cmd)
+					return m.handlePaste(false)
+				case "P":
+					return m.handlePaste(true)
 				}
 			}
 
@@ -414,10 +437,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logStart = len(m.log) - 1
 				return m, nil
 			case "Q":
-				return m, tea.Quit
+				return m.handleQuit(false)
 			case "q":
-				m.result = m.getTab().dir
-				return m, tea.Quit
+				return m.handleQuit(true)
 			}
 		}
 	}

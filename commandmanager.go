@@ -82,7 +82,10 @@ func (c *deleteCommand) getDir() string {
 
 func (c *deleteCommand) execute() error {
 	for i := range c.paths {
-		os.RemoveAll(c.paths[i])
+		err := os.RemoveAll(c.paths[i])
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -141,10 +144,23 @@ func (c *copyCutCommand) execute() error {
 			if err != nil {
 				return err
 			}
+			if !c.copy {
+				err := os.RemoveAll(c.pairs[i].src)
+				if err != nil {
+					return err
+				}
+			}
 		} else {
-			err := fileutils.CopyFile(c.pairs[i].src, c.pairs[i].dst)
-			if err != nil {
-				return err
+			if c.copy {
+				err := fileutils.CopyFile(c.pairs[i].src, c.pairs[i].dst)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := fileutils.MoveFile(c.pairs[i].src, c.pairs[i].dst)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -159,9 +175,23 @@ func (c *copyCutCommand) undo() error {
 		if !pathExists(c.pairs[i].dst) {
 			return fmt.Errorf("%s doesn't exist", c.pairs[i].dst)
 		}
-		err := os.RemoveAll(c.pairs[i].dst)
-		if err != nil {
-			return err
+		if c.copy {
+			err := os.RemoveAll(c.pairs[i].dst)
+			if err != nil {
+				return err
+			}
+		} else {
+			if fileutils.IsDir(c.pairs[i].dst) {
+				err := fileutils.CopyDir(c.pairs[i].dst, c.pairs[i].src)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := fileutils.MoveFile(c.pairs[i].dst, c.pairs[i].src)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 	return nil
