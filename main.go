@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("failed to launch the program: %s", err)
 	}
 
-	finalModel := m.(model)
+	finalModel := m.(*model)
 
 	if output {
 		if finalModel.result != "" {
