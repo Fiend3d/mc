@@ -234,7 +234,12 @@ func (m model) View() string {
 
 	default:
 		if m.ticks > 0 {
-			s.WriteString(empty.Width(m.width).Render(m.log[len(m.log)-1].render(&m.theme, false)))
+			logMsg := m.log[len(m.log)-1].render(&m.theme, false)
+			logMsgLength := lipgloss.Width(logMsg)
+			if logMsgLength > m.width {
+				logMsg = ansi.Truncate(logMsg, m.width, "…")
+			}
+			s.WriteString(empty.Width(m.width).Render(logMsg))
 		} else {
 			s.WriteString(empty.Width(m.width).Render())
 		}
@@ -322,9 +327,13 @@ func viewMessages(m *model) string {
 		if last >= 0 && last < length {
 			s.WriteString(base.Width(numbersLength).Foreground(m.theme.accentColor4).Render(
 				strconv.Itoa(i + 1 + m.logStart)))
+			logMsg := m.log[last].render(&m.theme, true)
+			logMsgLength := lipgloss.Width(logMsg)
+			if logMsgLength > m.width-numbersLength {
+				logMsg = ansi.Truncate(logMsg, m.width-numbersLength, "…")
+			}
 			s.WriteString(
-				empty.Width(m.width - numbersLength).Render(
-					m.log[last].render(&m.theme, true)))
+				empty.Width(m.width - numbersLength).Render(logMsg))
 		} else {
 			s.WriteString(base.Width(numbersLength).Render())
 			s.WriteString(empty.Width(m.width - numbersLength).Render())
