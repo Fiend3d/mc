@@ -36,6 +36,7 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.yes {
 				m.mode = normal
 				m.submode = noSubmode
+				m.jobs++
 				return m, m.addCommand(m.cmd)
 			} else {
 				m.mode = normal
@@ -45,6 +46,7 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "y":
 			m.mode = normal
 			m.submode = noSubmode
+			m.jobs++
 			return m, m.addCommand(m.cmd)
 		}
 	}

@@ -139,6 +139,9 @@ func (c *copyCutCommand) getDir() string {
 
 func (c *copyCutCommand) execute() error {
 	for i := range c.pairs {
+		if c.pairs[i].src == c.pairs[i].dst {
+			continue
+		}
 		if fileutils.IsDir(c.pairs[i].src) {
 			err := fileutils.CopyDir(c.pairs[i].src, c.pairs[i].dst)
 			if err != nil {
@@ -174,6 +177,9 @@ func (c *copyCutCommand) undo() error {
 	for i := range c.pairs {
 		if !pathExists(c.pairs[i].dst) {
 			return fmt.Errorf("%s doesn't exist", c.pairs[i].dst)
+		}
+		if c.pairs[i].src == c.pairs[i].dst {
+			continue
 		}
 		if c.copy {
 			err := os.RemoveAll(c.pairs[i].dst)
