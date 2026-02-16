@@ -124,3 +124,10 @@ func (m model) undo() tea.Cmd {
 		return commandDoneMsg{fmt.Sprintf("undo: %s", cmd), cmd.getDir(), err}
 	}
 }
+
+func (m model) redo() tea.Cmd {
+	return func() tea.Msg {
+		cmd, err := m.cm.redo()
+		return commandDoneMsg{fmt.Sprintf("redo: %s", cmd), cmd.getDir(), err}
+	}
+}

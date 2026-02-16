@@ -47,16 +47,17 @@ func (cm *commandManager) undo() (command, error) {
 	return lastCmd, err
 }
 
-func (cm *commandManager) redo() {
+func (cm *commandManager) redo() (command, error) {
 	if len(cm.redoStack) == 0 {
-		return
+		return nil, nil
 	}
 
 	lastCmd := cm.redoStack[len(cm.redoStack)-1]
-	lastCmd.execute()
+	err := lastCmd.execute()
 
 	cm.redoStack = cm.redoStack[:len(cm.redoStack)-1]
 	cm.history = append(cm.history, lastCmd)
+	return lastCmd, err
 }
 
 func (cm *commandManager) canUndo() bool {

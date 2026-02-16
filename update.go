@@ -282,7 +282,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.addMessage(msgInfo, "undo"),
 						m.spinner.Tick,
 						m.undo())
-
+				case "U":
+					if !m.cm.canRedo() {
+						return m, m.addMessage(msgWarning, "nothing to redo")
+					}
+					m.jobs++
+					return m, tea.Batch(
+						m.addMessage(msgInfo, "redo"),
+						m.spinner.Tick,
+						m.redo())
 				case "p":
 					return m.handlePaste(false)
 				case "P":
