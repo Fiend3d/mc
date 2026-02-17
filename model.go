@@ -180,6 +180,7 @@ type model struct {
 	err        error
 	tabs       []*tab
 	currentTab int
+	closedTabs []string
 	mode       mode
 	submode    submode
 	visual     int

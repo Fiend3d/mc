@@ -231,6 +231,39 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "g":
 					m.submode = goMode
 					return m, nil
+				case "t":
+					tabCopy := *m.getTab()
+					m.tabs = append(m.tabs, &tabCopy)
+					m.currentTab = len(m.tabs) - 1
+					return m, m.addMessage(msgInfo, "tab added")
+				case "]":
+					m.currentTab = (m.currentTab + 1) % len(m.tabs)
+					return m, nil
+				case "[":
+					m.currentTab = m.currentTab - 1
+					if m.currentTab < 0 {
+						m.currentTab = len(m.tabs) - 1
+					}
+					return m, nil
+				case "ctrl+w":
+					if len(m.tabs) == 1 {
+						return m, m.addMessage(msgWarning, "can't close the last tab")
+					}
+					m.closedTabs = append(m.closedTabs, m.getTab().dir)
+					m.tabs = slices.Delete(m.tabs, m.currentTab, m.currentTab+1)
+					if m.currentTab >= len(m.tabs) {
+						m.currentTab = len(m.tabs) - 1
+					}
+					return m, nil
+				case "T":
+					if len(m.closedTabs) == 0 {
+						return m, m.addMessage(msgWarning, "nothing to restore")
+					}
+					dir := m.closedTabs[len(m.closedTabs)-1]
+					m.closedTabs = m.closedTabs[:len(m.closedTabs)-1]
+					m.tabs = append(m.tabs, newTab(dir, &page{}))
+					m.currentTab = len(m.tabs) - 1
+					return m, m.readDir(m.currentTab, dir)
 				case "d":
 					m.confirm(&deleteCommand{m.getTab().dir, m.getPaths()})
 					return m, nil

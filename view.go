@@ -36,10 +36,24 @@ func (m model) View() string {
 
 	// Header (directory)
 	if m.mode != path {
-		s.WriteString(empty.Width(m.width).Bold(true).Render(m.getTab().dir))
+		tabsWidth := 0
+		tabsWidget := ""
+		if len(m.tabs) > 1 {
+			tabsWidget = empty.
+				Foreground(m.theme.accentColor5).
+				Bold(true).
+				Render(fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs)))
+			tabsWidth = lipgloss.Width(tabsWidget)
+		}
+		dir := ansi.Truncate(m.getTab().dir, m.width-tabsWidth, "…")
+		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))
+		if tabsWidth > 0 {
+			s.WriteString(tabsWidget)
+		}
 		s.WriteRune('\n')
 	} else {
 		widget := m.pathInput.View()
+		widget = ansi.Truncate(widget, m.width, "…")
 		s.WriteString(empty.Width(m.width).Render(widget))
 		s.WriteRune('\n')
 	}
@@ -248,10 +262,10 @@ func (m model) View() string {
 
 	switch m.submode {
 	case goMode:
-		headers := []string{"Button", "Description"}
+		headers := []string{" Button ", " Description "}
 		rows := [][]string{
-			{"g", "Go to path"},
-			{"b", "Go to bookmarks"},
+			{"g", " Change path "},
+			{"t", " View tabs "},
 		}
 
 		tStyle := m.theme.baseStyle
