@@ -248,9 +248,6 @@ func findExistingNumbers(dir, baseName, ext string) []int {
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
 		matches := pattern.FindStringSubmatch(entry.Name())
 		if len(matches) == 2 {
 			num, _ := strconv.Atoi(matches[1])
