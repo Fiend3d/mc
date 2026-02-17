@@ -23,7 +23,7 @@ func (m model) View() string {
 		)
 	}
 
-	if m.mode == messages {
+	if m.mode == messagesMode {
 		return viewMessages(&m)
 	}
 
@@ -35,7 +35,7 @@ func (m model) View() string {
 	settings := m.getTab().getPageSettings()
 
 	// Header (directory)
-	if m.mode != path {
+	if m.mode != pathMode {
 		tabsWidth := 0
 		tabsWidget := ""
 		if len(m.tabs) > 1 {
@@ -77,7 +77,7 @@ func (m model) View() string {
 		index := i + settings.start
 		current := index == settings.cursor
 		cursor := " "
-		if m.mode == visual {
+		if m.mode == visualMode {
 			start, end := m.getStartEnd()
 			if index >= start && index <= end {
 				style = &m.theme.cursorStyle
@@ -106,7 +106,7 @@ func (m model) View() string {
 			s.WriteString(style.Render(" "))
 		}
 
-		if m.mode == visual && current {
+		if m.mode == visualMode && current {
 			s.WriteString(style.Bold(true).Foreground(m.theme.accentColor3).Render(cursor))
 		} else {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
@@ -186,18 +186,21 @@ func (m model) View() string {
 		Bold(true)
 
 	switch m.mode {
-	case normal:
+	case normalMode:
 		modeStr = " NORMAL "
-	case visual:
+	case visualMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor4)
 		modeStr = " VISUAL "
-	case jump:
+	case jumpMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor1)
 		modeStr = " JUMP "
-	case filter:
+	case filterMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor2)
 		modeStr = " FILTER "
-	case path:
+	case createMode:
+		modeStyle = modeStyle.Background(m.theme.accentColor3)
+		modeStr = " CREATE "
+	case pathMode:
 		modeStyle = modeStyle.Background(m.theme.grayColor)
 		modeStr = " PATH "
 	default:
@@ -241,8 +244,8 @@ func (m model) View() string {
 	s.WriteRune('\n')
 
 	switch m.mode {
-	case filter:
-		widget := m.filterInput.View()
+	case filterMode, createMode:
+		widget := m.input.View()
 		text := empty.Width(m.width).Render(widget)
 		s.WriteString(text)
 

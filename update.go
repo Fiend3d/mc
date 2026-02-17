@@ -26,7 +26,7 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc", "n":
-			m.mode = normal
+			m.mode = normalMode
 			m.submode = noSubmode
 			return m, nil
 		case "left", "right", "h", "l":
@@ -34,17 +34,17 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "enter":
 			if m.yes {
-				m.mode = normal
+				m.mode = normalMode
 				m.submode = noSubmode
 				m.jobs++
 				return m, m.addCommand(m.cmd)
 			} else {
-				m.mode = normal
+				m.mode = normalMode
 				m.submode = noSubmode
 				return m, nil
 			}
 		case "y":
-			m.mode = normal
+			m.mode = normalMode
 			m.submode = noSubmode
 			m.jobs++
 			return m, m.addCommand(m.cmd)
@@ -128,7 +128,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.submode == noSubmode {
 			switch m.mode {
-			case normal, jump, visual:
+			case normalMode, jumpMode, visualMode:
 				switch msg.Type {
 				case tea.KeyCtrlA:
 					page := m.getPage()
@@ -174,7 +174,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				case " ":
 					tab := m.getTab()
-					if m.mode == visual {
+					if m.mode == visualMode {
 						start, end := m.getStartEnd()
 						for i := start; i <= end; i++ {
 							item := tab.page.items[i]
@@ -191,7 +191,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			switch m.mode {
-			case normal, jump:
+			case normalMode, jumpMode:
 				switch msg.String() {
 				case "left":
 					return m.left()
@@ -202,7 +202,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch m.mode {
-		case normal:
+		case normalMode:
 			switch m.submode {
 			case goMode:
 				switch msg.String() {
@@ -211,7 +211,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				case "g":
 					m.submode = noSubmode
-					m.mode = path
+					m.mode = pathMode
 					m.pathInput.Reset()
 					m.pathInput.SetValue(m.getTab().dir)
 					m.pathInput.Focus()
@@ -280,20 +280,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "l":
 					return m.right()
 				case "tab":
-					m.mode = jump
+					m.mode = jumpMode
 					return m, nil
 				case "v":
 					settings := m.getTab().getPageSettings()
 					m.visual = settings.cursor
-					m.mode = visual
+					m.mode = visualMode
 					return m, nil
 				case "f":
-					m.mode = filter
-					m.filterInput.Reset()
-					m.filterInput.Focus()
+					m.mode = filterMode
+					m.input.Placeholder = "e.g., term1;term2,term3"
+					m.input.Reset()
+					m.input.Focus()
+					return m, textinput.Blink
+				case "a":
+					m.mode = createMode
+					m.input.Placeholder = "e.g., filename.txt or dirname/"
+					m.input.Reset()
+					m.input.Focus()
 					return m, textinput.Blink
 				case "`":
-					m.mode = messages
+					m.mode = messagesMode
 					m.logStart = 0
 					return m, nil
 				case "f5":
@@ -331,10 +338,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 
-		case jump:
+		case jumpMode:
 			switch msg.String() {
 			case "esc", "tab":
-				m.mode = normal
+				m.mode = normalMode
 				return m, nil
 			default:
 				if len(msg.Runes) > 0 { // just in case, I dunno
@@ -366,23 +373,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case visual:
+		case visualMode:
 			switch m.submode {
 			case noSubmode:
 				switch msg.String() {
 				case "esc":
-					m.mode = normal
+					m.mode = normalMode
 					return m, nil
 				case "v":
-					m.mode = normal
+					m.mode = normalMode
 					return m, nil
 				case "y":
 					msg := m.copyCut(false)
-					m.mode = normal
+					m.mode = normalMode
 					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 				case "x":
 					msg := m.copyCut(true)
-					m.mode = normal
+					m.mode = normalMode
 					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 				case "d":
 					m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
@@ -393,17 +400,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleConfirm(msg)
 			}
 
-		case filter:
+		case filterMode:
 			switch msg.String() {
 			case "esc":
-				m.mode = normal
+				m.mode = normalMode
 				return m, nil
 			}
 
-		case path:
+		case createMode:
 			switch msg.String() {
 			case "esc":
-				m.mode = normal
+				m.mode = normalMode
+				return m, nil
+			}
+
+		case pathMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
 				return m, nil
 			case "enter":
 				dir := m.pathInput.Value()
@@ -426,7 +440,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
 				}
 				tab := m.getTab()
-				m.mode = normal
+				m.mode = normalMode
 				if tab.dir == dir {
 					return m, nil
 				}
@@ -452,10 +466,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case messages:
+		case messagesMode:
 			switch msg.String() {
 			case "esc", "`":
-				m.mode = normal
+				m.mode = normalMode
 				return m, nil
 			case "j", "down":
 				m.logStart += 1
@@ -496,11 +510,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.mode {
-	case filter:
+	case filterMode, createMode:
 		var cmd tea.Cmd
-		m.filterInput, cmd = m.filterInput.Update(msg)
+		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)
-	case path:
+	case pathMode:
 		var cmd tea.Cmd
 		m.pathInput, cmd = m.pathInput.Update(msg)
 		fillAutocomplete(&m)

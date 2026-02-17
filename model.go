@@ -16,14 +16,15 @@ import (
 type mode int
 
 const (
-	normal mode = iota
-	visual
-	jump
-	messages
-	filter
-	path
-	bookmark
-	bookmarkSelect
+	normalMode mode = iota
+	visualMode
+	jumpMode
+	messagesMode
+	filterMode
+	createMode
+	pathMode
+	bookmarkMode
+	bookmarkSelectMode
 )
 
 type submode int
@@ -143,7 +144,7 @@ func (m *model) getPaths() []string {
 	page := m.getPage()
 	var paths []string
 	switch m.mode {
-	case visual:
+	case visualMode:
 		start, end := m.getStartEnd()
 		for i := start; i <= end; i++ {
 			paths = append(paths, page.items[i].fullPath)
@@ -197,7 +198,7 @@ type model struct {
 
 	pathInput    textinput.Model
 	pathInputDir string // to optimize autocomplete
-	filterInput  textinput.Model
+	input        textinput.Model
 
 	log      []message
 	logStart int
@@ -291,9 +292,8 @@ func (m *model) getPage() *page { // probably redundant
 	return tab.page
 }
 
-func newTextinput(placeholder string, style lipgloss.Style, grayColor lipgloss.Color) textinput.Model {
+func newTextinput(style lipgloss.Style, grayColor lipgloss.Color) textinput.Model {
 	input := textinput.New()
-	input.Placeholder = placeholder
 	input.CharLimit = 256 // hello, windows!
 	input.Width = 0
 	input.PlaceholderStyle = style.Foreground(grayColor)
@@ -312,20 +312,20 @@ func initialModel(dirs []string) model {
 	}
 
 	theme := newTheme()
-	filterInput := newTextinput("Enter text to filter", theme.emptyStyle, theme.grayColor)
-	pathInput := newTextinput("", theme.emptyStyle, theme.grayColor)
+	input := newTextinput(theme.emptyStyle, theme.grayColor)
+	pathInput := newTextinput(theme.emptyStyle, theme.grayColor)
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = theme.baseStyle.Foreground(theme.accentColor1)
 
 	return model{
-		tabs:        tabs,
-		currentTab:  0,
-		mode:        normal,
-		theme:       theme,
-		filterInput: filterInput,
-		pathInput:   pathInput,
-		spinner:     s,
-		cm:          newCommandManager(),
+		tabs:       tabs,
+		currentTab: 0,
+		mode:       normalMode,
+		theme:      theme,
+		input:      input,
+		pathInput:  pathInput,
+		spinner:    s,
+		cm:         newCommandManager(),
 	}
 }
