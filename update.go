@@ -220,6 +220,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "t":
 					m.submode = noSubmode
 					m.mode = tabsMode
+					m.tabsCursor = m.currentTab
 					return m, nil
 				}
 
@@ -474,6 +475,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc":
 				m.mode = normalMode
+				return m, nil
+			case "down", "j":
+				m.tabsCursor++
+				m.tabsCursor = min(m.tabsCursor, len(m.tabs)-1)
+				return m, nil
+			case "up", "k":
+				m.tabsCursor--
+				m.tabsCursor = max(m.tabsCursor, 0)
 				return m, nil
 			}
 
