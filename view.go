@@ -27,7 +27,7 @@ func (m model) View() string {
 	case messagesMode:
 		return viewMessages(&m)
 	case tabsMode:
-		return ""
+		return viewTabs(&m)
 	}
 
 	base := &m.theme.baseStyle

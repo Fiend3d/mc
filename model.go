@@ -201,6 +201,9 @@ type model struct {
 	pathInputDir string // to optimize autocomplete
 	input        textinput.Model
 
+	tabsCursor int
+	tabsStart  int
+
 	log      []message
 	logStart int
 	ticks    int
