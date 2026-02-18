@@ -23,8 +23,11 @@ func (m model) View() string {
 		)
 	}
 
-	if m.mode == messagesMode {
+	switch m.mode {
+	case messagesMode:
 		return viewMessages(&m)
+	case tabsMode:
+		return ""
 	}
 
 	base := &m.theme.baseStyle
@@ -264,7 +267,7 @@ func (m model) View() string {
 	ui := s.String()
 
 	switch m.submode {
-	case goMode:
+	case goSubmode:
 		headers := []string{" Button ", " Description "}
 		rows := [][]string{
 			{"g", " Change path "},
@@ -295,7 +298,7 @@ func (m model) View() string {
 
 		ui = overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
 
-	case confirmDialog:
+	case confirmDialogSubmode:
 		cell := base.
 			Border(lipgloss.NormalBorder()).
 			BorderBackground(m.theme.baseStyle.GetBackground()).

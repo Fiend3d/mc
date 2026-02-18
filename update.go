@@ -204,7 +204,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.mode {
 		case normalMode:
 			switch m.submode {
-			case goMode:
+			case goSubmode:
 				switch msg.String() {
 				case "esc":
 					m.submode = noSubmode
@@ -217,9 +217,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pathInput.Focus()
 					m.pathInputDir = "nope"
 					return m, textinput.Blink
+				case "t":
+					m.submode = noSubmode
+					m.mode = tabsMode
+					return m, nil
 				}
 
-			case confirmDialog:
+			case confirmDialogSubmode:
 				return m.handleConfirm(msg)
 
 			case noSubmode:
@@ -229,7 +233,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "q":
 					return m.handleQuit(true)
 				case "g":
-					m.submode = goMode
+					m.submode = goSubmode
 					return m, nil
 				case "t":
 					tabCopy := *m.getTab()
@@ -396,7 +400,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 
-			case confirmDialog:
+			case confirmDialogSubmode:
 				return m.handleConfirm(msg)
 			}
 
@@ -463,6 +467,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.pathInput.Reset()
 				m.pathInput.SetValue(dir)
+				return m, nil
+			}
+
+		case tabsMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
 				return m, nil
 			}
 

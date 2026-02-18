@@ -20,6 +20,7 @@ const (
 	visualMode
 	jumpMode
 	messagesMode
+	tabsMode
 	filterMode
 	createMode
 	pathMode
@@ -31,8 +32,8 @@ type submode int
 
 const (
 	noSubmode submode = iota
-	goMode
-	confirmDialog
+	goSubmode
+	confirmDialogSubmode
 )
 
 type pageSettings struct {
@@ -210,7 +211,7 @@ type model struct {
 }
 
 func (m *model) confirm(cmd command) {
-	m.submode = confirmDialog
+	m.submode = confirmDialogSubmode
 	m.yes = false
 	m.cmd = cmd
 }
