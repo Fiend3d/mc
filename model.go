@@ -18,6 +18,9 @@ type mode int
 const (
 	normalMode mode = iota
 	visualMode
+	goMode
+	confirmDialogMode
+	confirmDialogVisualMode
 	jumpMode
 	messagesMode
 	tabsMode
@@ -26,14 +29,6 @@ const (
 	pathMode
 	bookmarkMode
 	bookmarkSelectMode
-)
-
-type submode int
-
-const (
-	noSubmode submode = iota
-	goSubmode
-	confirmDialogSubmode
 )
 
 type pageSettings struct {
@@ -184,7 +179,6 @@ type model struct {
 	currentTab int
 	closedTabs []string
 	mode       mode
-	submode    submode
 	visual     int
 	width      int
 	height     int
@@ -214,7 +208,11 @@ type model struct {
 }
 
 func (m *model) confirm(cmd command) {
-	m.submode = confirmDialogSubmode
+	if m.mode == visualMode {
+		m.mode = confirmDialogVisualMode
+	} else {
+		m.mode = confirmDialogMode
+	}
 	m.yes = false
 	m.cmd = cmd
 }

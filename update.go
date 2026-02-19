@@ -27,7 +27,6 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "n":
 			m.mode = normalMode
-			m.submode = noSubmode
 			return m, nil
 		case "left", "right", "h", "l":
 			m.yes = !m.yes
@@ -35,17 +34,14 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.yes {
 				m.mode = normalMode
-				m.submode = noSubmode
 				m.jobs++
 				return m, m.addCommand(m.cmd)
 			} else {
 				m.mode = normalMode
-				m.submode = noSubmode
 				return m, nil
 			}
 		case "y":
 			m.mode = normalMode
-			m.submode = noSubmode
 			m.jobs++
 			return m, m.addCommand(m.cmd)
 		}
@@ -126,221 +122,214 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.submode == noSubmode {
-			switch m.mode {
-			case normalMode, jumpMode, visualMode:
-				switch msg.Type {
-				case tea.KeyCtrlA:
-					page := m.getPage()
-					for i := range page.items {
-						page.items[i].selected = true
-					}
-					return m, nil
-				case tea.KeyCtrlR:
-					page := m.getPage()
-					for i := range page.items {
-						page.items[i].selected = !page.items[i].selected
-					}
-					return m, nil
-				case tea.KeyCtrlD:
-					page := m.getPage()
-					for i := range page.items {
-						page.items[i].selected = false
-					}
+		switch m.mode {
+		case normalMode, jumpMode, visualMode:
+			switch msg.String() {
+			case "ctrl+a":
+				page := m.getPage()
+				for i := range page.items {
+					page.items[i].selected = true
 				}
-				switch msg.String() {
-				case "down":
-					m.moveCursor(1)
-					return m, nil
-				case "up":
-					m.moveCursor(-1)
-					return m, nil
-				case "pgdown":
-					m.moveCursor(3)
-					return m, nil
-				case "pgup":
-					m.moveCursor(-3)
-					return m, nil
-				case "home":
-					settings := m.getTab().getPageSettings()
-					settings.cursor = 0
-					m.updateStart()
-					return m, nil
-				case "end":
-					tab := m.getTab()
-					settings := tab.getPageSettings()
-					settings.cursor = tab.page.length() - 1
-					m.updateStart()
-					return m, nil
-				case " ":
-					tab := m.getTab()
-					if m.mode == visualMode {
-						start, end := m.getStartEnd()
-						for i := start; i <= end; i++ {
-							item := tab.page.items[i]
-							item.selected = !item.selected
-						}
-					} else {
-						settings := tab.getPageSettings()
-						selectedItem := tab.page.items[settings.cursor]
-						selectedItem.selected = !selectedItem.selected
-						m.moveCursor(1)
-					}
-					return m, nil
+				return m, nil
+			case "ctrl+r":
+				page := m.getPage()
+				for i := range page.items {
+					page.items[i].selected = !page.items[i].selected
 				}
-			}
+				return m, nil
+			case "ctrl+d":
+				page := m.getPage()
+				for i := range page.items {
+					page.items[i].selected = false
+				}
+				return m, nil
 
-			switch m.mode {
-			case normalMode, jumpMode:
-				switch msg.String() {
-				case "left":
-					return m.left()
-				case "right", "enter":
-					return m.right()
+			case "down":
+				m.moveCursor(1)
+				return m, nil
+			case "up":
+				m.moveCursor(-1)
+				return m, nil
+			case "pgdown":
+				m.moveCursor(3)
+				return m, nil
+			case "pgup":
+				m.moveCursor(-3)
+				return m, nil
+			case "home":
+				settings := m.getTab().getPageSettings()
+				settings.cursor = 0
+				m.updateStart()
+				return m, nil
+			case "end":
+				tab := m.getTab()
+				settings := tab.getPageSettings()
+				settings.cursor = tab.page.length() - 1
+				m.updateStart()
+				return m, nil
+			case " ":
+				tab := m.getTab()
+				if m.mode == visualMode {
+					start, end := m.getStartEnd()
+					for i := start; i <= end; i++ {
+						item := tab.page.items[i]
+						item.selected = !item.selected
+					}
+				} else {
+					settings := tab.getPageSettings()
+					selectedItem := tab.page.items[settings.cursor]
+					selectedItem.selected = !selectedItem.selected
+					m.moveCursor(1)
 				}
+				return m, nil
 			}
 		}
 
 		switch m.mode {
+		case normalMode, jumpMode:
+			switch msg.String() {
+			case "left":
+				return m.left()
+			case "right", "enter":
+				return m.right()
+			}
+		}
+
+		switch m.mode {
+		case goMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
+			case "g":
+				m.mode = pathMode
+				m.pathInput.Reset()
+				m.pathInput.SetValue(m.getTab().dir)
+				m.pathInput.Focus()
+				m.pathInputDir = "nope"
+				return m, textinput.Blink
+			case "t":
+				m.mode = tabsMode
+				m.tabsCursor = m.currentTab
+				return m, nil
+			}
+
+		case confirmDialogMode, confirmDialogVisualMode:
+			return m.handleConfirm(msg)
+
 		case normalMode:
-			switch m.submode {
-			case goSubmode:
-				switch msg.String() {
-				case "esc":
-					m.submode = noSubmode
-					return m, nil
-				case "g":
-					m.submode = noSubmode
-					m.mode = pathMode
-					m.pathInput.Reset()
-					m.pathInput.SetValue(m.getTab().dir)
-					m.pathInput.Focus()
-					m.pathInputDir = "nope"
-					return m, textinput.Blink
-				case "t":
-					m.submode = noSubmode
-					m.mode = tabsMode
-					m.tabsCursor = m.currentTab
-					return m, nil
-				}
-
-			case confirmDialogSubmode:
-				return m.handleConfirm(msg)
-
-			case noSubmode:
-				switch msg.String() {
-				case "Q":
-					return m.handleQuit(false)
-				case "q":
-					return m.handleQuit(true)
-				case "g":
-					m.submode = goSubmode
-					return m, nil
-				case "t":
-					tabCopy := *m.getTab()
-					m.tabs = append(m.tabs, &tabCopy)
+			switch msg.String() {
+			case "Q":
+				return m.handleQuit(false)
+			case "q":
+				return m.handleQuit(true)
+			case "g":
+				m.mode = goMode
+				return m, nil
+			case "t":
+				tabCopy := *m.getTab()
+				m.tabs = append(m.tabs, &tabCopy)
+				m.currentTab = len(m.tabs) - 1
+				return m, m.addMessage(msgInfo, "tab added")
+			case "]":
+				m.currentTab = (m.currentTab + 1) % len(m.tabs)
+				return m, nil
+			case "[":
+				m.currentTab = m.currentTab - 1
+				if m.currentTab < 0 {
 					m.currentTab = len(m.tabs) - 1
-					return m, m.addMessage(msgInfo, "tab added")
-				case "]":
-					m.currentTab = (m.currentTab + 1) % len(m.tabs)
-					return m, nil
-				case "[":
-					m.currentTab = m.currentTab - 1
-					if m.currentTab < 0 {
-						m.currentTab = len(m.tabs) - 1
-					}
-					return m, nil
-				case "ctrl+w":
-					if len(m.tabs) == 1 {
-						return m, m.addMessage(msgWarning, "can't close the last tab")
-					}
-					m.closedTabs = append(m.closedTabs, m.getTab().dir)
-					m.tabs = slices.Delete(m.tabs, m.currentTab, m.currentTab+1)
-					if m.currentTab >= len(m.tabs) {
-						m.currentTab = len(m.tabs) - 1
-					}
-					return m, nil
-				case "T":
-					if len(m.closedTabs) == 0 {
-						return m, m.addMessage(msgWarning, "nothing to restore")
-					}
-					dir := m.closedTabs[len(m.closedTabs)-1]
-					m.closedTabs = m.closedTabs[:len(m.closedTabs)-1]
-					m.tabs = append(m.tabs, newTab(dir, &page{}))
-					m.currentTab = len(m.tabs) - 1
-					return m, m.readDir(m.currentTab, dir)
-				case "d":
-					m.confirm(&deleteCommand{m.getTab().dir, m.getPaths()})
-					return m, nil
-				// case "d":
-				// 	return m, newErr(errors.New("EPIC FAIL"))
-				case "j":
-					m.moveCursor(1)
-					return m, nil
-				case "k":
-					m.moveCursor(-1)
-					return m, nil
-				case "h":
-					return m.left()
-				case "l":
-					return m.right()
-				case "tab":
-					m.mode = jumpMode
-					return m, nil
-				case "v":
-					settings := m.getTab().getPageSettings()
-					m.visual = settings.cursor
-					m.mode = visualMode
-					return m, nil
-				case "f":
-					m.mode = filterMode
-					m.input.Placeholder = "e.g., term1;term2,term3"
-					m.input.Reset()
-					m.input.Focus()
-					return m, textinput.Blink
-				case "a":
-					m.mode = createMode
-					m.input.Placeholder = "e.g., filename.txt or dirname/"
-					m.input.Reset()
-					m.input.Focus()
-					return m, textinput.Blink
-				case "`":
-					m.mode = messagesMode
-					m.logStart = 0
-					return m, nil
-				case "f5":
-					return m, tea.Batch(
-						m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab)),
-						m.update(m.getTab().dir))
-				case "y":
-					msg := m.copyCut(false)
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-				case "x":
-					msg := m.copyCut(true)
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-				case "u":
-					if !m.cm.canUndo() {
-						return m, m.addMessage(msgWarning, "nothing to undo")
-					}
-					m.jobs++
-					return m, tea.Batch(
-						m.addMessage(msgInfo, "undo"),
-						m.spinner.Tick,
-						m.undo())
-				case "U":
-					if !m.cm.canRedo() {
-						return m, m.addMessage(msgWarning, "nothing to redo")
-					}
-					m.jobs++
-					return m, tea.Batch(
-						m.addMessage(msgInfo, "redo"),
-						m.spinner.Tick,
-						m.redo())
-				case "p":
-					return m.handlePaste(false)
-				case "P":
-					return m.handlePaste(true)
 				}
+				return m, nil
+			case "ctrl+w":
+				if len(m.tabs) == 1 {
+					return m, m.addMessage(msgWarning, "can't close the last tab")
+				}
+				m.closedTabs = append(m.closedTabs, m.getTab().dir)
+				m.tabs = slices.Delete(m.tabs, m.currentTab, m.currentTab+1)
+				if m.currentTab >= len(m.tabs) {
+					m.currentTab = len(m.tabs) - 1
+				}
+				return m, nil
+			case "T":
+				if len(m.closedTabs) == 0 {
+					return m, m.addMessage(msgWarning, "nothing to restore")
+				}
+				dir := m.closedTabs[len(m.closedTabs)-1]
+				m.closedTabs = m.closedTabs[:len(m.closedTabs)-1]
+				m.tabs = append(m.tabs, newTab(dir, &page{}))
+				m.currentTab = len(m.tabs) - 1
+				return m, m.readDir(m.currentTab, dir)
+			case "d":
+				m.confirm(&deleteCommand{m.getTab().dir, m.getPaths()})
+				return m, nil
+			// case "d":
+			// 	return m, newErr(errors.New("EPIC FAIL"))
+			case "j":
+				m.moveCursor(1)
+				return m, nil
+			case "k":
+				m.moveCursor(-1)
+				return m, nil
+			case "h":
+				return m.left()
+			case "l":
+				return m.right()
+			case "tab":
+				m.mode = jumpMode
+				return m, nil
+			case "v":
+				settings := m.getTab().getPageSettings()
+				m.visual = settings.cursor
+				m.mode = visualMode
+				return m, nil
+			case "f":
+				m.mode = filterMode
+				m.input.Placeholder = "e.g., term1;term2,term3"
+				m.input.Reset()
+				m.input.Focus()
+				return m, textinput.Blink
+			case "a":
+				m.mode = createMode
+				m.input.Placeholder = "e.g., filename.txt or dirname/"
+				m.input.Reset()
+				m.input.Focus()
+				return m, textinput.Blink
+			case "`":
+				m.mode = messagesMode
+				m.logStart = 0
+				return m, nil
+			case "f5":
+				return m, tea.Batch(
+					m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab)),
+					m.update(m.getTab().dir))
+			case "y":
+				msg := m.copyCut(false)
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+			case "x":
+				msg := m.copyCut(true)
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+			case "u":
+				if !m.cm.canUndo() {
+					return m, m.addMessage(msgWarning, "nothing to undo")
+				}
+				m.jobs++
+				return m, tea.Batch(
+					m.addMessage(msgInfo, "undo"),
+					m.spinner.Tick,
+					m.undo())
+			case "U":
+				if !m.cm.canRedo() {
+					return m, m.addMessage(msgWarning, "nothing to redo")
+				}
+				m.jobs++
+				return m, tea.Batch(
+					m.addMessage(msgInfo, "redo"),
+					m.spinner.Tick,
+					m.redo())
+			case "p":
+				return m.handlePaste(false)
+			case "P":
+				return m.handlePaste(true)
 			}
 
 		case jumpMode:
@@ -379,30 +368,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case visualMode:
-			switch m.submode {
-			case noSubmode:
-				switch msg.String() {
-				case "esc":
-					m.mode = normalMode
-					return m, nil
-				case "v":
-					m.mode = normalMode
-					return m, nil
-				case "y":
-					msg := m.copyCut(false)
-					m.mode = normalMode
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-				case "x":
-					msg := m.copyCut(true)
-					m.mode = normalMode
-					return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-				case "d":
-					m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
-					return m, nil
-				}
-
-			case confirmDialogSubmode:
-				return m.handleConfirm(msg)
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
+			case "v":
+				m.mode = normalMode
+				return m, nil
+			case "y":
+				msg := m.copyCut(false)
+				m.mode = normalMode
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+			case "x":
+				msg := m.copyCut(true)
+				m.mode = normalMode
+				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+			case "d":
+				m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
+				return m, nil
 			}
 
 		case filterMode:

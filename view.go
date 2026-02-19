@@ -80,7 +80,9 @@ func (m model) View() string {
 		index := i + settings.start
 		current := index == settings.cursor
 		cursor := " "
-		if m.mode == visualMode {
+
+		switch m.mode {
+		case visualMode, confirmDialogVisualMode:
 			start, end := m.getStartEnd()
 			if index >= start && index <= end {
 				style = &m.theme.cursorStyle
@@ -91,7 +93,7 @@ func (m model) View() string {
 					cursor = "|"
 				}
 			}
-		} else {
+		default:
 			if current {
 				style = &m.theme.cursorStyle
 				cursor = ">"
@@ -266,8 +268,8 @@ func (m model) View() string {
 
 	ui := s.String()
 
-	switch m.submode {
-	case goSubmode:
+	switch m.mode {
+	case goMode:
 		headers := []string{" Button ", " Description "}
 		rows := [][]string{
 			{"g", " Change path "},
@@ -298,7 +300,7 @@ func (m model) View() string {
 
 		ui = overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
 
-	case confirmDialogSubmode:
+	case confirmDialogMode, confirmDialogVisualMode:
 		cell := base.
 			Border(lipgloss.NormalBorder()).
 			BorderBackground(m.theme.baseStyle.GetBackground()).
