@@ -55,12 +55,12 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 	if err != nil {
 		return m, m.addMessage(msgWarning, "nothing to paste")
 	}
-	var cmd *copyCutCommand
+	var cmd *fileActionCommand
 	switch op {
 	case OpCopy:
-		cmd = newCopyCutCommand(true, paths, m.getTab().dir, override)
+		cmd = newFileActionCommand(copyFileAction, paths, m.getTab().dir, override)
 	case OpCut:
-		cmd = newCopyCutCommand(false, paths, m.getTab().dir, override)
+		cmd = newFileActionCommand(cutFileAction, paths, m.getTab().dir, override)
 	}
 	if cmd.collision {
 		m.confirm(cmd)
@@ -68,6 +68,20 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 	}
 	m.jobs++
 	return m, m.addCommand(cmd)
+}
+
+func (m *model) handleRename() (tea.Model, tea.Cmd) {
+	paths := m.getPaths()
+	if len(paths) != 1 {
+		return m, m.addMessage(msgError, "only one path is supported right now")
+	}
+	m.mode = renameMode
+	m.renamePaths = paths
+	m.input.Placeholder = ""
+	m.input.Reset()
+	m.input.Focus()
+	m.input.SetValue(filepath.Base(paths[0]))
+	return m, textinput.Blink
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -264,6 +278,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			// case "d":
 			// 	return m, newErr(errors.New("EPIC FAIL"))
+			case "r":
+				return m.handleRename()
 			case "j":
 				m.moveCursor(1)
 				return m, nil
@@ -383,6 +399,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				msg := m.copyCut(true)
 				m.mode = normalMode
 				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+			case "r":
+				return m.handleRename()
 			case "d":
 				m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
 				return m, nil
@@ -393,6 +411,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.mode = normalMode
 				return m, nil
+			}
+
+		case renameMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				m.renamePaths = nil
+				return m, nil
+			case "enter":
+				m.mode = normalMode
+				if len(m.renamePaths) == 1 {
+					value := m.input.Value()
+					dir := filepath.Dir(m.renamePaths[0])
+					path := filepath.Join(dir, value)
+					finalPath := uniquePath(path)
+					pairs := []pathPair{{m.renamePaths[0], finalPath}}
+					cmd := &fileActionCommand{
+						action: renameFileAction,
+						dir:    m.getTab().dir,
+						pairs:  pairs,
+					}
+					if finalPath != path {
+						return m, tea.Batch(m.addCommand(cmd),
+							m.addMessage(msgWarning, fmt.Sprintf("%s already exists", path)))
+
+					} else {
+						return m, m.addCommand(cmd)
+					}
+				} else {
+					return m, m.addMessage(msgError, "not implemented")
+				}
 			}
 
 		case createMode:
@@ -513,7 +562,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.mode {
-	case filterMode, createMode:
+	case filterMode, renameMode, createMode:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		cmds = append(cmds, cmd)

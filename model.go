@@ -25,11 +25,48 @@ const (
 	messagesMode
 	tabsMode
 	filterMode
+	renameMode
 	createMode
 	pathMode
 	bookmarkMode
 	bookmarkSelectMode
 )
+
+type model struct {
+	err        error
+	tabs       []*tab
+	currentTab int
+	closedTabs []string
+	mode       mode
+	visual     int
+	width      int
+	height     int
+
+	yes bool
+	cmd command
+
+	jobs    int
+	spinner spinner.Model
+
+	cm *commandManager
+
+	pathInput    textinput.Model
+	pathInputDir string // to optimize autocomplete
+	input        textinput.Model
+
+	renamePaths []string
+
+	tabsCursor int
+	tabsStart  int
+
+	log      []message
+	logStart int
+	ticks    int
+
+	theme theme
+
+	result string
+}
 
 type pageSettings struct {
 	start  int
@@ -171,40 +208,6 @@ func (m *model) copyCut(cut bool) string {
 	}
 
 	return fmt.Sprintf("%d paths %s", len(paths), txt)
-}
-
-type model struct {
-	err        error
-	tabs       []*tab
-	currentTab int
-	closedTabs []string
-	mode       mode
-	visual     int
-	width      int
-	height     int
-
-	yes bool
-	cmd command
-
-	jobs    int
-	spinner spinner.Model
-
-	cm *commandManager
-
-	pathInput    textinput.Model
-	pathInputDir string // to optimize autocomplete
-	input        textinput.Model
-
-	tabsCursor int
-	tabsStart  int
-
-	log      []message
-	logStart int
-	ticks    int
-
-	theme theme
-
-	result string
 }
 
 func (m *model) confirm(cmd command) {

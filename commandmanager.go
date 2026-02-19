@@ -100,14 +100,22 @@ type pathPair struct {
 	dst string
 }
 
-type copyCutCommand struct {
-	copy      bool
+type fileAction int
+
+const (
+	copyFileAction fileAction = iota
+	cutFileAction
+	renameFileAction
+)
+
+type fileActionCommand struct {
+	action    fileAction
 	dir       string
 	pairs     []pathPair
 	collision bool
 }
 
-func newCopyCutCommand(copy bool, paths []string, dst string, override bool) *copyCutCommand {
+func newFileActionCommand(action fileAction, paths []string, dst string, override bool) *fileActionCommand {
 	var pairs []pathPair
 	collision := false
 	for i := range paths {
@@ -123,22 +131,26 @@ func newCopyCutCommand(copy bool, paths []string, dst string, override bool) *co
 		}
 	}
 
-	return &copyCutCommand{copy, dst, pairs, collision}
+	return &fileActionCommand{action, dst, pairs, collision}
 }
 
-func (c *copyCutCommand) String() string {
-	if c.copy {
+func (c *fileActionCommand) String() string {
+	switch c.action {
+	case copyFileAction:
 		return fmt.Sprintf("copy paths:%d", len(c.pairs))
-	} else {
+	case cutFileAction:
 		return fmt.Sprintf("cut paths:%d", len(c.pairs))
+	case renameFileAction:
+		return fmt.Sprintf("rename paths:%d", len(c.pairs))
 	}
+	return "uknown command"
 }
 
-func (c *copyCutCommand) getDir() string {
+func (c *fileActionCommand) getDir() string {
 	return c.dir
 }
 
-func (c *copyCutCommand) execute() error {
+func (c *fileActionCommand) execute() error {
 	for i := range c.pairs {
 		if c.pairs[i].src == c.pairs[i].dst {
 			continue
@@ -148,19 +160,20 @@ func (c *copyCutCommand) execute() error {
 			if err != nil {
 				return err
 			}
-			if !c.copy {
+			if c.action == cutFileAction {
 				err := os.RemoveAll(c.pairs[i].src)
 				if err != nil {
 					return err
 				}
 			}
 		} else {
-			if c.copy {
+			switch c.action {
+			case copyFileAction:
 				err := fileutils.CopyFile(c.pairs[i].src, c.pairs[i].dst)
 				if err != nil {
 					return err
 				}
-			} else {
+			case cutFileAction, renameFileAction:
 				err := fileutils.MoveFile(c.pairs[i].src, c.pairs[i].dst)
 				if err != nil {
 					return err
@@ -171,7 +184,7 @@ func (c *copyCutCommand) execute() error {
 	return nil
 }
 
-func (c *copyCutCommand) undo() error {
+func (c *fileActionCommand) undo() error {
 	if c.collision {
 		return fmt.Errorf("there's a collision")
 	}
@@ -182,7 +195,7 @@ func (c *copyCutCommand) undo() error {
 		if c.pairs[i].src == c.pairs[i].dst {
 			continue
 		}
-		if c.copy {
+		if c.action == copyFileAction {
 			err := os.RemoveAll(c.pairs[i].dst)
 			if err != nil {
 				return err

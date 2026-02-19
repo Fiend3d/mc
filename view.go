@@ -202,6 +202,9 @@ func (m model) View() string {
 	case filterMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor2)
 		modeStr = " FILTER "
+	case renameMode:
+		modeStyle = modeStyle.Background(m.theme.greenColor)
+		modeStr = " RENAME "
 	case createMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor3)
 		modeStr = " CREATE "
@@ -249,7 +252,7 @@ func (m model) View() string {
 	s.WriteRune('\n')
 
 	switch m.mode {
-	case filterMode, createMode:
+	case filterMode, renameMode, createMode:
 		widget := m.input.View()
 		text := empty.Width(m.width).Render(widget)
 		s.WriteString(text)
