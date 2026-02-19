@@ -135,6 +135,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		return m, nil
 
+	case tea.MouseMsg:
+		switch msg.Action {
+		case tea.MouseActionRelease:
+			switch msg.Button {
+			case tea.MouseButtonLeft:
+				return m, m.addMessage(msgInfo, fmt.Sprintf("%d %d", msg.X, msg.Y))
+			}
+			return m, nil
+		}
+
 	case tea.KeyMsg:
 		switch m.mode {
 		case normalMode, jumpMode, visualMode:

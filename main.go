@@ -29,7 +29,11 @@ func main() {
 		dirs = []string{wd}
 	}
 
-	p := tea.NewProgram(initialModel(dirs), tea.WithAltScreen())
+	p := tea.NewProgram(
+		initialModel(dirs),
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion())
+
 	m, err := p.Run()
 	if err != nil {
 		log.Fatalf("failed to launch the program: %s", err)

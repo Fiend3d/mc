@@ -62,8 +62,10 @@ func viewTabs(m *model) string {
 	help := gray.Render("Keys:")
 	help += empty.Render(" d ")
 	help += gray.Render("- close")
-	help += empty.Render(" c ")
-	help += gray.Render("- close all")
+	if len(m.tabs) > 1 {
+		help += empty.Render(" c ")
+		help += gray.Render("- close all")
+	}
 	if m.tabsCursor > 0 {
 		help += empty.Render(" K ")
 		help += gray.Render("- move up")
