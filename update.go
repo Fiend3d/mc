@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"unicode"
@@ -140,7 +141,57 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.MouseActionRelease:
 			switch msg.Button {
 			case tea.MouseButtonLeft:
-				return m, m.addMessage(msgInfo, fmt.Sprintf("%d %d", msg.X, msg.Y))
+				m.click = newClick(msg.X, msg.Y, &m.click)
+				switch m.mode {
+				case normalMode:
+					if m.click.y == 0 {
+						tab := m.getTab()
+						diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
+						matches := diskExp.FindStringSubmatch(tab.dir)
+						start := 0
+						if len(matches) > 1 {
+							start = len(matches[1])
+							if m.click.x < start {
+								tab.dir = matches[1]
+								tab.page = &page{}
+								return m, m.readDir(m.currentTab, matches[1])
+							}
+						}
+						runes := []rune(tab.dir)
+						if m.click.x < len(runes) && m.click.x >= start {
+							var history []string
+							current := tab.dir
+							for {
+								history = append(history, current)
+								parent := filepath.Dir(current)
+								if parent == current {
+									break
+								}
+								current = parent
+							}
+							slices.Reverse(history)
+
+							clickedPath := string(runes[:m.click.x+1])
+							clickedDir := filepath.Dir(clickedPath)
+
+							index := slices.Index(history, clickedDir)
+
+							tab.dir = history[index+1]
+							tab.page = &page{}
+							return m, m.readDir(m.currentTab, tab.dir)
+						}
+					} else if m.click.y < m.height {
+						tab := m.getTab()
+						settings := tab.getPageSettings()
+						if m.click.y-1 < len(tab.page.items)-settings.start {
+							settings.cursor = m.click.y - 1 + settings.start
+							if m.click.doubleClick {
+								return m.right()
+							}
+						}
+					}
+				}
+				return m, nil
 			}
 			return m, nil
 		}

@@ -41,6 +41,7 @@ type model struct {
 	visual     int
 	width      int
 	height     int
+	click      mouseClick
 
 	yes bool
 	cmd command
