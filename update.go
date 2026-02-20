@@ -85,6 +85,21 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 	return m, textinput.Blink
 }
 
+func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
+	switch m.mode {
+	case normalMode:
+		tab := m.getTab()
+		if m.height-3 <= tab.page.length() {
+			settings := tab.getPageSettings()
+			settings.start += steps
+			actualHeight := m.height - 3
+			settings.start = max(0,
+				min(settings.start, tab.page.length()-actualHeight))
+		}
+	}
+	return m, nil
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
@@ -138,6 +153,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		switch msg.Action {
+		case tea.MouseActionPress:
+			switch msg.Button {
+			case tea.MouseButtonWheelUp:
+				return m.handleWheel(-3)
+			case tea.MouseButtonWheelDown:
+				return m.handleWheel(3)
+			}
 		case tea.MouseActionRelease:
 			switch msg.Button {
 			case tea.MouseButtonLeft:

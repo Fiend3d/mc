@@ -21,23 +21,13 @@ func (c *mouseClick) String() string {
 }
 
 func newClick(x, y int, prev *mouseClick) mouseClick {
-	now := time.Now()
+	t := time.Now()
 
-	if prev == nil {
-		return mouseClick{x, y, now, false}
-	}
+	doubleClick := prev != nil &&
+		!prev.doubleClick &&
+		x == prev.x &&
+		y == prev.y &&
+		t.Sub(prev.time) <= 500*time.Millisecond
 
-	if prev.doubleClick {
-		return mouseClick{x, y, now, false}
-	}
-
-	if x != prev.x || y != prev.y {
-		return mouseClick{x, y, now, false}
-	}
-
-	if now.Sub(prev.time) > 500*time.Millisecond {
-		return mouseClick{x, y, now, false}
-	}
-
-	return mouseClick{x, y, now, true}
+	return mouseClick{x, y, t, doubleClick}
 }
