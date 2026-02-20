@@ -165,8 +165,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case tea.MouseButtonLeft:
 				m.click = newClick(msg.X, msg.Y, &m.click)
 				switch m.mode {
-				case normalMode:
+				case normalMode, visualMode:
 					if m.click.y == 0 {
+						if m.mode == visualMode {
+							return m, nil
+						}
 						tab := m.getTab()
 						diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
 						matches := diskExp.FindStringSubmatch(tab.dir)
@@ -207,7 +210,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						settings := tab.getPageSettings()
 						if m.click.y-1 < len(tab.page.items)-settings.start {
 							settings.cursor = m.click.y - 1 + settings.start
-							if m.click.doubleClick {
+							if m.click.doubleClick && m.mode != visualMode {
 								return m.right()
 							}
 						}
