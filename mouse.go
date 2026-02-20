@@ -13,28 +13,31 @@ type mouseClick struct {
 }
 
 func (c *mouseClick) String() string {
-	doubleClick := "single"
 	if c.doubleClick {
-		doubleClick = "double"
+		return fmt.Sprintf("%d %d double click", c.x, c.y)
+	} else {
+		return fmt.Sprintf("%d %d click", c.x, c.y)
 	}
-	return fmt.Sprintf("%d %d %s click", c.x, c.y, doubleClick)
 }
 
 func newClick(x, y int, prev *mouseClick) mouseClick {
-	doubleClick := false
-	t := time.Now()
-	if prev != nil {
-		if prev.doubleClick {
-			goto out
-		}
-		if x != prev.x || y != prev.y {
-			goto out
-		}
-		if prev.time.Sub(t).Milliseconds() > 500 {
-			goto out
-		}
-		doubleClick = true
+	now := time.Now()
+
+	if prev == nil {
+		return mouseClick{x, y, now, false}
 	}
-out:
-	return mouseClick{x, y, t, doubleClick}
+
+	if prev.doubleClick {
+		return mouseClick{x, y, now, false}
+	}
+
+	if x != prev.x || y != prev.y {
+		return mouseClick{x, y, now, false}
+	}
+
+	if now.Sub(prev.time) > 500*time.Millisecond {
+		return mouseClick{x, y, now, false}
+	}
+
+	return mouseClick{x, y, now, true}
 }
