@@ -3,12 +3,9 @@ package main
 import "github.com/charmbracelet/lipgloss"
 
 type theme struct {
-	baseStyle     lipgloss.Style
-	emptyStyle    lipgloss.Style
-	cursorStyle   lipgloss.Style
-	selectedStyle lipgloss.Style
-	copiedStyle   lipgloss.Style
-	cutStyle      lipgloss.Style
+	baseStyle   lipgloss.Style
+	emptyStyle  lipgloss.Style
+	cursorStyle lipgloss.Style
 
 	whiteColor lipgloss.Color
 	blackColor lipgloss.Color
@@ -37,12 +34,9 @@ func newTheme() theme {
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
 	return theme{
-		baseStyle:     defaultStyle.Background(lipgloss.Color("#282a36")),
-		emptyStyle:    defaultStyle.Background(lipgloss.Color("#222430")),
-		cursorStyle:   defaultStyle.Background(lipgloss.Color("#44475a")),
-		selectedStyle: defaultStyle.Background(white),
-		copiedStyle:   defaultStyle.Background(accent3),
-		cutStyle:      defaultStyle.Background(accent1),
+		baseStyle:   defaultStyle.Background(lipgloss.Color("#282a36")),
+		emptyStyle:  defaultStyle.Background(lipgloss.Color("#222430")),
+		cursorStyle: defaultStyle.Background(lipgloss.Color("#44475a")),
 
 		whiteColor: white,
 		blackColor: black,

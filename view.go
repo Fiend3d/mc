@@ -48,7 +48,17 @@ func (m model) View() string {
 				Render(fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs)))
 			tabsWidth = lipgloss.Width(tabsWidget)
 		}
-		dir := ansi.Truncate(m.getTab().dir, m.width-tabsWidth, "…")
+		parts := strings.FieldsFunc(m.getTab().dir, func(r rune) bool {
+			return r == '\\' || r == '/'
+		})
+		var dirBuilder strings.Builder
+		for i := range parts {
+			dirBuilder.WriteString(empty.Bold(true).Foreground(m.theme.accentColor5).Render(parts[i]))
+			if i != len(parts)-1 || i == 0 {
+				dirBuilder.WriteString(empty.Bold(true).Foreground(m.theme.whiteColor).Render(`\`))
+			}
+		}
+		dir := ansi.Truncate(dirBuilder.String(), m.width-tabsWidth, "…")
 		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))
 		if tabsWidth > 0 {
 			s.WriteString(tabsWidget)
@@ -104,9 +114,9 @@ func (m model) View() string {
 
 		switch item.action {
 		case itemActionCopy:
-			s.WriteString(m.theme.copiedStyle.Render(" "))
+			s.WriteString(style.Foreground(m.theme.accentColor3).Render("┃"))
 		case itemActionCut:
-			s.WriteString(m.theme.cutStyle.Render(" "))
+			s.WriteString(style.Foreground(m.theme.accentColor1).Render("┃"))
 		default:
 			s.WriteString(style.Render(" "))
 		}
@@ -117,7 +127,7 @@ func (m model) View() string {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
 		}
 		if item.selected {
-			s.WriteString(m.theme.selectedStyle.Render(" "))
+			s.WriteString(style.Foreground(m.theme.whiteColor).Render("┃"))
 		} else {
 			s.WriteString(style.Render(" "))
 		}
