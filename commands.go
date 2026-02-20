@@ -20,9 +20,9 @@ func newErr(err error) tea.Cmd {
 }
 
 type readDirMsg struct {
-	tab     int
-	entries []os.DirEntry
-	dir     string
+	tab   int
+	items []*item
+	dir   string
 }
 
 func (m *model) update(dir string) tea.Cmd {
@@ -37,14 +37,14 @@ func (m *model) update(dir string) tea.Cmd {
 		// Create command for each page
 		cmd := func(dir string, tab int) tea.Cmd {
 			return func() tea.Msg {
-				entries, err := readEntries(dir)
+				items, err := readItems(dir)
 				if err != nil {
 					return newErr(err)
 				}
 				return readDirMsg{
-					tab:     tab,
-					dir:     dir,
-					entries: entries,
+					tab:   tab,
+					dir:   dir,
+					items: items,
 				}
 			}
 		}(tab.dir, i)
@@ -61,7 +61,11 @@ func (m *model) update(dir string) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func readEntries(dir string) ([]os.DirEntry, error) {
+func readItems(dir string) ([]*item, error) {
+	if isUNCroot(dir) {
+		paths, err := netView(dir)
+	}
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -91,17 +95,26 @@ func readEntries(dir string) ([]os.DirEntry, error) {
 		return strings.ToLower(filteredEntries[i].Name()) < strings.ToLower(filteredEntries[j].Name())
 	})
 
-	return filteredEntries, nil
+	items := make([]*item, len(filteredEntries))
+	for i := range filteredEntries {
+		item, err := newItem(filteredEntries[i], dir)
+		if err != nil {
+			return nil, err
+		}
+		items[i] = item
+	}
+
+	return items, nil
 }
 
 func (m model) readDir(tab int, dir string) tea.Cmd {
 	return func() tea.Msg {
-		entries, err := readEntries(dir)
+		items, err := readItems(dir)
 		if err != nil {
 			return errorMsg{err}
 		}
 
-		return readDirMsg{tab: tab, entries: entries, dir: dir}
+		return readDirMsg{tab: tab, items: items, dir: dir}
 	}
 }
 

@@ -13,6 +13,40 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func isUNC(path string) bool {
+	p := filepath.ToSlash(path)
+	return strings.HasPrefix(p, "//") &&
+		len(p) > 2 &&
+		p[2] != '/' // not three slashes (///) or more
+}
+
+func isUNCroot(path string) bool {
+	if !isUNC(path) {
+		return false
+	}
+	if len(splitPath(path)) == 1 {
+		return true
+	}
+	return false
+}
+
+func splitPath(path string) []string {
+	return strings.FieldsFunc(path, func(r rune) bool {
+		return r == '\\' || r == '/'
+	})
+}
+
+func filepathDir(path string) string {
+	if isUNC(path) {
+		parts := splitPath(path)
+		if len(parts) > 1 {
+			return `\\` + parts[0]
+		}
+	}
+	return filepath.Dir(path)
+
+}
+
 // DirExists checks if a path exists and is a directory
 func dirExists(path string) bool {
 	info, err := os.Stat(path)

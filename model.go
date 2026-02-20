@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -143,6 +142,10 @@ type message struct {
 	message     string
 }
 
+func newMessage(messageType msgType, msg string) message {
+	return message{time.Now(), messageType, msg}
+}
+
 func (m *message) render(theme *theme, renderTime bool) string {
 	var s strings.Builder
 	if renderTime {
@@ -245,21 +248,14 @@ func tick() tea.Cmd {
 	})
 }
 
-func (m *model) fillPage(tab int, entries []os.DirEntry) error {
+func (m *model) fillPage(tab int, items []*item) error {
 	page := m.tabs[tab].page
-	page.items = nil
-	for i := range entries {
-		item, err := newItem(entries[i], m.tabs[tab].dir)
-		if err != nil {
-			return err
-		}
-		page.items = append(page.items, item)
-	}
+	page.items = items
 	return nil
 }
 
 func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
-	message := message{time: time.Now(), messageType: msgType, message: msg}
+	message := newMessage(msgType, msg)
 	m.log = append(m.log, message)
 	m.ticks += 6
 	return tick()
@@ -267,7 +263,7 @@ func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
 
 func (m *model) left() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
-	parent := filepath.Dir(tab.dir)
+	parent := filepathDir(tab.dir)
 	tab.dir = parent
 	tab.page = &page{}
 	return m, m.readDir(m.currentTab, parent)

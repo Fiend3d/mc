@@ -104,8 +104,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 
 	case errorMsg:
-		m.err = msg.err
-		return m, nil
+		// m.err = msg.err
+		// return m, nil
+		return m, m.addMessage(msgError, msg.err.Error())
 
 	case tickMsg:
 		if m.ticks > 0 {
@@ -126,12 +127,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case readDirMsg:
-		err := m.fillPage(msg.tab, msg.entries)
+		err := m.fillPage(msg.tab, msg.items)
 		if err != nil {
-			return m, newErr(err)
+			return m, m.addMessage(msgError, err.Error())
 		}
 		settings := m.tabs[msg.tab].getPageSettings()
-		length := len(msg.entries)
+		length := len(msg.items)
 		if settings.cursor >= length {
 			settings.cursor = length - 1
 		}
@@ -558,9 +559,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !dirExists(dir) {
 					return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
 				}
-				dir, err = realWindowsPath(dir)
-				if err != nil {
-					return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
+				if !isUNC(dir) {
+					dir, err = realWindowsPath(dir)
+					if err != nil {
+						return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
+					}
 				}
 				tab := m.getTab()
 				m.mode = normalMode

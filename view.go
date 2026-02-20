@@ -48,17 +48,24 @@ func (m model) View() string {
 				Render(fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs)))
 			tabsWidth = lipgloss.Width(tabsWidget)
 		}
-		parts := strings.FieldsFunc(m.getTab().dir, func(r rune) bool {
-			return r == '\\' || r == '/'
-		})
 		var dirBuilder strings.Builder
-		for i := range parts {
-			dirBuilder.WriteString(empty.Bold(true).Foreground(m.theme.accentColor5).Render(parts[i]))
-			if i != len(parts)-1 || i == 0 {
-				dirBuilder.WriteString(empty.Bold(true).Foreground(m.theme.whiteColor).Render(`\`))
+		dir := m.getTab().dir
+		sepStyle := empty.Bold(true).Foreground(m.theme.whiteColor)
+		dirStyle := empty.Bold(true).Foreground(m.theme.accentColor5)
+		start := 0
+		for i := 0; i < len(dir); i++ {
+			if dir[i] == '/' || dir[i] == '\\' {
+				if start < i {
+					dirBuilder.WriteString(dirStyle.Render(dir[start:i]))
+				}
+				dirBuilder.WriteString(sepStyle.Render(dir[i : i+1]))
+				start = i + 1
 			}
 		}
-		dir := ansi.Truncate(dirBuilder.String(), m.width-tabsWidth, "…")
+		if start < len(dir) {
+			dirBuilder.WriteString(dirStyle.Render(dir[start:]))
+		}
+		dir = ansi.Truncate(dirBuilder.String(), m.width-tabsWidth, "…")
 		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))
 		if tabsWidth > 0 {
 			s.WriteString(tabsWidget)

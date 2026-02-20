@@ -18,7 +18,6 @@ const (
 )
 
 type item struct {
-	entry    os.DirEntry
 	fullPath string
 	selected bool
 	action   itemAction
@@ -38,7 +37,7 @@ func newItem(entry os.DirEntry, dir string) (*item, error) {
 		return nil, err
 	}
 
-	item := &item{entry: entry, selected: false}
+	item := &item{selected: false}
 
 	item.name = entry.Name()
 	item.fullPath = filepath.Join(dir, item.name)
