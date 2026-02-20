@@ -40,7 +40,7 @@ func filepathDir(path string) string {
 	if isUNC(path) {
 		parts := splitPath(path)
 		if len(parts) > 1 {
-			return `\\` + parts[0]
+			return `\\` + strings.Join(parts[:len(parts)-1], `\`)
 		}
 	}
 	return filepath.Dir(path)
@@ -83,6 +83,10 @@ func numberOfDigits(n int) int {
 
 func fillAutocomplete(m *model) {
 	path := m.pathInput.Value()
+	if isUNC(path) { // because network is slow T_T
+		m.pathInput.ShowSuggestions = false
+		return
+	}
 	if strings.HasSuffix(path, ":") {
 		path = path + "\\"
 	}

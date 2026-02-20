@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -64,6 +65,20 @@ func (m *model) update(dir string) tea.Cmd {
 func readItems(dir string) ([]*item, error) {
 	if isUNCroot(dir) {
 		paths, err := netView(dir)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]*item, len(paths))
+		for i := range paths {
+			item := &item{
+				name:     paths[i],
+				isDir:    true,
+				fullPath: filepath.Join(dir, paths[i]),
+				modTime:  "[shared]",
+			}
+			result[i] = item
+		}
+		return result, nil
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -105,6 +120,17 @@ func readItems(dir string) ([]*item, error) {
 	}
 
 	return items, nil
+}
+
+func (m *model) changeDir(dir string) (tea.Model, tea.Cmd) {
+	tab := m.getTab()
+	m.mode = normalMode
+	if tab.dir == dir {
+		return m, nil
+	}
+	tab.dir = dir
+	tab.page = &page{}
+	return m, m.readDir(m.currentTab, dir)
 }
 
 func (m model) readDir(tab int, dir string) tea.Cmd {

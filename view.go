@@ -52,18 +52,18 @@ func (m model) View() string {
 		dir := m.getTab().dir
 		sepStyle := empty.Bold(true).Foreground(m.theme.whiteColor)
 		dirStyle := empty.Bold(true).Foreground(m.theme.accentColor5)
-		start := 0
+		shift := 0
 		for i := 0; i < len(dir); i++ {
 			if dir[i] == '/' || dir[i] == '\\' {
-				if start < i {
-					dirBuilder.WriteString(dirStyle.Render(dir[start:i]))
+				if shift < i {
+					dirBuilder.WriteString(dirStyle.Render(dir[shift:i]))
 				}
 				dirBuilder.WriteString(sepStyle.Render(dir[i : i+1]))
-				start = i + 1
+				shift = i + 1
 			}
 		}
-		if start < len(dir) {
-			dirBuilder.WriteString(dirStyle.Render(dir[start:]))
+		if shift < len(dir) {
+			dirBuilder.WriteString(dirStyle.Render(dir[shift:]))
 		}
 		dir = ansi.Truncate(dirBuilder.String(), m.width-tabsWidth, "…")
 		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))
@@ -181,7 +181,7 @@ func (m model) View() string {
 
 		// time column
 		timeStyle := style.Foreground(m.theme.grayColor)
-		s.WriteString(timeStyle.Render(item.modTime))
+		s.WriteString(timeStyle.Width(timeWidth).Render(item.modTime))
 
 		s.WriteString(style.Render(" "))
 

@@ -189,7 +189,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							current := tab.dir
 							for {
 								history = append(history, current)
-								parent := filepath.Dir(current)
+								parent := filepathDir(current)
 								if parent == current {
 									break
 								}
@@ -198,10 +198,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							slices.Reverse(history)
 
 							clickedPath := string(runes[:m.click.x+1])
-							clickedDir := filepath.Dir(clickedPath)
+							clickedDir := filepathDir(clickedPath)
 
 							index := slices.Index(history, clickedDir)
 
+							// return m, m.addMessage(msgInfo, fmt.Sprintf("%#v %d %v", history, index, clickedDir))
 							tab.dir = history[index+1]
 							tab.page = &page{}
 							return m, m.readDir(m.currentTab, tab.dir)
@@ -548,6 +549,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if strings.TrimSpace(dir) == "" {
 					return m, m.addMessage(msgError, "empty path")
 				}
+				if isUNCroot(dir) {
+					return m.changeDir(dir)
+				}
 				if strings.HasSuffix(dir, ":") {
 					dir += "\\" // windows...
 				}
@@ -565,14 +569,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
 					}
 				}
-				tab := m.getTab()
-				m.mode = normalMode
-				if tab.dir == dir {
-					return m, nil
-				}
-				tab.dir = dir
-				tab.page = &page{}
-				return m, m.readDir(m.currentTab, dir)
+				return m.changeDir(dir)
 			case "ctrl+w":
 				path := m.pathInput.Value()
 				parent := filepath.Dir(path)

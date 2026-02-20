@@ -36,7 +36,7 @@ func netView(server string) ([]string, error) {
 		}
 	}
 
-	var bufPtr uintptr
+	var bufPtr *byte
 	var entriesRead uint32
 	var totalEntries uint32
 
@@ -54,9 +54,9 @@ func netView(server string) ([]string, error) {
 		return nil, fmt.Errorf("NetShareEnum failed: %d", ret)
 	}
 
-	defer procNetApiBufferFree.Call(bufPtr)
+	defer procNetApiBufferFree.Call(uintptr(unsafe.Pointer(bufPtr)))
 
-	shares := (*[1 << 20]SHARE_INFO_1)(unsafe.Pointer(bufPtr))[:entriesRead:entriesRead]
+	shares := unsafe.Slice((*SHARE_INFO_1)(unsafe.Pointer(bufPtr)), entriesRead)
 
 	var result []string
 	for _, share := range shares {
