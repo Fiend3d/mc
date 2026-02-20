@@ -43,7 +43,7 @@ func (m model) View() string {
 		tabsWidget := ""
 		if len(m.tabs) > 1 {
 			tabsWidget = empty.
-				Foreground(m.theme.accentColor5).
+				Foreground(m.theme.accentColor3).
 				Bold(true).
 				Render(fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs)))
 			tabsWidth = lipgloss.Width(tabsWidget)
