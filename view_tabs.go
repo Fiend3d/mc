@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -19,7 +20,7 @@ func viewTabs(m *model) string {
 	}
 	header := fmt.Sprintf(" %d %s", len(m.tabs), tabs)
 
-	s.WriteString(empty.Width(m.width).Bold(true).Foreground(m.theme.accentColor5).Render(header))
+	s.WriteString(empty.Width(m.width).Bold(true).Foreground(m.theme.accentColor3).Render(header))
 	s.WriteRune('\n')
 
 	countLines := 0
@@ -35,19 +36,42 @@ func viewTabs(m *model) string {
 		cursorWidth := 3
 
 		cursor := "   "
+		current := index == m.currentTab
+
 		if index == m.tabsCursor {
 			style = &m.theme.cursorStyle
 			cursor = " > "
 		}
 
+		prefix := fmt.Sprintf("[%d] ", i+m.tabsStart+1)
+		prefixWidth := cursorWidth + len(prefix)
+
 		s.WriteString(style.Bold(true).Render(cursor))
+		if current {
+			s.WriteString(style.Render(prefix))
+		} else {
+			s.WriteString(style.Foreground(m.theme.grayColor).Render(prefix))
+		}
 
 		text := m.tabs[index].dir
-		if index == m.currentTab {
-			text += style.Foreground(m.theme.grayColor).Render(" [current]")
+		tag := ""
+		if current {
+			tag += style.Foreground(m.theme.grayColor).Render(" [current] ")
 		}
-		text = ansi.Truncate(text, m.width-cursorWidth, "…")
-		s.WriteString(style.Width(m.width - cursorWidth).Render(text))
+		tagLength := lipgloss.Width(tag)
+		text = ansi.Truncate(text, m.width-prefixWidth-tagLength, "…")
+
+		textLength := lipgloss.Width(text)
+		var coloredText string
+		if current {
+			coloredText = colorizeDir(text, *style, style.Foreground(m.theme.accentColor5), textLength)
+		} else {
+			coloredText = colorizeDir(text, *style, style.Foreground(m.theme.accentColor4), textLength)
+		}
+		s.WriteString(style.Width(m.width - prefixWidth - tagLength).Render(coloredText))
+		if tagLength > 0 {
+			s.WriteString(tag)
+		}
 		s.WriteRune('\n')
 		countLines++
 	}

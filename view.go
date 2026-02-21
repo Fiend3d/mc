@@ -48,24 +48,12 @@ func (m model) View() string {
 				Render(fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs)))
 			tabsWidth = lipgloss.Width(tabsWidget)
 		}
-		var dirBuilder strings.Builder
-		dir := m.getTab().dir
-		sepStyle := empty.Bold(true).Foreground(m.theme.whiteColor)
-		dirStyle := empty.Bold(true).Foreground(m.theme.accentColor5)
-		shift := 0
-		for i := 0; i < len(dir); i++ {
-			if dir[i] == '/' || dir[i] == '\\' {
-				if shift < i {
-					dirBuilder.WriteString(dirStyle.Render(dir[shift:i]))
-				}
-				dirBuilder.WriteString(sepStyle.Render(dir[i : i+1]))
-				shift = i + 1
-			}
-		}
-		if shift < len(dir) {
-			dirBuilder.WriteString(dirStyle.Render(dir[shift:]))
-		}
-		dir = ansi.Truncate(dirBuilder.String(), m.width-tabsWidth, "…")
+
+		dir := colorizeDir(m.getTab().dir,
+			empty.Bold(true).Foreground(m.theme.whiteColor),
+			empty.Bold(true).Foreground(m.theme.accentColor5),
+			m.width-tabsWidth)
+
 		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))
 		if tabsWidth > 0 {
 			s.WriteString(tabsWidget)
@@ -134,7 +122,7 @@ func (m model) View() string {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
 		}
 		if item.selected {
-			s.WriteString(style.Foreground(m.theme.whiteColor).Render("┃"))
+			s.WriteString(style.Foreground(m.theme.grayColor).Render("┃"))
 		} else {
 			s.WriteString(style.Render(" "))
 		}

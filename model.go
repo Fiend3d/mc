@@ -119,6 +119,17 @@ func (m *model) updateStart() {
 	}
 }
 
+func (m *model) updateTabsStart() {
+	if m.tabsCursor < m.tabsStart {
+		m.tabsStart = m.tabsCursor
+		return
+	}
+	actualHeight := m.height - 3
+	if m.tabsCursor > m.tabsStart+actualHeight {
+		m.tabsStart = m.tabsCursor - actualHeight
+	}
+}
+
 func (m *model) moveCursor(move int) {
 	tab := m.getTab()
 	settings := tab.getPageSettings()

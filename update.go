@@ -96,6 +96,13 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 			settings.start = max(0,
 				min(settings.start, tab.page.length()-actualHeight))
 		}
+	case tabsMode:
+		if m.height-2 <= len(m.tabs) {
+			m.tabsStart += steps
+			actualHeight := m.height - 2
+			m.tabsStart = max(0,
+				min(m.tabsStart, len(m.tabs)-actualHeight))
+		}
 	}
 	return m, nil
 }
@@ -166,9 +173,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleWheel(3)
 			}
 		case tea.MouseActionRelease:
+			m.click = newClick(msg.X, msg.Y, msg.Button, &m.click)
 			switch msg.Button {
 			case tea.MouseButtonLeft:
-				m.click = newClick(msg.X, msg.Y, &m.click)
 				switch m.mode {
 				case normalMode, visualMode:
 					if m.click.y == 0 {
@@ -220,6 +227,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								return m.right()
 							}
 						}
+					}
+				case tabsMode:
+					if m.click.y > 0 &&
+						m.click.y < m.height &&
+						m.click.y-1 < len(m.tabs)-m.tabsStart {
+						m.tabsCursor = m.click.y - 1 + m.tabsStart
 					}
 				}
 				return m, nil
@@ -317,6 +330,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "t":
 				m.mode = tabsMode
 				m.tabsCursor = m.currentTab
+				m.updateTabsStart()
 				return m, nil
 			}
 
@@ -601,11 +615,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "down", "j":
 				m.tabsCursor++
 				m.tabsCursor = min(m.tabsCursor, len(m.tabs)-1)
+				m.updateTabsStart()
 				return m, nil
 			case "up", "k":
 				m.tabsCursor--
 				m.tabsCursor = max(m.tabsCursor, 0)
+				m.updateTabsStart()
 				return m, nil
+			case "q":
+				return m.handleQuit(true)
+			case "Q":
+				return m.handleQuit(false)
 			}
 
 		case messagesMode:
