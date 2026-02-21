@@ -194,6 +194,12 @@ func (m model) View() string {
 		countItems++
 	}
 
+	if page.items == nil {
+		s.WriteString(empty.Width(m.width).Foreground(m.theme.grayColor).Render("   Loading..."))
+		s.WriteRune('\n')
+		countItems++
+	}
+
 	// render empty lines
 	for i := countItems; i < m.height-3; i++ {
 		s.WriteString(empty.Width(m.width).Render(" "))

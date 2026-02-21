@@ -127,11 +127,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case readDirMsg:
+		tab := m.tabs[msg.tab]
+		if tab.dir != msg.dir {
+			return m, nil
+		}
 		err := m.fillPage(msg.tab, msg.items)
 		if err != nil {
 			return m, m.addMessage(msgError, err.Error())
 		}
-		settings := m.tabs[msg.tab].getPageSettings()
+		settings := tab.getPageSettings()
 		length := len(msg.items)
 		if settings.cursor >= length {
 			settings.cursor = length - 1
