@@ -236,7 +236,7 @@ func realWindowsPath(path string) (string, error) {
 
 // uniquePath returns the next available numbered path
 // Like Maya's naming: if test01, test02 exist, returns test03
-func uniquePath(path string) string {
+func uniquePath(reserved []string, path string) string {
 	// If exact path doesn't exist, use it
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return path
@@ -251,7 +251,7 @@ func uniquePath(path string) string {
 	baseName, numWidth := parseName(name)
 
 	// Collect all existing numbers
-	existingNums := findExistingNumbers(dir, baseName, ext)
+	existingNums := findExistingNumbers(reserved, dir, baseName, ext)
 
 	// Find next available (smallest positive integer not in existing)
 	nextNum := 1
@@ -276,7 +276,7 @@ func parseName(name string) (baseName string, numWidth int) {
 	return name, 1
 }
 
-func findExistingNumbers(dir, baseName, ext string) []int {
+func findExistingNumbers(reserved []string, dir, baseName, ext string) []int {
 	var nums []int
 	pattern := regexp.MustCompile(`^` + regexp.QuoteMeta(baseName) + `(\d+)` + regexp.QuoteMeta(ext) + `$`)
 
@@ -287,6 +287,17 @@ func findExistingNumbers(dir, baseName, ext string) []int {
 
 	for _, entry := range entries {
 		matches := pattern.FindStringSubmatch(entry.Name())
+		if len(matches) == 2 {
+			num, _ := strconv.Atoi(matches[1])
+			if num > 0 {
+				nums = append(nums, num)
+			}
+		}
+	}
+
+	for _, path := range reserved {
+		name := filepath.Base(path)
+		matches := pattern.FindStringSubmatch(name)
 		if len(matches) == 2 {
 			num, _ := strconv.Atoi(matches[1])
 			if num > 0 {

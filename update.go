@@ -513,7 +513,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					value := m.input.Value()
 					dir := filepath.Dir(m.renamePaths[0])
 					path := filepath.Join(dir, value)
-					finalPath := uniquePath(path)
+					finalPath := uniquePath(nil, path)
 					pairs := []pathPair{{m.renamePaths[0], finalPath}}
 					cmd := &fileActionCommand{
 						action: renameFileAction,

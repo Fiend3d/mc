@@ -118,6 +118,7 @@ type fileActionCommand struct {
 func newFileActionCommand(action fileAction, paths []string, dst string, override bool) *fileActionCommand {
 	var pairs []pathPair
 	collision := false
+	var reserved []string
 	for i := range paths {
 		name := filepath.Base(paths[i])
 		dstPath := filepath.Join(dst, name)
@@ -127,7 +128,9 @@ func newFileActionCommand(action fileAction, paths []string, dst string, overrid
 			}
 			pairs = append(pairs, pathPair{paths[i], dstPath})
 		} else {
-			pairs = append(pairs, pathPair{paths[i], uniquePath(dstPath)})
+			path := uniquePath(reserved, dstPath)
+			reserved = append(reserved, path)
+			pairs = append(pairs, pathPair{paths[i], path})
 		}
 	}
 

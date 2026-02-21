@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -279,10 +278,10 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 	if !selectedItem.isDir {
 		return m, nil
 	}
-	dir := filepath.Join(tab.dir, selectedItem.name)
-	tab.dir = dir
+	// dir := filepath.Join(tab.dir, selectedItem.name) // I dunno about that
+	tab.dir = selectedItem.fullPath
 	tab.page = &page{}
-	return m, m.readDir(m.currentTab, dir)
+	return m, m.readDir(m.currentTab, selectedItem.fullPath)
 }
 
 func (m *model) getTab() *tab {
