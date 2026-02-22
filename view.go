@@ -222,6 +222,9 @@ func (m model) View() string {
 	case pathMode:
 		modeStyle = modeStyle.Background(m.theme.grayColor)
 		modeStr = " PATH "
+	case goMode:
+		modeStyle = modeStyle.Background(m.theme.grayColor)
+		modeStr = " GO "
 	default:
 		modeStyle = modeStyle.Background(m.theme.whiteColor)
 		modeStr = " NONE "

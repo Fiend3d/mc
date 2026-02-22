@@ -74,7 +74,7 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 func (m *model) handleRename() (tea.Model, tea.Cmd) {
 	paths := m.getPaths()
 	if len(paths) != 1 {
-		return m, m.addMessage(msgError, "only one path is supported right now")
+		return m, m.addMessage(msgError, "only one path is supported at the moment")
 	}
 	m.mode = renameMode
 	m.renamePaths = paths
@@ -233,6 +233,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.click.y < m.height &&
 						m.click.y-1 < len(m.tabs)-m.tabsStart {
 						m.tabsCursor = m.click.y - 1 + m.tabsStart
+						if m.click.doubleClick {
+							m.mode = normalMode
+							m.currentTab = m.tabsCursor
+						}
 					}
 				}
 				return m, nil
@@ -621,6 +625,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tabsCursor--
 				m.tabsCursor = max(m.tabsCursor, 0)
 				m.updateTabsStart()
+				return m, nil
+			case "enter":
+				m.mode = normalMode
+				m.currentTab = m.tabsCursor
 				return m, nil
 			case "q":
 				return m.handleQuit(true)
