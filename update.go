@@ -85,6 +85,17 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 	return m, textinput.Blink
 }
 
+func (m *model) handleRestoreTab() (tea.Model, tea.Cmd) {
+	if len(m.closedTabs) == 0 {
+		return m, m.addMessage(msgWarning, "nothing to restore")
+	}
+	dir := m.closedTabs[len(m.closedTabs)-1]
+	m.closedTabs = m.closedTabs[:len(m.closedTabs)-1]
+	m.tabs = append(m.tabs, newTab(dir, &page{}))
+	m.currentTab = len(m.tabs) - 1
+	return m, m.readDir(m.currentTab, dir)
+}
+
 func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 	switch m.mode {
 	case normalMode:
@@ -375,14 +386,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "T":
-				if len(m.closedTabs) == 0 {
-					return m, m.addMessage(msgWarning, "nothing to restore")
-				}
-				dir := m.closedTabs[len(m.closedTabs)-1]
-				m.closedTabs = m.closedTabs[:len(m.closedTabs)-1]
-				m.tabs = append(m.tabs, newTab(dir, &page{}))
-				m.currentTab = len(m.tabs) - 1
-				return m, m.readDir(m.currentTab, dir)
+				return m.handleRestoreTab()
 			case "d":
 				m.confirm(&deleteCommand{m.getTab().dir, m.getPaths()})
 				return m, nil
@@ -630,6 +634,73 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normalMode
 				m.currentTab = m.tabsCursor
 				return m, nil
+			case "d":
+				if len(m.tabs) == 1 {
+					return m, m.addMessage(msgWarning, "can't close the last tab")
+				}
+				m.closedTabs = append(m.closedTabs, m.tabs[m.tabsCursor].dir)
+				m.tabs = slices.Delete(m.tabs, m.tabsCursor, m.tabsCursor+1)
+				if m.tabsCursor == m.currentTab {
+					m.tabsCursor = min(m.tabsCursor, len(m.tabs)-1)
+					m.currentTab = m.tabsCursor
+				} else if m.tabsCursor < m.currentTab {
+					m.currentTab = m.currentTab - 1
+				} else {
+					m.tabsCursor = m.tabsCursor - 1
+				}
+				return m, nil
+			case "u":
+				return m.handleRestoreTab()
+			case "J":
+				if len(m.tabs) == 1 {
+					return m, nil
+				}
+				nextIndex := m.tabsCursor + 1
+				if nextIndex > len(m.tabs)-1 {
+					return m, nil
+				}
+				temp1 := *m.tabs[m.tabsCursor]
+				temp2 := *m.tabs[nextIndex]
+				m.tabs[m.tabsCursor] = &temp2
+				m.tabs[nextIndex] = &temp1
+				m.tabsCursor = m.tabsCursor + 1
+				m.updateTabsStart()
+				return m, nil
+			case "K":
+				if len(m.tabs) == 1 {
+					return m, nil
+				}
+				nextIndex := m.tabsCursor - 1
+				if nextIndex < 0 {
+					return m, nil
+				}
+				temp1 := *m.tabs[m.tabsCursor]
+				temp2 := *m.tabs[nextIndex]
+				m.tabs[m.tabsCursor] = &temp2
+				m.tabs[nextIndex] = &temp1
+				m.tabsCursor = m.tabsCursor - 1
+				m.updateTabsStart()
+				return m, nil
+			case "a":
+				temp := *m.tabs[m.tabsCursor]
+				for i := range m.tabs {
+					if i != m.tabsCursor {
+						m.closedTabs = append(m.closedTabs, m.tabs[i].dir)
+					}
+				}
+				m.tabs = nil
+				m.tabs = append(m.tabs, &temp)
+				m.currentTab = 0
+				m.tabsCursor = 0
+				m.tabsStart = 0
+				return m, nil
+			case "c":
+				dir := m.tabs[m.tabsCursor].dir
+				err := clipboardWrite(dir)
+				if err != nil {
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+				}
+				return m, m.addMessage(msgInfo, fmt.Sprintf("%s copied to clipboard", dir))
 			case "q":
 				return m.handleQuit(true)
 			case "Q":

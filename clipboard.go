@@ -6,7 +6,18 @@ import (
 	"unsafe"
 
 	"github.com/gonutz/w32"
+	"golang.design/x/clipboard"
 )
+
+func clipboardWrite(text string) error {
+	err := clipboard.Init()
+	if err != nil {
+		return err
+	}
+
+	clipboard.Write(clipboard.FmtText, []byte(text))
+	return nil
+}
 
 const (
 	cfHDrop        = 15 // CF_HDROP
