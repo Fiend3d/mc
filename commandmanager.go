@@ -219,3 +219,47 @@ func (c *fileActionCommand) undo() error {
 	}
 	return nil
 }
+
+type createCommand struct {
+	path  string
+	isDir bool
+	dir   string
+}
+
+func newCreateCommand(name string, dir string) *createCommand {
+	isDir := false
+	runes := []rune(name)
+	if runes[len(runes)-1] == '\\' || runes[len(runes)-1] == '/' {
+		isDir = true
+		runes = runes[:len(runes)-1]
+	}
+	path := uniquePath(nil, filepath.Join(dir, string(runes)))
+	return &createCommand{path, isDir, dir}
+}
+
+func (c *createCommand) execute() error {
+	if c.isDir {
+		err := os.MkdirAll(c.path, 0755)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := fileutils.TouchFile(c.path)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *createCommand) undo() error {
+	return os.RemoveAll(c.path)
+}
+
+func (c *createCommand) getDir() string {
+	return c.dir
+}
+
+func (c *createCommand) String() string {
+	return fmt.Sprintf("create %s", c.path)
+}

@@ -293,29 +293,20 @@ func (m model) View() string {
 			{"t", " View tabs "},
 		}
 
-		tStyle := m.theme.baseStyle
+		ui = m.renderTableOverlay(headers, rows, ui)
 
-		t := table.New().
-			Border(lipgloss.NormalBorder()).
-			BorderStyle(tStyle.Foreground(m.theme.grayColor)).
-			Headers(headers...).
-			Rows(rows...).
-			StyleFunc(func(row, col int) lipgloss.Style {
-				if row == table.HeaderRow {
-					return tStyle.Foreground(m.theme.grayColor)
-				}
+	case pathMode:
+		headers := []string{" Hotkey ", " Description "}
+		rows := [][]string{
+			{" ctrl+a ", " Clear all "},
+			{" ctrl+w ", " Clear a word "},
+			{" tab ", " Autocomplete "},
+			{" up/down ", " Next/previous autocomplete "},
+			{" ctrl+e ", " Expand environment variables "},
+			{" ctrl+n ", " Open the path in a new tab "},
+		}
 
-				if col == 0 {
-					return tStyle.
-						Foreground(m.theme.accentColor2).
-						Align(lipgloss.Center)
-				} else {
-					return tStyle
-				}
-
-			})
-
-		ui = overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
+		ui = m.renderTableOverlay(headers, rows, ui)
 
 	case confirmDialogMode, confirmDialogVisualMode:
 		cell := base.
@@ -349,6 +340,32 @@ func (m model) View() string {
 	}
 
 	return ui
+}
+
+func (m *model) renderTableOverlay(headers []string, rows [][]string, ui string) string {
+	tStyle := m.theme.baseStyle
+
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(tStyle.Foreground(m.theme.grayColor)).
+		Headers(headers...).
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return tStyle.Foreground(m.theme.grayColor)
+			}
+
+			if col == 0 {
+				return tStyle.
+					Foreground(m.theme.accentColor2).
+					Align(lipgloss.Center)
+			} else {
+				return tStyle
+			}
+
+		})
+
+	return overlay.Composite(t.Render(), ui, overlay.Center, overlay.Center, 0, 0)
 }
 
 func viewMessages(m *model) string {
