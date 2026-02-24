@@ -452,6 +452,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normalMode
 				m.sort(extensionSort, true)
 				return m, m.addMessage(msgInfo, "sorted by extension (reverse)")
+			case "n":
+				m.mode = normalMode
+				m.sort(normalSort, false)
+				return m, m.addMessage(msgInfo, "sorted normally")
+			case "N":
+				m.mode = normalMode
+				m.sort(normalSort, true)
+				return m, m.addMessage(msgInfo, "sorted normally (reverse)")
+			case "s":
+				m.mode = normalMode
+				m.sort(sizeSort, false)
+				return m, m.addMessage(msgInfo, "sorted by size")
+			case "S":
+				m.mode = normalMode
+				m.sort(sizeSort, true)
+				return m, m.addMessage(msgInfo, "sorted by size (reverse)")
+			case "r":
+				m.mode = normalMode
+				m.sort(randomSort, false)
+				return m, m.addMessage(msgInfo, "sorted randomly")
 			}
 
 		case renameMode:
