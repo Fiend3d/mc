@@ -93,7 +93,7 @@ func (t *tab) getPageSettings() *pageSettings {
 }
 
 type page struct {
-	items []*item
+	items []item
 }
 
 func (m *model) getStartEnd() (int, int) {
@@ -194,17 +194,17 @@ func (m *model) getPaths() []string {
 	case visualMode:
 		start, end := m.getStartEnd()
 		for i := start; i <= end; i++ {
-			paths = append(paths, page.items[i].fullPath)
+			paths = append(paths, page.items[i].getFullPath())
 		}
 	default:
 		settings := m.getTab().getPageSettings()
 		for i := range page.items {
-			if page.items[i].selected {
-				paths = append(paths, page.items[i].fullPath)
+			if page.items[i].isSelected() {
+				paths = append(paths, page.items[i].getFullPath())
 			}
 		}
 		if len(paths) == 0 {
-			paths = append(paths, page.items[settings.cursor].fullPath)
+			paths = append(paths, page.items[settings.cursor].getFullPath())
 		}
 	}
 	return paths
@@ -258,7 +258,7 @@ func tick() tea.Cmd {
 	})
 }
 
-func (m *model) fillPage(tab int, items []*item) error {
+func (m *model) fillPage(tab int, items []item) error {
 	page := m.tabs[tab].page
 	page.items = items
 	return nil
@@ -286,13 +286,13 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	selectedItem := tab.page.items[settings.cursor]
-	if !selectedItem.isDir {
+	if !selectedItem.isDirectory() {
 		return m, nil
 	}
 	// dir := filepath.Join(tab.dir, selectedItem.name) // I dunno about that
-	tab.dir = selectedItem.fullPath
+	tab.dir = selectedItem.getFullPath()
 	tab.page = &page{}
-	return m, m.readDir(m.currentTab, selectedItem.fullPath)
+	return m, m.readDir(m.currentTab, selectedItem.getFullPath())
 }
 
 func (m *model) getTab() *tab {

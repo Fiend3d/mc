@@ -155,19 +155,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "ctrl+a":
 				page := m.getPage()
 				for i := range page.items {
-					page.items[i].selected = true
+					page.items[i].setSelected(true)
 				}
 				return m, nil
 			case "ctrl+r":
 				page := m.getPage()
 				for i := range page.items {
-					page.items[i].selected = !page.items[i].selected
+					page.items[i].setSelected(!page.items[i].isSelected())
 				}
 				return m, nil
 			case "ctrl+d":
 				page := m.getPage()
 				for i := range page.items {
-					page.items[i].selected = false
+					page.items[i].setSelected(false)
 				}
 				return m, nil
 
@@ -200,12 +200,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					start, end := m.getStartEnd()
 					for i := start; i <= end; i++ {
 						item := tab.page.items[i]
-						item.selected = !item.selected
+						item.setSelected(!item.isSelected())
 					}
 				} else {
 					settings := tab.getPageSettings()
 					selectedItem := tab.page.items[settings.cursor]
-					selectedItem.selected = !selectedItem.selected
+					selectedItem.setSelected(!selectedItem.isSelected())
 					m.moveCursor(1)
 				}
 				return m, nil
@@ -366,7 +366,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					page := m.getPage()
 					var matches []int
 					for i := range page.items {
-						runes := []rune(page.items[i].name)
+						runes := []rune(page.items[i].getName())
 						if len(runes) == 0 {
 							continue
 						}

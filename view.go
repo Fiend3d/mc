@@ -68,9 +68,6 @@ func (m model) View() string {
 
 	const (
 		cursorWidth = 3
-		sizeWidth   = 8
-		timeWidth   = 16
-		colGap      = 1
 	)
 
 	countItems := 0
@@ -107,7 +104,7 @@ func (m model) View() string {
 
 		item := page.items[i+settings.start] // it might crash here
 
-		switch item.action {
+		switch item.getAction() {
 		case itemActionCopy:
 			s.WriteString(style.Foreground(m.theme.accentColor3).Render("┃"))
 		case itemActionCut:
@@ -121,63 +118,13 @@ func (m model) View() string {
 		} else {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
 		}
-		if item.selected {
+		if item.isSelected() {
 			s.WriteString(style.Foreground(m.theme.grayColor).Render("┃"))
 		} else {
 			s.WriteString(style.Render(" "))
 		}
 
-		// name block
-		var nameBlock strings.Builder
-
-		nameWidth := max(
-			m.width-cursorWidth-sizeWidth-timeWidth-colGap*2+1, 1)
-
-		if item.isDir {
-			nameBlock.WriteString(
-				style.Foreground(m.theme.accentColor4).Render(item.name),
-			)
-			nameBlock.WriteString(style.Bold(true).Render("/"))
-		} else {
-			if strings.HasSuffix(strings.ToLower(item.name), ".exe") {
-				nameBlock.WriteString(
-					style.Foreground(m.theme.greenColor).Render(item.name),
-				)
-			} else {
-				nameBlock.WriteString(
-					style.Foreground(m.theme.whiteColor).Render(item.name),
-				)
-			}
-		}
-
-		if item.isSymlink {
-			nameBlock.WriteString(
-				style.Foreground(m.theme.accentColor2).Render(" -> "))
-			nameBlock.WriteString(
-				style.Foreground(m.theme.accentColor3).Render(item.symlink))
-		}
-
-		name := nameBlock.String()
-
-		name = ansi.Truncate(name, nameWidth, "…")
-
-		s.WriteString(name)
-		nameLen := lipgloss.Width(name)
-		if nameLen < nameWidth {
-			s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
-		}
-
-		// time column
-		timeStyle := style.Foreground(m.theme.grayColor)
-		s.WriteString(timeStyle.Width(timeWidth).Render(item.modTime))
-
-		s.WriteString(style.Render(" "))
-
-		// size column
-		s.WriteString(style.Render(
-			lipgloss.PlaceHorizontal(sizeWidth, lipgloss.Center, item.size)))
-		s.WriteString(style.Render(item.size))
-
+		item.render(&s, style, &m.theme, m.width-cursorWidth)
 		s.WriteRune('\n')
 		countItems++
 	}
@@ -239,18 +186,18 @@ func (m model) View() string {
 	}
 
 	var itemName string
-	var modeBitsStr string
+	var extraStr string
 	if settings.cursor < len(page.items) {
 		selected_item := page.items[settings.cursor]
-		itemName = selected_item.name
-		modeBitsStr = selected_item.mode
+		itemName = selected_item.getName()
+		extraStr = selected_item.getExtra()
 	}
 
-	modeBitsBlock := base.Foreground(m.theme.grayColor).Render(modeBitsStr)
+	extraBlock := base.Foreground(m.theme.grayColor).Render(extraStr)
 
 	rightStr := fmt.Sprintf(" [%d/%d] ", settings.cursor+1, len(page.items))
 	rightBlock := m.theme.baseStyle.Render(rightStr)
-	rightBlock = modeBitsBlock + rightBlock
+	rightBlock = extraBlock + rightBlock
 	rightWidth := lipgloss.Width(rightBlock)
 
 	nameWidth := max(1, m.width-modeWidth-rightWidth)

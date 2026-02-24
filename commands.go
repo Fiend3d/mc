@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -22,7 +21,7 @@ func newErr(err error) tea.Cmd {
 
 type readDirMsg struct {
 	tab   int
-	items []*item
+	items []item
 	dir   string
 }
 
@@ -62,23 +61,24 @@ func (m *model) update(dir string) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func readItems(dir string) ([]*item, error) {
+func readItems(dir string) ([]item, error) {
 	if isUNCroot(dir) {
-		paths, err := netView(dir)
-		if err != nil {
-			return nil, err
-		}
-		result := make([]*item, len(paths))
-		for i := range paths {
-			item := &item{
-				name:     paths[i],
-				isDir:    true,
-				fullPath: filepath.Join(dir, paths[i]),
-				modTime:  "[shared]",
-			}
-			result[i] = item
-		}
-		return result, nil
+		return nil, fmt.Errorf("oops!")
+		// paths, err := netView(dir)
+		// if err != nil {
+		// 	return nil, err
+		// }
+		// result := make([]*item, len(paths))
+		// for i := range paths {
+		// 	item := item{
+		// 		name:     paths[i],
+		// 		isDir:    true,
+		// 		fullPath: filepath.Join(dir, paths[i]),
+		// 		modTime:  "[shared]",
+		// 	}
+		// 	result[i] = item
+		// }
+		// return result, nil
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -110,9 +110,9 @@ func readItems(dir string) ([]*item, error) {
 		return strings.ToLower(filteredEntries[i].Name()) < strings.ToLower(filteredEntries[j].Name())
 	})
 
-	items := make([]*item, len(filteredEntries))
+	items := make([]item, len(filteredEntries))
 	for i := range filteredEntries {
-		item, err := newItem(filteredEntries[i], dir)
+		item, err := newFilesystemItem(filteredEntries[i], dir)
 		if err != nil {
 			return nil, err
 		}
