@@ -160,6 +160,9 @@ func (m model) View() string {
 	case filterMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor2)
 		modeStr = " FILTER "
+	case sortMode:
+		modeStyle = modeStyle.Background(m.theme.accentColor2)
+		modeStr = " SORT "
 	case renameMode:
 		modeStyle = modeStyle.Background(m.theme.greenColor)
 		modeStr = " RENAME "
@@ -238,6 +241,24 @@ func (m model) View() string {
 		rows := [][]string{
 			{"g", " Change path "},
 			{"t", " View tabs "},
+		}
+
+		ui = m.renderTableOverlay(headers, rows, ui)
+
+	case sortMode:
+		headers := []string{" Button ", " Description "}
+		rows := [][]string{
+			{"m", " Sort by modified time "},
+			{"M", " Sort by modified time (reverse) "},
+			{"a", " Sort alphabetically "},
+			{"A", " Sort alphabetically (reverse) "},
+			{"n", " Sort normally "},
+			{"N", " Sort normally (reverse) "},
+			{"e", " Sort by extension "},
+			{"E", " Sort by extension (reverse) "},
+			{"s", " Sort by size "},
+			{"S", " Sort by size (reverse) "},
+			{"r", " Sort randomly "},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)

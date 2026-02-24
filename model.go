@@ -23,6 +23,7 @@ const (
 	messagesMode
 	tabsMode
 	filterMode
+	sortMode
 	renameMode
 	createMode
 	pathMode

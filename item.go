@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -16,6 +17,7 @@ type item interface {
 	getFullPath() string
 	isDirectory() bool
 	getSize() uint64
+	getModTime() time.Time
 	isSelected() bool
 	setSelected(bool)
 	getAction() itemAction
@@ -39,12 +41,13 @@ type filesystemItem struct {
 
 	size uint64
 
-	isDir     bool
-	isSymlink bool
-	symlink   string
-	modTime   string
-	sizeStr   string
-	mode      string
+	isDir      bool
+	isSymlink  bool
+	symlink    string
+	modTimeStr string
+	modTime    time.Time
+	sizeStr    string
+	mode       string
 }
 
 func newFilesystemItem(clipboardFiles []string, op OpType, entry os.DirEntry, dir string) (*filesystemItem, error) {
@@ -84,7 +87,8 @@ func newFilesystemItem(clipboardFiles []string, op OpType, entry os.DirEntry, di
 		)
 	}
 
-	item.modTime = info.ModTime().Format("02.01.2006 15:04")
+	item.modTime = info.ModTime()
+	item.modTimeStr = item.modTime.Format("02.01.2006 15:04")
 	item.mode = info.Mode().String()
 
 	if clipboardFiles != nil {
@@ -115,6 +119,10 @@ func (i *filesystemItem) isDirectory() bool {
 
 func (i *filesystemItem) getSize() uint64 {
 	return i.size
+}
+
+func (i *filesystemItem) getModTime() time.Time {
+	return i.modTime
 }
 
 func (i *filesystemItem) isSelected() bool {
@@ -178,7 +186,7 @@ func (i *filesystemItem) render(s *strings.Builder, style *lipgloss.Style, t *th
 
 	// time column
 	timeStyle := style.Foreground(t.grayColor)
-	s.WriteString(timeStyle.Width(timeWidth).Render(i.modTime))
+	s.WriteString(timeStyle.Width(timeWidth).Render(i.modTimeStr))
 
 	s.WriteString(style.Render(" "))
 
@@ -228,6 +236,11 @@ func (i *sharedItem) isDirectory() bool {
 
 func (i *sharedItem) getSize() uint64 {
 	return 0
+}
+
+func (i *sharedItem) getModTime() time.Time {
+	var result time.Time
+	return result
 }
 
 func (i *sharedItem) isSelected() bool {

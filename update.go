@@ -311,6 +311,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Reset()
 				m.input.Focus()
 				return m, textinput.Blink
+			case ",":
+				m.mode = sortMode
+				return m, nil
 			case "a":
 				m.mode = createMode
 				m.input.Placeholder = "e.g., filename.txt or dirname/"
@@ -418,6 +421,37 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.mode = normalMode
 				return m, nil
+			}
+
+		case sortMode:
+			switch msg.String() {
+			case "esc", ",":
+				m.mode = normalMode
+				return m, nil
+			case "m":
+				m.mode = normalMode
+				m.sort(modifiedTimeSort, false)
+				return m, m.addMessage(msgInfo, "sorted by modified time")
+			case "M":
+				m.mode = normalMode
+				m.sort(modifiedTimeSort, true)
+				return m, m.addMessage(msgInfo, "sorted by modified time (reverse)")
+			case "a":
+				m.mode = normalMode
+				m.sort(alphabeticSort, false)
+				return m, m.addMessage(msgInfo, "sorted alphabetically")
+			case "A":
+				m.mode = normalMode
+				m.sort(alphabeticSort, true)
+				return m, m.addMessage(msgInfo, "sorted alphabetically (reverse)")
+			case "e":
+				m.mode = normalMode
+				m.sort(extensionSort, false)
+				return m, m.addMessage(msgInfo, "sorted by extension")
+			case "E":
+				m.mode = normalMode
+				m.sort(extensionSort, true)
+				return m, m.addMessage(msgInfo, "sorted by extension (reverse)")
 			}
 
 		case renameMode:

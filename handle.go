@@ -147,6 +147,12 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 			m.tabsStart = max(0,
 				min(m.tabsStart, len(m.tabs)-actualHeight))
 		}
+	case messagesMode:
+		if m.height <= len(m.log) {
+			m.logStart += steps
+			m.logStart = max(0,
+				min(m.logStart, len(m.log)-m.height))
+		}
 	}
 	return m, nil
 }
