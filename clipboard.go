@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/gonutz/w32"
@@ -130,6 +131,9 @@ func setClipboardFiles(paths []string, op OpType) error {
 			w32.SetClipboardData(cfPreferredDropEffect, w32.HANDLE(hEffect))
 		}
 	}
+
+	// it's too fast fast without it and updating happens too early sometimes
+	time.Sleep(time.Microsecond * 100)
 
 	return nil
 }

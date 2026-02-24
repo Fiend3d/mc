@@ -13,8 +13,9 @@ import (
 
 type item interface {
 	getName() string
-	isDirectory() bool
 	getFullPath() string
+	isDirectory() bool
+	getSize() uint64
 	isSelected() bool
 	setSelected(bool)
 	getAction() itemAction
@@ -31,20 +32,22 @@ const (
 )
 
 type filesystemItem struct {
+	name     string
 	fullPath string
 	selected bool
 	action   itemAction
 
+	size uint64
+
 	isDir     bool
 	isSymlink bool
-	name      string
 	symlink   string
 	modTime   string
-	size      string
+	sizeStr   string
 	mode      string
 }
 
-func newFilesystemItem(entry os.DirEntry, dir string) (*filesystemItem, error) {
+func newFilesystemItem(clipboardFiles []string, op OpType, entry os.DirEntry, dir string) (*filesystemItem, error) {
 	info, err := entry.Info()
 	if err != nil {
 		return nil, err
@@ -70,10 +73,11 @@ func newFilesystemItem(entry os.DirEntry, dir string) (*filesystemItem, error) {
 		item.symlink = target
 	}
 
-	item.size = ""
+	item.sizeStr = ""
 	if !item.isDir {
-		item.size = strings.Replace(
-			humanize.Bytes(uint64(info.Size())),
+		item.size = uint64(info.Size())
+		item.sizeStr = strings.Replace(
+			humanize.Bytes(item.size),
 			" ",
 			"",
 			1,
@@ -81,12 +85,10 @@ func newFilesystemItem(entry os.DirEntry, dir string) (*filesystemItem, error) {
 	}
 
 	item.modTime = info.ModTime().Format("02.01.2006 15:04")
-
 	item.mode = info.Mode().String()
 
-	paths, op, err := getClipboardFiles()
-	if err == nil {
-		if slices.Contains(paths, item.fullPath) {
+	if clipboardFiles != nil {
+		if slices.Contains(clipboardFiles, item.fullPath) {
 			switch op {
 			case OpCopy:
 				item.action = itemActionCopy
@@ -103,12 +105,16 @@ func (i *filesystemItem) getName() string {
 	return i.name
 }
 
+func (i *filesystemItem) getFullPath() string {
+	return i.fullPath
+}
+
 func (i *filesystemItem) isDirectory() bool {
 	return i.isDir
 }
 
-func (i *filesystemItem) getFullPath() string {
-	return i.fullPath
+func (i *filesystemItem) getSize() uint64 {
+	return i.size
 }
 
 func (i *filesystemItem) isSelected() bool {
@@ -178,10 +184,89 @@ func (i *filesystemItem) render(s *strings.Builder, style *lipgloss.Style, t *th
 
 	// size column
 	s.WriteString(style.Render(
-		lipgloss.PlaceHorizontal(sizeWidth, lipgloss.Center, i.size)))
-	s.WriteString(style.Render(i.size))
+		lipgloss.PlaceHorizontal(sizeWidth, lipgloss.Center, i.sizeStr)))
+	s.WriteString(style.Render(i.sizeStr))
 }
 
 func (i *filesystemItem) getExtra() string {
 	return i.mode
+}
+
+type sharedItem struct {
+	name     string
+	fullPath string
+	selected bool
+	action   itemAction
+}
+
+func newSharedItem(clipboardFiles []string, op OpType, name string, fullPath string) *sharedItem {
+	action := itemActionNone
+	if clipboardFiles != nil {
+		if slices.Contains(clipboardFiles, fullPath) {
+			switch op {
+			case OpCopy:
+				action = itemActionCopy
+			case OpCut:
+				action = itemActionCut
+			}
+		}
+	}
+	return &sharedItem{name: name, fullPath: fullPath, action: action}
+}
+
+func (i *sharedItem) getName() string {
+	return i.name
+}
+
+func (i *sharedItem) getFullPath() string {
+	return i.fullPath
+}
+
+func (i *sharedItem) isDirectory() bool {
+	return true
+}
+
+func (i *sharedItem) getSize() uint64 {
+	return 0
+}
+
+func (i *sharedItem) isSelected() bool {
+	return i.selected
+}
+
+func (i *sharedItem) setSelected(selected bool) {
+	i.selected = selected
+}
+
+func (i *sharedItem) getAction() itemAction {
+	return i.action
+}
+
+func (i *sharedItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
+	info := " [shared] "
+	infoSize := len(info)
+
+	var nameBlock strings.Builder
+	nameWidth := max(width-infoSize, 1)
+
+	nameBlock.WriteString(
+		style.Foreground(t.accentColor4).Render(i.name),
+	)
+	nameBlock.WriteString(style.Bold(true).Render("/"))
+
+	name := nameBlock.String()
+
+	name = ansi.Truncate(name, nameWidth, "…")
+
+	s.WriteString(name)
+	nameLen := lipgloss.Width(name)
+	if nameLen < nameWidth {
+		s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
+	}
+
+	s.WriteString(style.Foreground(t.grayColor).Render(info))
+}
+
+func (i *sharedItem) getExtra() string {
+	return ""
 }

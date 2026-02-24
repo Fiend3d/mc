@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -62,23 +63,19 @@ func (m *model) update(dir string) tea.Cmd {
 }
 
 func readItems(dir string) ([]item, error) {
+	clipboardFiles, op, _ := getClipboardFiles() // not sure about handling this error
+
 	if isUNCroot(dir) {
-		return nil, fmt.Errorf("oops!")
-		// paths, err := netView(dir)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		// result := make([]*item, len(paths))
-		// for i := range paths {
-		// 	item := item{
-		// 		name:     paths[i],
-		// 		isDir:    true,
-		// 		fullPath: filepath.Join(dir, paths[i]),
-		// 		modTime:  "[shared]",
-		// 	}
-		// 	result[i] = item
-		// }
-		// return result, nil
+		paths, err := netView(dir)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]item, len(paths))
+		for i := range paths {
+			item := newSharedItem(clipboardFiles, op, paths[i], filepath.Join(dir, paths[i]))
+			result[i] = item
+		}
+		return result, nil
 	}
 
 	entries, err := os.ReadDir(dir)
@@ -110,13 +107,13 @@ func readItems(dir string) ([]item, error) {
 		return strings.ToLower(filteredEntries[i].Name()) < strings.ToLower(filteredEntries[j].Name())
 	})
 
-	items := make([]item, len(filteredEntries))
+	items := make([]item, 0, len(filteredEntries))
 	for i := range filteredEntries {
-		item, err := newFilesystemItem(filteredEntries[i], dir)
+		item, err := newFilesystemItem(clipboardFiles, op, filteredEntries[i], dir)
 		if err != nil {
 			return nil, err
 		}
-		items[i] = item
+		items = append(items, item)
 	}
 
 	return items, nil

@@ -323,7 +323,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "f5":
 				return m, tea.Batch(
-					m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab)),
+					m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab+1)),
 					m.update(m.getTab().dir))
 			case "y":
 				msg := m.copyCut(false)
