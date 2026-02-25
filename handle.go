@@ -69,17 +69,32 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleRename() (tea.Model, tea.Cmd) {
-	paths := m.getPaths()
-	if len(paths) != 1 {
-		return m, m.addMessage(msgError, "only one path is supported at the moment")
+	page := m.getPage()
+	if len(page.items) > 0 {
+		item := page.items[0]
+		switch item.(type) {
+		case *driveItem:
+			// TODO: implement changing labels
+			return m, m.addMessage(msgError, "not supported yet")
+		case *sharedItem:
+			return m, m.addMessage(msgError, "can't rename these")
+		case *filesystemItem:
+			paths := m.getPaths()
+			if len(paths) != 1 {
+				return m, m.addMessage(msgError, "only one path is supported at the moment")
+			}
+			m.mode = renameMode
+			m.renamePaths = paths
+			m.input.Placeholder = ""
+			m.input.Reset()
+			m.input.Focus()
+			m.input.SetValue(filepath.Base(paths[0]))
+			return m, textinput.Blink
+		default:
+			return m, m.addMessage(msgError, "uknown type of item")
+		}
 	}
-	m.mode = renameMode
-	m.renamePaths = paths
-	m.input.Placeholder = ""
-	m.input.Reset()
-	m.input.Focus()
-	m.input.SetValue(filepath.Base(paths[0]))
-	return m, textinput.Blink
+	return m, m.addMessage(msgError, "nothing to rename")
 }
 
 func (m *model) handleRestoreTab() (tea.Model, tea.Cmd) {
@@ -95,10 +110,8 @@ func (m *model) handleRestoreTab() (tea.Model, tea.Cmd) {
 
 func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 	dir := m.pathInput.Value()
-	if strings.TrimSpace(dir) == "" {
-		return m, m.addMessage(msgError, "empty path")
-	}
-	if isUNCroot(dir) {
+	dir = strings.TrimSpace(dir)
+	if isUNCroot(dir) || dir == "" {
 		if addTab {
 			m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
 			m.currentTab = len(m.tabs) - 1

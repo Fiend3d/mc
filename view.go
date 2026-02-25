@@ -49,10 +49,15 @@ func (m model) View() string {
 			tabsWidth = lipgloss.Width(tabsWidget)
 		}
 
-		dir := colorizeDir(m.getTab().dir,
-			empty.Bold(true).Foreground(m.theme.whiteColor),
-			empty.Bold(true).Foreground(m.theme.accentColor5),
-			m.width-tabsWidth)
+		dir := m.getTab().dir
+		if dir == "" {
+			dir = empty.Bold(true).Foreground(m.theme.accentColor3).Render(" This PC")
+		} else {
+			dir = colorizeDir(dir,
+				empty.Bold(true).Foreground(m.theme.whiteColor),
+				empty.Bold(true).Foreground(m.theme.accentColor5),
+				m.width-tabsWidth)
+		}
 
 		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))
 		if tabsWidth > 0 {

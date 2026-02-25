@@ -63,6 +63,18 @@ func (m *model) update(dir string) tea.Cmd {
 }
 
 func readItems(dir string) ([]item, error) {
+	if dir == "" {
+		drives, err := getDrives()
+		if err != nil {
+			return nil, err
+		}
+		result := make([]item, len(drives))
+		for i := range drives {
+			result[i] = newDriveItem(drives[i])
+		}
+		return result, nil
+	}
+
 	clipboardFiles, op, _ := getClipboardFiles() // not sure about handling this error
 
 	if isUNCroot(dir) {

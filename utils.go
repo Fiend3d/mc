@@ -37,13 +37,24 @@ func splitPath(path string) []string {
 }
 
 func filepathDir(path string) string {
+	if path == "" {
+		return path
+	}
 	if isUNC(path) {
 		parts := splitPath(path)
 		if len(parts) > 1 {
 			return `\\` + strings.Join(parts[:len(parts)-1], `\`)
 		}
 	}
-	return filepath.Dir(path)
+	dir := filepath.Dir(path)
+	if dir == path {
+		pattern := `^[A-Za-z]:\\$`
+		driveRegex := regexp.MustCompile(pattern)
+		if driveRegex.MatchString(path) {
+			return ""
+		}
+	}
+	return dir
 
 }
 

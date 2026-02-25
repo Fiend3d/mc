@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -282,4 +283,95 @@ func (i *sharedItem) render(s *strings.Builder, style *lipgloss.Style, t *theme,
 
 func (i *sharedItem) getExtra() string {
 	return ""
+}
+
+type driveItem struct {
+	label     string
+	selected  bool
+	letter    string
+	driveType string
+	total     uint64
+	free      uint64
+	available uint64
+}
+
+func newDriveItem(d drive) *driveItem {
+	return &driveItem{
+		label:     d.name,
+		letter:    d.letter,
+		driveType: d.driveType,
+		total:     d.total,
+		free:      d.free,
+		available: d.available,
+	}
+}
+
+func (i *driveItem) getName() string {
+	return i.letter
+}
+
+func (i *driveItem) getFullPath() string {
+	return i.letter + "\\"
+}
+
+func (i *driveItem) isDirectory() bool {
+	return true
+}
+
+func (i *driveItem) getSize() uint64 {
+	return i.total
+}
+
+func (i *driveItem) getModTime() time.Time {
+	var result time.Time
+	return result
+}
+
+func (i *driveItem) isSelected() bool {
+	return i.selected
+}
+
+func (i *driveItem) setSelected(selected bool) {
+	i.selected = selected
+}
+
+func (i *driveItem) getAction() itemAction {
+	return itemActionNone
+}
+
+func (i *driveItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
+	var infoBlock strings.Builder
+	infoBlock.WriteString(style.Render(humanize.Bytes(i.free)))
+	infoBlock.WriteString(style.Render(" free of "))
+	infoBlock.WriteString(style.Foreground(t.accentColor5).Bold(true).Render(humanize.Bytes(i.total)))
+	infoBlock.WriteString(style.Render(" "))
+
+	info := infoBlock.String()
+	infoSize := lipgloss.Width(info)
+
+	var nameBlock strings.Builder
+	nameWidth := max(width-infoSize, 1)
+
+	nameBlock.WriteString(
+		style.Foreground(t.accentColor4).Render(i.letter),
+	)
+	nameBlock.WriteString(style.Bold(true).Render("/"))
+	nameBlock.WriteString(style.Foreground(t.accentColor2).Render(fmt.Sprintf(" %s", i.label)))
+	nameBlock.WriteString(style.Foreground(t.grayColor).Render(fmt.Sprintf(" - %s", i.driveType)))
+	name := nameBlock.String()
+
+	name = ansi.Truncate(name, nameWidth, "…")
+
+	s.WriteString(name)
+	nameLen := lipgloss.Width(name)
+	if nameLen < nameWidth {
+		s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
+	}
+
+	s.WriteString(style.Foreground(t.grayColor).Render(info))
+}
+
+func (i *driveItem) getExtra() string {
+	percent := (float64(i.free) / float64(i.total)) * 100
+	return fmt.Sprintf("%.2f%% left", percent)
 }
