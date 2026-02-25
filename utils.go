@@ -36,6 +36,15 @@ func splitPath(path string) []string {
 	})
 }
 
+func isDisk(path string) bool {
+	pattern := `^[A-Za-z]:\\$`
+	driveRegex := regexp.MustCompile(pattern)
+	if driveRegex.MatchString(path) {
+		return true
+	}
+	return false
+}
+
 func filepathDir(path string) string {
 	if path == "" {
 		return path
@@ -47,12 +56,8 @@ func filepathDir(path string) string {
 		}
 	}
 	dir := filepath.Dir(path)
-	if dir == path {
-		pattern := `^[A-Za-z]:\\$`
-		driveRegex := regexp.MustCompile(pattern)
-		if driveRegex.MatchString(path) {
-			return ""
-		}
+	if dir == path && isDisk(path) {
+		return ""
 	}
 	return dir
 

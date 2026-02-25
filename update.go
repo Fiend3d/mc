@@ -178,10 +178,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.moveCursor(-1)
 				return m, nil
 			case "pgdown":
-				m.moveCursor(3)
+				m.moveCursor((m.height - 3) / 2)
 				return m, nil
 			case "pgup":
-				m.moveCursor(-3)
+				m.moveCursor(-(m.height - 3) / 2)
 				return m, nil
 			case "home":
 				settings := m.getTab().getPageSettings()
@@ -654,11 +654,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logStart = max(m.logStart, 0)
 				return m, nil
 			case "pgdown":
-				m.logStart += 3
+				m.logStart += m.height / 2
 				m.logStart = min(len(m.log)-1, m.logStart)
 				return m, nil
 			case "pgup":
-				m.logStart -= 3
+				m.logStart -= m.height / 2
 				m.logStart = max(m.logStart, 0)
 				return m, nil
 			case "home":
