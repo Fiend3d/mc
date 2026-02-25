@@ -341,9 +341,16 @@ func (i *driveItem) getAction() itemAction {
 
 func (i *driveItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
 	var infoBlock strings.Builder
-	infoBlock.WriteString(style.Render(humanize.Bytes(i.free)))
+	sizeWidth := 8
+	infoBlock.WriteString(style.Foreground(t.grayColor).Render(fmt.Sprintf("%s ", i.driveType)))
+	infoBlock.WriteString(style.Align(lipgloss.Right).Width(sizeWidth).Render(humanize.Bytes(i.free)))
 	infoBlock.WriteString(style.Render(" free of "))
-	infoBlock.WriteString(style.Foreground(t.accentColor5).Bold(true).Render(humanize.Bytes(i.total)))
+	infoBlock.WriteString(style.
+		Align(lipgloss.Left).
+		Foreground(t.accentColor5).
+		Bold(true).
+		Width(sizeWidth).
+		Render(humanize.Bytes(i.total)))
 	infoBlock.WriteString(style.Render(" "))
 
 	info := infoBlock.String()
@@ -357,7 +364,6 @@ func (i *driveItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, 
 	)
 	nameBlock.WriteString(style.Bold(true).Render("/"))
 	nameBlock.WriteString(style.Foreground(t.accentColor2).Render(fmt.Sprintf(" %s", i.label)))
-	nameBlock.WriteString(style.Foreground(t.grayColor).Render(fmt.Sprintf(" - %s", i.driveType)))
 	name := nameBlock.String()
 
 	name = ansi.Truncate(name, nameWidth, "…")
