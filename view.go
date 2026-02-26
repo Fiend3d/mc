@@ -24,6 +24,8 @@ func (m model) View() string {
 	}
 
 	switch m.mode {
+	case helpMode, helpFilterMode:
+		return viewHelp(&m)
 	case messagesMode:
 		return viewMessages(&m)
 	case tabsMode:

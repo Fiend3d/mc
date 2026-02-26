@@ -16,6 +16,8 @@ type mode int
 const (
 	normalMode mode = iota
 	visualMode
+	helpMode
+	helpFilterMode
 	goMode
 	confirmDialogMode
 	confirmDialogVisualMode

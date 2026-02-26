@@ -61,7 +61,7 @@ func netView(server string) ([]string, error) {
 	var result []string
 	for _, share := range shares {
 		name := windows.UTF16PtrToString(share.NetName)
-		if share.Type == 0 {
+		if share.Type == 0 { // TODO: handle hidden shares
 			result = append(result, name)
 		}
 	}

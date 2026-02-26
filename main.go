@@ -9,14 +9,28 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+var (
+	// Set by build flags
+	Version   = "dev"
+	GitCommit = ""
+	BuildTime = ""
+)
+
 func (m model) Init() tea.Cmd {
 	return m.readDir(0, m.tabs[0].dir)
 }
 
 func main() {
+	var showVersion bool
+	flag.BoolVar(&showVersion, "version", false, "show version")
+	flag.BoolVar(&showVersion, "v", false, "show version (shorthand)")
 	tempFileFlag := flag.String("tf", "output.tmp", "temp file for output")
 	outputFlag := flag.Bool("o", false, "enable temp file output")
 	flag.Parse()
+	if showVersion {
+		fmt.Println(Version)
+		return
+	}
 	dirs := flag.Args()
 	tempFile := *tempFileFlag
 	output := *outputFlag

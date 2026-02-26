@@ -242,6 +242,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+		case helpMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
+			}
+
 		case confirmDialogMode, confirmDialogVisualMode:
 			return m.handleConfirm(msg)
 
@@ -251,6 +258,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleQuit(false)
 			case "q":
 				return m.handleQuit(true)
+			case "f1":
+				m.mode = helpMode
+				return m, nil
 			case "g":
 				m.mode = goMode
 				return m, nil
