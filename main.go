@@ -28,7 +28,7 @@ func main() {
 	outputFlag := flag.Bool("o", false, "enable temp file output")
 	flag.Parse()
 	if showVersion {
-		fmt.Printf("mc %s (%s) %s\n", Version, GitCommit, BuildTime)
+		fmt.Printf("mc %s (GitCommit: %s) Build Time: %s\n", Version, GitCommit, BuildTime)
 		return
 	}
 	dirs := flag.Args()
