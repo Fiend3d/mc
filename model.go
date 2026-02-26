@@ -44,6 +44,9 @@ type model struct {
 	height     int
 	click      mouseClick
 
+	help       int
+	helpFilter string
+
 	yes bool
 	cmd command
 
