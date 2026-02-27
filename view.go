@@ -79,8 +79,16 @@ func (m model) View() string {
 
 	countItems := 0
 
-	for i := range page.items {
-		if i+1 > m.height-3 || i+settings.start >= len(page.items) {
+	var items []item
+
+	if len(page.tempItems) > 0 {
+		items = page.tempItems
+	} else {
+		items = page.items
+	}
+
+	for i := range items {
+		if i+1 > m.height-3 || i+settings.start >= len(items) {
 			break
 		}
 
@@ -109,7 +117,7 @@ func (m model) View() string {
 			}
 		}
 
-		item := page.items[i+settings.start] // it might crash here
+		item := items[i+settings.start] // it might crash here
 
 		switch item.getAction() {
 		case itemActionCopy:
@@ -136,7 +144,7 @@ func (m model) View() string {
 		countItems++
 	}
 
-	if page.items == nil {
+	if items == nil {
 		s.WriteString(empty.Width(m.width).Foreground(m.theme.grayColor).Render("   Loading..."))
 		s.WriteRune('\n')
 		countItems++
@@ -197,15 +205,15 @@ func (m model) View() string {
 
 	var itemName string
 	var extraStr string
-	if settings.cursor < len(page.items) {
-		selected_item := page.items[settings.cursor]
+	if settings.cursor < len(items) {
+		selected_item := items[settings.cursor]
 		itemName = selected_item.getName()
 		extraStr = selected_item.getExtra()
 	}
 
 	extraBlock := base.Foreground(m.theme.grayColor).Render(extraStr)
 
-	rightStr := fmt.Sprintf(" [%d/%d] ", settings.cursor+1, len(page.items))
+	rightStr := fmt.Sprintf(" [%d/%d] ", settings.cursor+1, len(items))
 	rightBlock := m.theme.baseStyle.Render(rightStr)
 	rightBlock = extraBlock + rightBlock
 	rightWidth := lipgloss.Width(rightBlock)

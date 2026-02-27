@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"unicode"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -473,6 +474,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc":
 				m.mode = normalMode
+				page := m.getPage()
+				page.tempItems = nil
+				return m, nil
+			case "enter":
+				m.mode = normalMode
+				m.filterItems()
 				return m, nil
 			}
 
@@ -740,9 +747,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case filterMode, helpFilterMode, renameMode, createMode:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
-		if m.mode == helpFilterMode {
-			m.help = 0
-			m.helpFilter = m.input.Value()
+		switch msg.(type) {
+		case tea.KeyMsg:
+			switch m.mode {
+			case helpFilterMode:
+				m.help = 0
+				m.helpFilter = m.input.Value()
+			case filterMode:
+				m.filterItems()
+			}
 		}
 		cmds = append(cmds, cmd)
 	case pathMode:
@@ -753,4 +766,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *model) filterItems() {
+	patterns := strings.FieldsFunc(m.input.Value(), func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+	var tempItems []item
+	page := m.getPage()
+	for i := range page.items {
+		for j := range patterns {
+			if strings.Contains(page.items[i].getName(), patterns[j]) {
+				tempItems = append(tempItems, page.items[i])
+			}
+		}
+	}
+	page.tempItems = tempItems
+	settings := m.getTab().getPageSettings()
+	settings.cursor = 0
+	settings.start = 0
 }

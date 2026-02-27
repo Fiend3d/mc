@@ -99,7 +99,8 @@ func (t *tab) getPageSettings() *pageSettings {
 }
 
 type page struct {
-	items []item
+	items     []item
+	tempItems []item
 }
 
 func (m *model) getStartEnd() (int, int) {
@@ -110,6 +111,9 @@ func (m *model) getStartEnd() (int, int) {
 }
 
 func (p *page) length() int {
+	if len(p.tempItems) > 0 {
+		return len(p.tempItems)
+	}
 	return len(p.items)
 }
 
