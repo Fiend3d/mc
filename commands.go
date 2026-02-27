@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -62,7 +63,13 @@ func (m *model) update(dir string) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+var mutex sync.Mutex
+
 func readItems(dir string) ([]item, error) {
+	// I dunno exactly why, but it can crash without it if you press F5 too often
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if dir == "" {
 		drives, err := getDrives()
 		if err != nil {

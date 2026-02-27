@@ -79,13 +79,7 @@ func (m model) View() string {
 
 	countItems := 0
 
-	var items []item
-
-	if len(page.tempItems) > 0 {
-		items = page.tempItems
-	} else {
-		items = page.items
-	}
+	items := page.getItems()
 
 	for i := range items {
 		if i+1 > m.height-3 || i+settings.start >= len(items) {
@@ -196,6 +190,10 @@ func (m model) View() string {
 	}
 
 	modeBlock := modeStyle.Render(modeStr)
+	if page.isTemp() {
+		modeBlock += modeStyle.Background(m.theme.accentColor1).Render(" TEMP ")
+
+	}
 	modeWidth := lipgloss.Width(modeBlock) + 2
 	if m.jobs > 0 {
 		modeBlock += m.spinner.View()

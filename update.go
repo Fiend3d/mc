@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 	"unicode"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -127,7 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else if m.click.y < m.height {
 						tab := m.getTab()
 						settings := tab.getPageSettings()
-						if m.click.y-1 < len(tab.page.items)-settings.start {
+						if m.click.y-1 < len(tab.page.getItems())-settings.start {
 							settings.cursor = m.click.y - 1 + settings.start
 							if m.click.doubleClick && m.mode != visualMode {
 								return m.right()
@@ -155,21 +154,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case normalMode, jumpMode, visualMode:
 			switch msg.String() {
 			case "ctrl+a":
-				page := m.getPage()
-				for i := range page.items {
-					page.items[i].setSelected(true)
+				items := m.getPage().getItems()
+				for i := range items {
+					items[i].setSelected(true)
 				}
 				return m, nil
 			case "ctrl+r":
-				page := m.getPage()
-				for i := range page.items {
-					page.items[i].setSelected(!page.items[i].isSelected())
+				items := m.getPage().getItems()
+				for i := range items {
+					items[i].setSelected(!items[i].isSelected())
 				}
 				return m, nil
 			case "ctrl+d":
-				page := m.getPage()
-				for i := range page.items {
-					page.items[i].setSelected(false)
+				items := m.getPage().getItems()
+				for i := range items {
+					items[i].setSelected(false)
 				}
 				return m, nil
 
@@ -201,13 +200,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.mode == visualMode {
 					start, end := m.getStartEnd()
 					for i := start; i <= end; i++ {
-						item := tab.page.items[i]
+						item := tab.page.getItems()[i]
 						item.setSelected(!item.isSelected())
 					}
 					m.mode = normalMode
 				} else {
 					settings := tab.getPageSettings()
-					selectedItem := tab.page.items[settings.cursor]
+					selectedItem := tab.page.getItems()[settings.cursor]
 					selectedItem.setSelected(!selectedItem.isSelected())
 					m.moveCursor(1)
 				}
@@ -284,23 +283,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case normalMode:
 			switch msg.String() {
-			case "Q":
-				return m.handleQuit(false)
-			case "q":
-				return m.handleQuit(true)
 			case "f1":
 				m.mode = helpMode
 				m.help = 0
 				m.helpFilter = ""
 				return m, nil
+			case "Q":
+				return m.handleQuit(false)
+			case "q":
+				return m.handleQuit(true)
+			case "esc":
+				tab := m.getTab()
+				if tab.page.isTemp() {
+					tab.page.tempItems = nil
+					tab.filterText = nil
+				}
+				return m, nil
 			case "g":
 				m.mode = goMode
 				return m, nil
 			case "t":
-				tabCopy := *m.getTab()
-				m.tabs = append(m.tabs, &tabCopy)
+				dir := m.getTab().dir
+				tabCopy := newTab(dir, &page{nil, nil})
+				m.tabs = append(m.tabs, tabCopy)
 				m.currentTab = len(m.tabs) - 1
-				return m, m.addMessage(msgInfo, "tab added")
+				return m, tea.Batch(
+					m.addMessage(msgInfo, "tab copied"),
+					m.readDir(m.currentTab, dir),
+				)
 			case "]":
 				m.currentTab = (m.currentTab + 1) % len(m.tabs)
 				return m, m.addMessage(msgInfo, fmt.Sprintf("tab %d", m.currentTab+1))
@@ -420,10 +430,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			default:
 				if len(msg.Runes) > 0 { // just in case, I dunno
 					r := unicode.ToUpper(msg.Runes[0])
-					page := m.getPage()
+					items := m.getPage().getItems()
 					var matches []int
-					for i := range page.items {
-						runes := []rune(page.items[i].getName())
+					for i := range items {
+						runes := []rune(items[i].getName())
 						if len(runes) == 0 {
 							continue
 						}
@@ -474,12 +484,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc":
 				m.mode = normalMode
-				page := m.getPage()
-				page.tempItems = nil
+				tab := m.getTab()
+				tab.page.tempItems = nil
+				tab.filterText = nil
 				return m, nil
 			case "enter":
 				m.mode = normalMode
-				m.filterItems()
+				m.setFilter()
+				m.getTab().filter()
 				return m, nil
 			}
 
@@ -754,7 +766,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.help = 0
 				m.helpFilter = m.input.Value()
 			case filterMode:
-				m.filterItems()
+				m.setFilter()
+				m.getTab().filter()
 			}
 		}
 		cmds = append(cmds, cmd)
@@ -766,29 +779,4 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
-}
-
-func (m *model) filterItems() {
-	patterns := strings.FieldsFunc(m.input.Value(), func(r rune) bool {
-		return r == ',' || r == ';'
-	})
-	var tempItems []item
-	page := m.getPage()
-loop:
-	for i := range page.items {
-		for j := range patterns {
-			if !strings.Contains(page.items[i].getName(), patterns[j]) {
-				continue loop
-			}
-		}
-		tempItems = append(tempItems, page.items[i])
-	}
-	if len(tempItems) == 0 {
-		page.tempItems = nil
-		return
-	}
-	page.tempItems = tempItems
-	settings := m.getTab().getPageSettings()
-	settings.cursor = 0
-	settings.start = 0
 }

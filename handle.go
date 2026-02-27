@@ -69,9 +69,9 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) handleRename() (tea.Model, tea.Cmd) {
-	page := m.getPage()
-	if len(page.items) > 0 {
-		item := page.items[0]
+	items := m.getPage().getItems()
+	if len(items) > 0 {
+		item := items[0]
 		switch item.(type) {
 		case *driveItem:
 			// TODO: implement changing labels

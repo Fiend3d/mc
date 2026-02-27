@@ -82,6 +82,30 @@ type tab struct {
 	dir          string
 	page         *page
 	pageSettings map[string]*pageSettings
+	filterText   []string
+}
+
+func (t *tab) filter() {
+	if t.filterText == nil {
+		return
+	}
+	tempItems := make([]item, 0)
+loop:
+	for i := range t.page.items {
+		for j := range t.filterText {
+			if !strings.Contains(t.page.items[i].getName(), t.filterText[j]) {
+				continue loop
+			}
+		}
+		tempItems = append(tempItems, t.page.items[i])
+	}
+	t.page.tempItems = tempItems
+	if len(tempItems) == 0 {
+		return
+	}
+	settings := t.getPageSettings()
+	settings.cursor = 0
+	settings.start = 0
 }
 
 func newTab(dir string, page *page) *tab {
@@ -110,11 +134,31 @@ func (m *model) getStartEnd() (int, int) {
 	return start, end
 }
 
+func (m *model) setFilter() {
+	patterns := strings.FieldsFunc(m.input.Value(), func(r rune) bool {
+		return r == ',' || r == ';'
+	})
+	tab := m.getTab()
+	tab.filterText = patterns
+}
+
+func (p *page) getItems() []item {
+	if p.isTemp() {
+		return p.tempItems
+	} else {
+		return p.items
+	}
+}
+
 func (p *page) length() int {
-	if len(p.tempItems) > 0 {
+	if p.isTemp() {
 		return len(p.tempItems)
 	}
 	return len(p.items)
+}
+
+func (p *page) isTemp() bool {
+	return p.tempItems != nil
 }
 
 func (m *model) updateStart() {
@@ -198,23 +242,23 @@ func (m *message) render(theme *theme, renderTime bool) string {
 }
 
 func (m *model) getPaths() []string {
-	page := m.getPage()
+	items := m.getPage().getItems()
 	var paths []string
 	switch m.mode {
 	case visualMode:
 		start, end := m.getStartEnd()
 		for i := start; i <= end; i++ {
-			paths = append(paths, page.items[i].getFullPath())
+			paths = append(paths, items[i].getFullPath())
 		}
 	default:
 		settings := m.getTab().getPageSettings()
-		for i := range page.items {
-			if page.items[i].isSelected() {
-				paths = append(paths, page.items[i].getFullPath())
+		for i := range items {
+			if items[i].isSelected() {
+				paths = append(paths, items[i].getFullPath())
 			}
 		}
 		if len(paths) == 0 {
-			paths = append(paths, page.items[settings.cursor].getFullPath())
+			paths = append(paths, items[settings.cursor].getFullPath())
 		}
 	}
 	return paths
@@ -269,8 +313,8 @@ func tick() tea.Cmd {
 }
 
 func (m *model) fillPage(tab int, items []item) error {
-	page := m.tabs[tab].page
-	page.items = items
+	m.tabs[tab].page.items = items
+	m.tabs[tab].filter()
 	return nil
 }
 
@@ -286,22 +330,25 @@ func (m *model) left() (tea.Model, tea.Cmd) {
 	parent := filepathDir(tab.dir)
 	tab.dir = parent
 	tab.page = &page{}
+	tab.filterText = nil
 	return m, m.readDir(m.currentTab, parent)
 }
 
 func (m *model) right() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
 	settings := tab.getPageSettings()
-	if settings.cursor > len(tab.page.items)-1 {
+	items := tab.page.getItems()
+	if settings.cursor > len(items)-1 {
 		return m, nil
 	}
-	selectedItem := tab.page.items[settings.cursor]
+	selectedItem := items[settings.cursor]
 	if !selectedItem.isDirectory() {
 		return m, nil
 	}
 	// dir := filepath.Join(tab.dir, selectedItem.name) // I dunno about that
 	tab.dir = selectedItem.getFullPath()
 	tab.page = &page{}
+	tab.filterText = nil
 	return m, m.readDir(m.currentTab, selectedItem.getFullPath())
 }
 
