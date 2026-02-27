@@ -784,6 +784,7 @@ loop:
 		tempItems = append(tempItems, page.items[i])
 	}
 	if len(tempItems) == 0 {
+		page.tempItems = nil
 		return
 	}
 	page.tempItems = tempItems
