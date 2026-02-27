@@ -202,6 +202,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						item := tab.page.items[i]
 						item.setSelected(!item.isSelected())
 					}
+					m.mode = normalMode
 				} else {
 					settings := tab.getPageSettings()
 					selectedItem := tab.page.items[settings.cursor]
