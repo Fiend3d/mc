@@ -774,12 +774,15 @@ func (m *model) filterItems() {
 	})
 	var tempItems []item
 	page := m.getPage()
+loop:
 	for i := range page.items {
 		for j := range patterns {
-			if strings.Contains(page.items[i].getName(), patterns[j]) {
-				tempItems = append(tempItems, page.items[i])
+
+			if !strings.Contains(page.items[i].getName(), patterns[j]) {
+				continue loop
 			}
 		}
+		tempItems = append(tempItems, page.items[i])
 	}
 	page.tempItems = tempItems
 	settings := m.getTab().getPageSettings()
