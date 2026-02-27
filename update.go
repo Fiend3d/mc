@@ -783,6 +783,9 @@ loop:
 		}
 		tempItems = append(tempItems, page.items[i])
 	}
+	if len(tempItems) == 0 {
+		return
+	}
 	page.tempItems = tempItems
 	settings := m.getTab().getPageSettings()
 	settings.cursor = 0
