@@ -777,7 +777,6 @@ func (m *model) filterItems() {
 loop:
 	for i := range page.items {
 		for j := range patterns {
-
 			if !strings.Contains(page.items[i].getName(), patterns[j]) {
 				continue loop
 			}
