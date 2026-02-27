@@ -94,7 +94,7 @@ func (m *model) sort(method sortMethod, reverse bool) {
 		sort.Slice(page.items, func(i, j int) bool {
 			a := page.items[i]
 			b := page.items[j]
-			result := a.getModTime().Before(b.getModTime())
+			result := a.getModTime().After(b.getModTime())
 			if reverse {
 				result = !result
 			}
