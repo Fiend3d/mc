@@ -18,9 +18,6 @@ func addTopic(docs []string, topic *helpTopic, m *model) []string {
 		return docs
 	}
 	base := &m.theme.baseStyle
-	if len(docs) > 0 { // spacing
-		docs = append(docs, base.Width(m.width).Render())
-	}
 	highlight := base.Bold(true).Foreground(m.theme.accentColor3)
 	str := highlight.Render(topic.header)
 	docs = addParagraph(docs, m, str, lipgloss.Left, true)
@@ -52,14 +49,6 @@ func addParagraph(docs []string, m *model, text string, position lipgloss.Positi
 	return docs
 }
 
-func makeHelpHeader(docs []string, m *model, text string) []string {
-	base := &m.theme.baseStyle
-	highlight := base.Bold(true).Foreground(m.theme.accentColor3)
-	str := highlight.Render(text)
-	docs = addParagraph(docs, m, str, lipgloss.Left, true)
-	return docs
-}
-
 func makeDocs(docs []string, m *model, prefix string, text string) []string {
 	base := &m.theme.baseStyle
 	highlight := base.Bold(true).Foreground(m.theme.accentColor5)
@@ -68,6 +57,8 @@ func makeDocs(docs []string, m *model, prefix string, text string) []string {
 	return docs
 }
 
+// TODO: optimize this madness
+// or maybe it's okay and nobody cares
 func viewHelp(m *model) string {
 	base := &m.theme.baseStyle
 	empty := &m.theme.emptyStyle
@@ -89,50 +80,88 @@ func viewHelp(m *model) string {
 		true,
 	)
 
-	nd := helpTopic{header: " Normal Mode"}
-	nd.docs = makeDocs(nd.docs, m, " q", " - Quit, returning the current directory.")
-	nd.docs = makeDocs(nd.docs, m, " Q", " - Quit without returning anything.")
-	nd.docs = makeDocs(nd.docs, m, " g", " - Enter Go mode.")
-	nd.docs = makeDocs(nd.docs, m, " t", " - Duplicate the current tab.")
-	nd.docs = makeDocs(nd.docs, m, " ]", " - Next tab.")
-	nd.docs = makeDocs(nd.docs, m, " [", " - Previous tab.")
-	nd.docs = makeDocs(nd.docs, m, " 1-0", " - Select tabs 1 to 10 (0 is tab 10).")
-	nd.docs = makeDocs(nd.docs, m, " space", " - Select.")
-	nd.docs = makeDocs(nd.docs, m, " Ctrl+a", " - Select all.")
-	nd.docs = makeDocs(nd.docs, m, " Ctrl+d", " - Deselect all.")
-	nd.docs = makeDocs(nd.docs, m, " Ctrl+r", " - Toggle selection (invert all).")
-	nd.docs = makeDocs(nd.docs, m, " Ctrl+w", " - Close the current tab.")
-	nd.docs = makeDocs(nd.docs, m, " T", " - Restore the last closed tab.")
-	nd.docs = makeDocs(nd.docs, m, " d", " - Delete the selected items PERMANENTLY.")
-	nd.docs = makeDocs(nd.docs, m, " r", " - Rename the selected items.")
-	nd.docs = makeDocs(nd.docs, m, " y", " - Copy the selected items.")
-	nd.docs = makeDocs(nd.docs, m, " x", " - Cut the selected items.")
-	nd.docs = makeDocs(nd.docs, m, " p", " - Paste.")
-	nd.docs = makeDocs(nd.docs, m, " u", " - Undo.")
-	nd.docs = makeDocs(nd.docs, m, " U", " - Redo.")
-	nd.docs = makeDocs(nd.docs, m, " j, down", " - Move the cursor down.")
-	nd.docs = makeDocs(nd.docs, m, " k, up", " - Move the cursor up.")
-	nd.docs = makeDocs(nd.docs, m, " l, right", " - Enter the selected directory.")
-	nd.docs = makeDocs(nd.docs, m, " h, left", " - Enter the parent directory.")
-	nd.docs = makeDocs(nd.docs, m, " tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut.")
-	nd.docs = makeDocs(nd.docs, m, " v", " - Enter Visual mode.")
-	nd.docs = makeDocs(nd.docs, m, " f", " - Enter Filter mode. Filter mode filters the items in the current tab.")
-	nd.docs = makeDocs(nd.docs, m, " ,", " - Enter Sort mode.")
-	nd.docs = makeDocs(nd.docs, m, " a", " - Enter Create mode. You can create files and directories here.")
-	nd.docs = makeDocs(nd.docs, m, " `", " - Enter Message mode. The message history can be viewed here.")
-	nd.docs = makeDocs(nd.docs, m, " F5", " - Refresh the current tab.")
+	normalDocs := helpTopic{header: " Normal Mode"}
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" q", " - Quit, returning the current directory.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Q", " - Quit without returning anything.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" g", " - Enter Go mode.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" t", " - Duplicate the current tab.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" ]", " - Next tab.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" [", " - Previous tab.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" 1-0", " - Select tabs 1 to 10 (0 is tab 10).")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" space", " - Select.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+a", " - Select all.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+d", " - Deselect all.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+r", " - Toggle selection (invert all).")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+w", " - Close the current tab.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" T", " - Restore the last closed tab.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" d", " - Delete the selected items PERMANENTLY.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" r", " - Rename the selected items.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" y", " - Copy the selected items.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" x", " - Cut the selected items.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" p", " - Paste.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" u", " - Undo.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" U", " - Redo.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" j, down", " - Move the cursor down.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" k, up", " - Move the cursor up.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" l, right", " - Enter the selected directory.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" h, left", " - Enter the parent directory.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" v", " - Enter Visual mode.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" f", " - Enter Filter mode. Filter mode filters the items in the current tab.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" ,", " - Enter Sort mode.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" a", " - Enter Create mode. You can create files and directories here.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" `", " - Enter Message mode. The message history can be viewed here.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F5", " - Refresh the current tab.")
 
-	pd := helpTopic{header: " Path Mode"}
-	pd.docs = makeDocs(pd.docs, m, "", " Path mode allows changing the directory by typing. You can enter this mode from Normal mode by typing gg (press g twice).")
-	pd.docs = makeDocs(pd.docs, m, " Ctrl+a", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.).")
-	pd.docs = makeDocs(pd.docs, m, " Ctrl+w", " - Delete the last word.")
-	pd.docs = makeDocs(pd.docs, m, " Ctrl+e", " - Expand environment variables.")
-	pd.docs = makeDocs(pd.docs, m, " Ctrl+n", " - Open the directory in a new tab.")
-	pd.docs = makeDocs(pd.docs, m, " tab", " - Autocomplete.")
-	pd.docs = makeDocs(pd.docs, m, " down/up", " - Next/Previous autocomplete.")
+	pathDocs := helpTopic{header: " Path Mode"}
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		"", " Path mode allows changing the directory by typing. You can enter this mode from Normal mode by typing gg (press g twice).")
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		" Ctrl+a", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.).")
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		" Ctrl+w", " - Delete the last word.")
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		" Ctrl+e", " - Expand environment variables.")
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		" Ctrl+n", " - Open the directory in a new tab.")
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		" tab", " - Autocomplete.")
+	pathDocs.docs = makeDocs(pathDocs.docs, m,
+		" down/up", " - Next/Previous autocomplete.")
 
-	docs = addTopic(docs, &nd, m)
-	docs = addTopic(docs, &pd, m)
+	docs = addTopic(docs, &normalDocs, m)
+	docs = addTopic(docs, &pathDocs, m)
 	var s strings.Builder
 
 	for i := 0; i < m.height-1; i++ {
