@@ -274,7 +274,7 @@ func (m model) View() string {
 		headers := []string{" Hotkey ", " Description "}
 		rows := [][]string{
 			{" ctrl+a ", " Clear all "},
-			{" ctrl+w ", " Clear a word "},
+			{" ctrl+w ", " Delete a word "},
 			{" tab ", " Autocomplete "},
 			{" up/down ", " Next/previous autocomplete "},
 			{" ctrl+e ", " Expand environment variables "},

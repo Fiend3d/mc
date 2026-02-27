@@ -247,6 +247,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.mode = normalMode
 				return m, nil
+			case "j", "down":
+				m.help++
+				return m, nil
+			case "k", "up":
+				m.help--
+				m.help = max(0, m.help)
+				return m, nil
+			case "home":
+				m.help = 0
+				return m, nil
+			case "f":
+				m.mode = helpFilterMode
+				m.input.Placeholder = "e.g., undo"
+				m.input.Reset()
+				m.input.Focus()
+				return m, textinput.Blink
+			}
+
+		case helpFilterMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = helpMode
+				return m, nil
+			case "enter":
+				m.mode = helpMode
+				m.helpFilter = m.input.Value()
+				return m, nil
 			}
 
 		case confirmDialogMode, confirmDialogVisualMode:
@@ -260,6 +287,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleQuit(true)
 			case "f1":
 				m.mode = helpMode
+				m.help = 0
+				m.helpFilter = ""
 				return m, nil
 			case "g":
 				m.mode = goMode
@@ -694,9 +723,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.mode {
-	case filterMode, renameMode, createMode:
+	case filterMode, helpFilterMode, renameMode, createMode:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
+		if m.mode == helpFilterMode {
+			m.help = 0
+			m.helpFilter = m.input.Value()
+		}
 		cmds = append(cmds, cmd)
 	case pathMode:
 		var cmd tea.Cmd

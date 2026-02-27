@@ -159,6 +159,7 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 			settings.start = max(0,
 				min(settings.start, tab.page.length()-actualHeight))
 		}
+		return m, nil
 	case tabsMode:
 		if m.height-2 <= len(m.tabs) {
 			m.tabsStart += steps
@@ -166,12 +167,18 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 			m.tabsStart = max(0,
 				min(m.tabsStart, len(m.tabs)-actualHeight))
 		}
+		return m, nil
 	case messagesMode:
 		if m.height <= len(m.log) {
 			m.logStart += steps
 			m.logStart = max(0,
 				min(m.logStart, len(m.log)-m.height))
 		}
+		return m, nil
+	case helpMode:
+		m.help += steps
+		m.help = max(0, m.help)
+		return m, nil
 	}
 	return m, nil
 }
