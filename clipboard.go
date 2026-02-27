@@ -2,13 +2,15 @@ package main
 
 import (
 	"fmt"
+	"sync"
 	"syscall"
-	"time"
 	"unsafe"
 
 	"github.com/gonutz/w32"
 	"golang.design/x/clipboard"
 )
+
+var mutex sync.Mutex
 
 func clipboardWrite(text string) error {
 	err := clipboard.Init()
@@ -62,6 +64,9 @@ type dropFiles struct {
 
 // setClipboardFiles copies file paths to clipboard with copy or cut operation.
 func setClipboardFiles(paths []string, op OpType) error {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if len(paths) == 0 {
 		return fmt.Errorf("no paths provided")
 	}
@@ -132,9 +137,6 @@ func setClipboardFiles(paths []string, op OpType) error {
 		}
 	}
 
-	// it's too fast fast without it and updating happens too early sometimes
-	time.Sleep(time.Microsecond * 100)
-
 	return nil
 }
 
@@ -152,6 +154,9 @@ func dragQueryFilePath(hDrop w32.HDROP, index uint32, buf []uint16) uint32 {
 
 // getClipboardFiles retrieves file paths from clipboard and operation type.
 func getClipboardFiles() ([]string, OpType, error) {
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	if !w32.IsClipboardFormatAvailable(cfHDrop) {
 		return nil, OpCopy, fmt.Errorf("no files in clipboard")
 	}
