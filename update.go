@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"unicode"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -301,13 +302,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.addMessage(msgInfo, "tab added")
 			case "]":
 				m.currentTab = (m.currentTab + 1) % len(m.tabs)
-				return m, nil
+				return m, m.addMessage(msgInfo, fmt.Sprintf("tab %d", m.currentTab+1))
 			case "[":
 				m.currentTab = m.currentTab - 1
 				if m.currentTab < 0 {
 					m.currentTab = len(m.tabs) - 1
 				}
-				return m, nil
+				return m, m.addMessage(msgInfo, fmt.Sprintf("tab %d", m.currentTab+1))
+			case "1", "2", "3", "4", "5", "6", "7", "8", "9", "0":
+				index, _ := strconv.Atoi(msg.String()) // it shouldn't ever err
+				if index == 0 {
+					index = 9
+				} else {
+					index--
+				}
+				if index >= len(m.tabs) {
+					return m, m.addMessage(msgWarning, fmt.Sprintf("tab %d doesn't exist", index+1))
+				}
+				m.currentTab = index
+				return m, m.addMessage(msgInfo, fmt.Sprintf("tab %d", index+1))
 			case "ctrl+w":
 				if len(m.tabs) == 1 {
 					return m, m.addMessage(msgWarning, "can't close the last tab")
