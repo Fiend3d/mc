@@ -182,3 +182,53 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+type clipboardCopy int
+
+const (
+	clipboardCopyFilepath clipboardCopy = iota
+	clipboardCopyDirectory
+)
+
+func (m *model) handleClipboardCopy(action clipboardCopy) (tea.Model, tea.Cmd) {
+	switchMode := func() {
+		if m.mode == copyVisualMode {
+			m.mode = visualMode
+		} else {
+			m.mode = normalMode
+		}
+	}
+
+	result := func(m *model, paths []string) (tea.Model, tea.Cmd) {
+		if len(paths) == 1 {
+			return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, paths[0]))
+		} else {
+			return m, m.addMessage(msgInfo, fmt.Sprintf("%d paths copied", len(paths)))
+		}
+	}
+
+	switch action {
+	case clipboardCopyFilepath:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		err := clipboardWrite(strings.Join(paths, "\n"))
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return result(m, paths)
+
+	case clipboardCopyDirectory:
+		dir := m.getTab().dir
+		switchMode()
+		err := clipboardWrite(dir)
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, dir))
+	}
+
+	return m, m.addMessage(msgError, "lol?")
+}

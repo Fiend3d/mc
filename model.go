@@ -29,6 +29,8 @@ const (
 	renameMode
 	createMode
 	pathMode
+	copyMode
+	copyVisualMode
 	bookmarkMode
 	bookmarkSelectMode
 )
@@ -258,9 +260,12 @@ func (m *message) render(theme *theme, renderTime bool) string {
 
 func (m *model) getPaths() []string {
 	items := m.getPage().getItems()
+	if len(items) == 0 {
+		return nil
+	}
 	var paths []string
 	switch m.mode {
-	case visualMode:
+	case visualMode, copyVisualMode:
 		start, end := m.getStartEnd()
 		for i := start; i <= end; i++ {
 			paths = append(paths, items[i].getFullPath())

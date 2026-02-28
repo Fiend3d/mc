@@ -299,7 +299,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "t":
 				dir := m.getTab().dir
-				tabCopy := newTab(dir, &page{nil, nil})
+				tabCopy := newTab(dir, &page{})
 				m.tabs = append(m.tabs, tabCopy)
 				m.currentTab = len(m.tabs) - 1
 				return m, tea.Batch(
@@ -383,6 +383,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Reset()
 				m.input.Focus()
 				return m, textinput.Blink
+			case "c":
+				m.mode = copyMode
+				return m, nil
 			case "`":
 				m.mode = messagesMode
 				m.logStart = 0
@@ -476,6 +479,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleRename()
 			case "d":
 				m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
+				return m, nil
+			case "c":
+				m.mode = copyVisualMode
 				return m, nil
 			}
 
@@ -589,6 +595,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd := newCreateCommand(name, dir)
 				m.jobs++
 				return m, m.addCommand(cmd)
+			}
+
+		case copyMode, copyVisualMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
+			case "c":
+				return m.handleClipboardCopy(clipboardCopyFilepath)
+			case "d":
+				return m.handleClipboardCopy(clipboardCopyDirectory)
 			}
 
 		case pathMode:

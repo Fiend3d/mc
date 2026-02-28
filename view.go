@@ -93,7 +93,7 @@ func (m model) View() string {
 		cursor := " "
 
 		switch m.mode {
-		case visualMode, confirmDialogVisualMode:
+		case visualMode, confirmDialogVisualMode, copyVisualMode:
 			start, end := m.getStartEnd()
 			if index >= start && index <= end {
 				style = &m.theme.cursorStyle
@@ -178,6 +178,9 @@ func (m model) View() string {
 	case createMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor3)
 		modeStr = " CREATE "
+	case copyMode, copyVisualMode:
+		modeStyle = modeStyle.Background(m.theme.whiteColor)
+		modeStr = " COPY "
 	case pathMode:
 		modeStyle = modeStyle.Background(m.theme.grayColor)
 		modeStr = " PATH "
@@ -285,6 +288,19 @@ func (m model) View() string {
 			{" up/down ", " Next/previous autocomplete "},
 			{" ctrl+e ", " Expand environment variables "},
 			{" ctrl+n ", " Open the path in a new tab "},
+		}
+
+		ui = m.renderTableOverlay(headers, rows, ui)
+
+	case copyMode, copyVisualMode:
+		headers := []string{" Button ", " Description "}
+		rows := [][]string{
+			{" c ", " Copy the file path "},
+			{" d ", " Copy the directory "},
+			{" f ", " Copy the filename "},
+			{" n ", " Copy the filename without extension "},
+			{" a ", " Copy the file paths as arguments "},
+			{" s ", " Copy the filenames as arguments "},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)
