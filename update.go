@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
+	"strings"
 	"unicode"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -48,19 +49,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.addMessage(msgError, err.Error())
 		}
 		settings := tab.getPageSettings()
-		length := len(msg.items)
-		if settings.cursor >= length {
-			settings.cursor = length - 1
-		}
-		if settings.cursor < 0 {
-			settings.cursor = 0
-		}
-		if settings.start >= length {
-			settings.start = length - 1
-		}
-		if settings.start < 0 {
-			settings.start = 0
-		}
+		settings.update(len(tab.page.getItems()))
 		return m, nil
 
 	case tea.WindowSizeMsg:
@@ -295,8 +284,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				tab := m.getTab()
 				if tab.page.isTemp() {
+					if len(tab.page.tempItems) > 0 {
+						settings := tab.getPageSettings()
+						selectedItem := tab.page.tempItems[settings.cursor]
+						for i := range tab.page.items {
+							if tab.page.items[i].getFullPath() == selectedItem.getFullPath() {
+								settings.cursor = i
+								break
+							}
+						}
+						settings.update(len(tab.page.items))
+					}
 					tab.page.tempItems = nil
 					tab.filterText = nil
+					m.updateStart()
 				}
 				return m, nil
 			case "g":
@@ -374,6 +375,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Placeholder = "e.g., term1;term2,term3"
 				m.input.Reset()
 				m.input.Focus()
+				tab := m.getTab()
+				if tab.page.isTemp() {
+					m.input.SetValue(strings.Join(tab.filterText, ";"))
+				}
 				return m, textinput.Blink
 			case ",":
 				m.mode = sortMode

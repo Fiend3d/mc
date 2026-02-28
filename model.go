@@ -78,6 +78,21 @@ type pageSettings struct {
 	cursor int
 }
 
+func (s *pageSettings) update(length int) {
+	if s.cursor >= length {
+		s.cursor = length - 1
+	}
+	if s.cursor < 0 {
+		s.cursor = 0
+	}
+	if s.start >= length {
+		s.start = length - 1
+	}
+	if s.start < 0 {
+		s.start = 0
+	}
+}
+
 type tab struct {
 	dir          string
 	page         *page
@@ -100,9 +115,6 @@ loop:
 		tempItems = append(tempItems, t.page.items[i])
 	}
 	t.page.tempItems = tempItems
-	if len(tempItems) == 0 {
-		return
-	}
 	settings := t.getPageSettings()
 	settings.cursor = 0
 	settings.start = 0

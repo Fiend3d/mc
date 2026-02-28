@@ -136,6 +136,8 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" f", " - Enter Filter mode. Filter mode filters the items in the current tab.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" esc", " - Exit Temp mode of the filtered items.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" ,", " - Enter Sort mode.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" a", " - Enter Create mode. You can create files and directories here.")
