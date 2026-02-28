@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 )
 
 func viewTabs(m *model) string {
@@ -59,7 +58,7 @@ func viewTabs(m *model) string {
 			tag += style.Foreground(m.theme.grayColor).Render(" [current] ")
 		}
 		tagLength := lipgloss.Width(tag)
-		text = ansi.Truncate(text, m.width-prefixWidth-tagLength, "…")
+		text = truncate(text, m.width-prefixWidth-tagLength)
 
 		textLength := lipgloss.Width(text)
 		var coloredText string
@@ -105,7 +104,7 @@ func viewTabs(m *model) string {
 		help += gray.Render("- restore")
 	}
 
-	help = ansi.Truncate(help, m.width, "…")
+	help = truncate(help, m.width)
 
 	s.WriteString(empty.Foreground(m.theme.grayColor).Width(m.width).Render(help))
 

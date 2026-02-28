@@ -603,9 +603,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normalMode
 				return m, nil
 			case "c":
-				return m.handleClipboardCopy(clipboardCopyFilepath)
+				return m.handleClipboardCopy(clipboardCopyFilepath, false)
+			case "C":
+				return m.handleClipboardCopy(clipboardCopyFilepath, true)
 			case "d":
-				return m.handleClipboardCopy(clipboardCopyDirectory)
+				return m.handleClipboardCopy(clipboardCopyDirectory, false)
+			case "D":
+				return m.handleClipboardCopy(clipboardCopyDirectory, true)
+			case "f":
+				return m.handleClipboardCopy(clipboardCopyFilename, false)
+			case "n":
+				return m.handleClipboardCopy(clipboardCopyFilenameNoExt, false)
+			case "a":
+				return m.handleClipboardCopy(clipboardCopyFilepathArgs, false)
+			case "A":
+				return m.handleClipboardCopy(clipboardCopyFilepathArgs, true)
+			case "s":
+				return m.handleClipboardCopy(clipboardCopyFilenameArgs, false)
+			case "q":
+				return m.handleClipboardCopy(clipboardCopyFilepathArray, false)
+			case "Q":
+				return m.handleClipboardCopy(clipboardCopyFilepathArray, true)
+			case "w":
+				return m.handleClipboardCopy(clipboardCopyFilenameArray, false)
 			}
 
 		case pathMode:

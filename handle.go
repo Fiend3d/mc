@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -188,9 +189,15 @@ type clipboardCopy int
 const (
 	clipboardCopyFilepath clipboardCopy = iota
 	clipboardCopyDirectory
+	clipboardCopyFilename
+	clipboardCopyFilenameNoExt
+	clipboardCopyFilepathArgs
+	clipboardCopyFilenameArgs
+	clipboardCopyFilepathArray
+	clipboardCopyFilenameArray
 )
 
-func (m *model) handleClipboardCopy(action clipboardCopy) (tea.Model, tea.Cmd) {
+func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Model, tea.Cmd) {
 	switchMode := func() {
 		if m.mode == copyVisualMode {
 			m.mode = visualMode
@@ -199,7 +206,7 @@ func (m *model) handleClipboardCopy(action clipboardCopy) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	result := func(m *model, paths []string) (tea.Model, tea.Cmd) {
+	result := func(paths []string) (tea.Model, tea.Cmd) {
 		if len(paths) == 1 {
 			return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, paths[0]))
 		} else {
@@ -207,27 +214,152 @@ func (m *model) handleClipboardCopy(action clipboardCopy) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	const maxWidth = 40
+
 	switch action {
+
 	case clipboardCopyFilepath:
 		paths := m.getPaths()
 		switchMode()
 		if len(paths) == 0 {
 			return m, m.addMessage(msgWarning, "nothing to copy")
 		}
+		if forward {
+			for i := range paths {
+				paths[i] = strings.ReplaceAll(paths[i], "\\", "/")
+			}
+		}
 		err := clipboardWrite(strings.Join(paths, "\n"))
 		if err != nil {
 			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
 		}
-		return result(m, paths)
+		return result(paths)
 
 	case clipboardCopyDirectory:
 		dir := m.getTab().dir
+		if forward {
+			dir = strings.ReplaceAll(dir, "\\", "/")
+		}
 		switchMode()
 		err := clipboardWrite(dir)
 		if err != nil {
 			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
 		}
 		return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, dir))
+
+	case clipboardCopyFilename:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		for i := range paths {
+			paths[i] = filepath.Base(paths[i])
+		}
+		err := clipboardWrite(strings.Join(paths, "\n"))
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return result(paths)
+
+	case clipboardCopyFilenameNoExt:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		for i := range paths {
+			base := filepath.Base(paths[i])
+			ext := filepath.Ext(base)
+			name := base[:len(base)-len(ext)]
+			paths[i] = name
+		}
+		err := clipboardWrite(strings.Join(paths, "\n"))
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return result(paths)
+
+	case clipboardCopyFilepathArgs:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		for i := range paths {
+			path := paths[i]
+			if forward {
+				path = strings.ReplaceAll(path, "\\", "/")
+			}
+			if strings.Contains(path, " ") {
+				path = fmt.Sprintf(`"%s"`, path)
+			}
+			paths[i] = path
+		}
+		output := strings.Join(paths, " ")
+		err := clipboardWrite(output)
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, truncate(output, maxWidth)))
+
+	case clipboardCopyFilenameArgs:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		for i := range paths {
+			name := filepath.Base(paths[i])
+			if strings.Contains(name, " ") {
+				name = fmt.Sprintf(`"%s"`, name)
+			}
+			paths[i] = name
+		}
+		output := strings.Join(paths, " ")
+		err := clipboardWrite(output)
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, truncate(output, maxWidth)))
+
+	case clipboardCopyFilepathArray:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		for i := range paths {
+			path := paths[i]
+			if forward {
+				path = strings.ReplaceAll(path, "\\", "/")
+			}
+			path = strconv.Quote(path)
+			paths[i] = path
+		}
+		output := strings.Join(paths, ", ")
+		err := clipboardWrite(output)
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return m, m.addMessage(msgInfo, fmt.Sprintf(`[%s] copied`, truncate(output, maxWidth)))
+
+	case clipboardCopyFilenameArray:
+		paths := m.getPaths()
+		switchMode()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing to copy")
+		}
+		for i := range paths {
+			name := strconv.Quote(filepath.Base(paths[i]))
+			paths[i] = name
+		}
+		output := strings.Join(paths, ", ")
+		err := clipboardWrite(output)
+		if err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+		}
+		return m, m.addMessage(msgInfo, fmt.Sprintf(`[%s] copied`, truncate(output, maxWidth)))
 	}
 
 	return m, m.addMessage(msgError, "lol?")

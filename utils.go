@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/charmbracelet/x/ansi"
 	"golang.org/x/sys/windows"
 )
 
@@ -324,4 +325,8 @@ func findExistingNumbers(reserved []string, dir, baseName, ext string) []int {
 
 	sort.Ints(nums)
 	return nums
+}
+
+func truncate(s string, width int) string {
+	return ansi.Truncate(s, width, "…")
 }

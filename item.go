@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 	"github.com/dustin/go-humanize"
 )
 
@@ -177,7 +176,7 @@ func (i *filesystemItem) render(s *strings.Builder, style *lipgloss.Style, t *th
 
 	name := nameBlock.String()
 
-	name = ansi.Truncate(name, nameWidth, "…")
+	name = truncate(name, nameWidth)
 
 	s.WriteString(name)
 	nameLen := lipgloss.Width(name)
@@ -270,7 +269,7 @@ func (i *sharedItem) render(s *strings.Builder, style *lipgloss.Style, t *theme,
 
 	name := nameBlock.String()
 
-	name = ansi.Truncate(name, nameWidth, "…")
+	name = truncate(name, nameWidth)
 
 	s.WriteString(name)
 	nameLen := lipgloss.Width(name)
@@ -366,7 +365,7 @@ func (i *driveItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, 
 	nameBlock.WriteString(style.Foreground(t.accentColor2).Render(fmt.Sprintf(" %s", i.label)))
 	name := nameBlock.String()
 
-	name = ansi.Truncate(name, nameWidth, "…")
+	name = truncate(name, nameWidth)
 
 	s.WriteString(name)
 	nameLen := lipgloss.Width(name)

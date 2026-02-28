@@ -186,7 +186,7 @@ func viewHelp(m *model) string {
 			help += base.Render(m.helpFilter)
 			help += base.Foreground(m.theme.grayColor).Render(")")
 		}
-		help = ansi.Truncate(help, m.width, "…")
+		help = truncate(help, m.width)
 		s.WriteString(base.Width(m.width).Render(help))
 	case helpFilterMode:
 		widget := m.input.View()

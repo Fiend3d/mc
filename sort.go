@@ -36,6 +36,11 @@ func hasExtension(path string) bool {
 
 func (m *model) sort(method sortMethod, reverse bool) {
 	items := m.getPage().getItems()
+	if len(items) == 0 {
+		return
+	}
+	settings := m.getTab().getPageSettings()
+	selectedItem := items[settings.cursor]
 	switch method {
 	case alphabeticSort:
 		sort.Slice(items, func(i, j int) bool {
@@ -132,5 +137,11 @@ func (m *model) sort(method sortMethod, reverse bool) {
 		r.Shuffle(len(items), func(i, j int) {
 			items[i], items[j] = items[j], items[i]
 		})
+	}
+	for i := range items {
+		if selectedItem == items[i] {
+			settings.cursor = i
+			break
+		}
 	}
 }

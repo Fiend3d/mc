@@ -7,7 +7,6 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
-	"github.com/charmbracelet/x/ansi"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
@@ -68,7 +67,7 @@ func (m model) View() string {
 		s.WriteRune('\n')
 	} else {
 		widget := m.pathInput.View()
-		widget = ansi.Truncate(widget, m.width, "…")
+		widget = truncate(widget, m.width)
 		s.WriteString(empty.Width(m.width).Render(widget))
 		s.WriteRune('\n')
 	}
@@ -220,7 +219,7 @@ func (m model) View() string {
 	rightWidth := lipgloss.Width(rightBlock)
 
 	nameWidth := max(1, m.width-modeWidth-rightWidth)
-	itemName = ansi.Truncate(itemName, nameWidth, "…")
+	itemName = truncate(itemName, nameWidth)
 
 	nameBlock := base.
 		Width(nameWidth).
@@ -241,7 +240,7 @@ func (m model) View() string {
 		if m.ticks > 0 {
 			logMsg := m.log[len(m.log)-1].render(&m.theme, false)
 			if lipgloss.Width(logMsg) > m.width {
-				logMsg = ansi.Truncate(logMsg, m.width, "…")
+				logMsg = truncate(logMsg, m.width)
 			}
 			s.WriteString(empty.Width(m.width).Render(logMsg))
 		} else {
@@ -295,12 +294,14 @@ func (m model) View() string {
 	case copyMode, copyVisualMode:
 		headers := []string{" Button ", " Description "}
 		rows := [][]string{
-			{" c ", " Copy the file path "},
-			{" d ", " Copy the directory "},
+			{" c/C ", " Copy the file path/Forward "},
+			{" d/D ", " Copy the directory/Forward "},
 			{" f ", " Copy the filename "},
 			{" n ", " Copy the filename without extension "},
-			{" a ", " Copy the file paths as arguments "},
+			{" a/A ", " Copy the file paths as arguments/Forward "},
 			{" s ", " Copy the filenames as arguments "},
+			{" q/Q ", " Copy the file paths as array/Forward "},
+			{" w ", " Copy the filenames as array "},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)
@@ -381,7 +382,7 @@ func viewMessages(m *model) string {
 				strconv.Itoa(i + 1 + m.logStart)))
 			logMsg := m.log[last].render(&m.theme, true)
 			if lipgloss.Width(logMsg) > m.width-numbersLength {
-				logMsg = ansi.Truncate(logMsg, m.width-numbersLength, "…")
+				logMsg = truncate(logMsg, m.width-numbersLength)
 			}
 			s.WriteString(
 				empty.Width(m.width - numbersLength).Render(logMsg))
