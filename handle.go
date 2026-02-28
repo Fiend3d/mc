@@ -342,7 +342,7 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Mod
 		if err != nil {
 			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
 		}
-		return m, m.addMessage(msgInfo, fmt.Sprintf(`[%s] copied`, truncate(output, maxWidth)))
+		return m, m.addMessage(msgInfo, fmt.Sprintf("[%s] copied", truncate(output, maxWidth)))
 
 	case clipboardCopyFilenameArray:
 		paths := m.getPaths()
@@ -359,7 +359,7 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Mod
 		if err != nil {
 			return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
 		}
-		return m, m.addMessage(msgInfo, fmt.Sprintf(`[%s] copied`, truncate(output, maxWidth)))
+		return m, m.addMessage(msgInfo, fmt.Sprintf("[%s] copied", truncate(output, maxWidth)))
 	}
 
 	return m, m.addMessage(msgError, "lol?")
