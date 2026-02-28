@@ -76,22 +76,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if m.mode == visualMode {
 							return m, nil
 						}
-						tab := m.getTab()
+						dir := m.getTab().dir
 						diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
-						matches := diskExp.FindStringSubmatch(tab.dir)
+						matches := diskExp.FindStringSubmatch(dir)
 						start := 0
 						if len(matches) > 1 {
 							start = len(matches[1])
 							if m.click.x < start {
-								tab.dir = matches[1]
-								tab.page = &page{}
-								return m, m.readDir(m.currentTab, matches[1])
+								return m.changeDir(matches[1])
 							}
 						}
-						runes := []rune(tab.dir)
+						runes := []rune(dir)
 						if m.click.x < len(runes) && m.click.x >= start {
 							var history []string
-							current := tab.dir
+							current := dir
 							for {
 								history = append(history, current)
 								parent := filepathDir(current)
@@ -106,11 +104,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							clickedDir := filepathDir(clickedPath)
 
 							index := slices.Index(history, clickedDir)
-
-							// return m, m.addMessage(msgInfo, fmt.Sprintf("%#v %d %v", history, index, clickedDir))
-							tab.dir = history[index+1]
-							tab.page = &page{}
-							return m, m.readDir(m.currentTab, tab.dir)
+							return m.changeDir(history[index+1])
 						}
 					} else if m.click.y < m.height {
 						tab := m.getTab()

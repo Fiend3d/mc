@@ -137,12 +137,15 @@ func (m *model) changeDir(dir string) (tea.Model, tea.Cmd) {
 	if tab.dir == dir {
 		return m, nil
 	}
+	if tab.page.isTemp() {
+		tab.filterText = nil
+	}
 	tab.dir = dir
 	tab.page = &page{}
 	return m, m.readDir(m.currentTab, dir)
 }
 
-func (m model) readDir(tab int, dir string) tea.Cmd {
+func (m *model) readDir(tab int, dir string) tea.Cmd {
 	return func() tea.Msg {
 		items, err := readItems(dir)
 		if err != nil {

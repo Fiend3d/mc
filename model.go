@@ -108,7 +108,10 @@ func (t *tab) filter() {
 loop:
 	for i := range t.page.items {
 		for j := range t.filterText {
-			if !strings.Contains(t.page.items[i].getName(), t.filterText[j]) {
+			if !strings.Contains(
+				strings.ToUpper(t.page.items[i].getName()),
+				strings.ToUpper(t.filterText[j]),
+			) {
 				continue loop
 			}
 		}
