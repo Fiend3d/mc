@@ -373,7 +373,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "T":
 				return m.handleRestoreTab()
 			case "d":
-				m.confirm(&deleteCommand{m.getTab().dir, m.getPaths()})
+				paths := m.getPaths()
+				if len(paths) == 0 {
+					return m, m.addMessage(msgWarning, "nothing selected")
+				}
+				m.confirm(&deleteCommand{m.getTab().dir, paths})
 				return m, nil
 			// case "d":
 			// 	return m, newErr(errors.New("EPIC FAIL"))
@@ -529,7 +533,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "r":
 				return m.handleRename()
 			case "d":
-				m.confirm(&deleteCommand{dir: m.getTab().dir, paths: m.getPaths()})
+				paths := m.getPaths()
+				if len(paths) == 0 {
+					return m, m.addMessage(msgWarning, "nothing selected")
+				}
+				m.confirm(&deleteCommand{m.getTab().dir, paths})
 				return m, nil
 			case "c":
 				m.mode = copyVisualMode
