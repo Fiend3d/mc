@@ -21,7 +21,7 @@ func isUNC(path string) bool {
 		p[2] != '/' // not three slashes (///) or more
 }
 
-func isUNCroot(path string) bool {
+func isUNCRoot(path string) bool {
 	if !isUNC(path) {
 		return false
 	}

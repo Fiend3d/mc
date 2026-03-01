@@ -113,7 +113,7 @@ func (m *model) handleRestoreTab() (tea.Model, tea.Cmd) {
 func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 	dir := m.pathInput.Value()
 	dir = strings.TrimSpace(dir)
-	if isUNCroot(dir) || dir == "" {
+	if isUNCRoot(dir) || dir == "" {
 		if addTab {
 			m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
 			m.currentTab = len(m.tabs) - 1
@@ -387,5 +387,6 @@ func (m *model) handleTool(t *ToolConfig) (tea.Model, tea.Cmd) {
 	default:
 		return m, m.addMessage(msgError, "unknown type of tool (not path/dir/none)")
 	}
+	cmd.Dir = m.getTab().dir
 	return m, tea.ExecProcess(cmd, nil)
 }

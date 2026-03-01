@@ -77,7 +77,7 @@ func readItems(dir string) ([]item, error) {
 
 	clipboardFiles, op, _ := getClipboardFiles() // not sure about handling this error
 
-	if isUNCroot(dir) {
+	if isUNCRoot(dir) {
 		paths, err := netView(dir)
 		if err != nil {
 			return nil, err
