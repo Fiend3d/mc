@@ -234,11 +234,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if err != nil {
 					return m, m.addMessage(msgError, err.Error())
 				}
+				var info string
 				if configExists {
-					return m, m.addMessage(msgInfo, fmt.Sprintf("config overriden: %s", configPath))
+					info = fmt.Sprintf("config overriden: %s", configPath)
 				} else {
-					return m, m.addMessage(msgInfo, fmt.Sprintf("config saved: %s", configPath))
+					info = fmt.Sprintf("config saved: %s", configPath)
 				}
+
+				dir := m.getTab().dir
+				if dir == getConfigDir() {
+					return m, tea.Batch(m.addMessage(msgInfo, info), m.update(dir))
+				} else {
+					return m, m.addMessage(msgInfo, info)
+				}
+
 			case "C":
 				m.mode = normalMode
 				configDir := getConfigDir()

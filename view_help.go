@@ -38,6 +38,7 @@ func addParagraph(docs []string, m *model, text string, position lipgloss.Positi
 		}
 	}
 	base := &m.theme.baseStyle
+
 	if len(docs) > 0 { // spacing
 		docs = append(docs, base.Width(m.width).Render())
 	}
@@ -146,7 +147,31 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" `", " - Enter Message mode. The message history can be viewed here.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F5", " - Refresh the current tab.")
+		" F3", " - Viewer tool (bat with less by default, configurable)")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F4", " - Editor (Helix by default, configurable)")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F5", " - Refresh current tab")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F6", " - File explorer (configurable)")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F7", " - VS Code paths (configurable)")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F8", " - VS Code directory (configurable)")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" F9-F12", " - Unassigned (configurable)")
+
+	goDocs := helpTopic{header: " Go Mode"}
+	goDocs.docs = makeDocs(goDocs.docs, m,
+		"", " Go mode is just a menu")
+	goDocs.docs = makeDocs(goDocs.docs, m,
+		" g", " - Enter Path mode")
+	goDocs.docs = makeDocs(goDocs.docs, m,
+		" t", " - Browse tabs")
+	goDocs.docs = makeDocs(goDocs.docs, m,
+		" c", " - Save settings to config.toml for editing")
+	goDocs.docs = makeDocs(goDocs.docs, m,
+		" C", " - Open settings directory")
 
 	pathDocs := helpTopic{header: " Path Mode"}
 	pathDocs.docs = makeDocs(pathDocs.docs, m,
@@ -165,6 +190,7 @@ func viewHelp(m *model) string {
 		" down/up", " - Next/Previous autocomplete.")
 
 	docs = addTopic(docs, &normalDocs, m)
+	docs = addTopic(docs, &goDocs, m)
 	docs = addTopic(docs, &pathDocs, m)
 	var s strings.Builder
 
