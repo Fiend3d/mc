@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -363,4 +364,28 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Mod
 	}
 
 	return m, m.addMessage(msgError, "lol?")
+}
+
+func (m *model) handleTool(t *ToolConfig) (tea.Model, tea.Cmd) {
+	if t == nil {
+		return m, m.addMessage(msgWarning, "undefined tool")
+	}
+	var cmd *exec.Cmd
+	switch t.Type {
+	case "path":
+		paths := m.getPaths()
+		if len(paths) == 0 {
+			return m, m.addMessage(msgWarning, "nothing is selected")
+		}
+		args := append(t.Args, paths...)
+		cmd = exec.Command(t.Command, args...)
+	case "dir":
+		args := append(t.Args, m.getTab().dir)
+		cmd = exec.Command(t.Command, args...)
+	case "none": // why?
+		cmd = exec.Command(t.Command, t.Args...)
+	default:
+		return m, m.addMessage(msgError, "unknown type of tool (not path/dir/none)")
+	}
+	return m, tea.ExecProcess(cmd, nil)
 }

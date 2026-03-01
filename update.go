@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os/exec"
+	"os"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -228,10 +228,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "c":
 				m.mode = normalMode
-				return m, nil
+				configPath := getConfigPath()
+				configExists := pathExists(configPath)
+				err := saveConfig(m.cfg)
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
+				if configExists {
+					return m, m.addMessage(msgInfo, fmt.Sprintf("config overriden: %s", configPath))
+				} else {
+					return m, m.addMessage(msgInfo, fmt.Sprintf("config saved: %s", configPath))
+				}
 			case "C":
 				m.mode = normalMode
-				return m, nil
+				configDir := getConfigDir()
+				if !dirExists(configDir) {
+					err := os.MkdirAll(configDir, 0755)
+					if err != nil {
+						return m, m.addMessage(msgError, err.Error())
+					}
+				}
+				return m.changeDir(configDir)
 			}
 
 		case helpMode:
@@ -430,21 +447,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "P":
 				return m.handlePaste(true)
 			case "f3":
-				paths := m.getPaths()
-				if len(paths) == 0 {
-					return m, m.addMessage(msgWarning, "nothing is selected")
-				}
-				args := append(m.cfg.F3.Args, paths...)
-				cmd := exec.Command(m.cfg.F3.Command, args...)
-				return m, tea.ExecProcess(cmd, nil)
+				return m.handleTool(m.cfg.F3)
 			case "f4":
-				paths := m.getPaths()
-				if len(paths) == 0 {
-					return m, m.addMessage(msgWarning, "nothing is selected")
-				}
-				args := append(m.cfg.F4.Args, paths...)
-				cmd := exec.Command(m.cfg.F4.Command, args...)
-				return m, tea.ExecProcess(cmd, nil)
+				return m.handleTool(m.cfg.F4)
+			case "f6":
+				return m.handleTool(m.cfg.F6)
+			case "f7":
+				return m.handleTool(m.cfg.F7)
+			case "f8":
+				return m.handleTool(m.cfg.F8)
+			case "f9":
+				return m.handleTool(m.cfg.F9)
+			case "f10":
+				return m.handleTool(m.cfg.F10)
+			case "f11":
+				return m.handleTool(m.cfg.F11)
+			case "f12":
+				return m.handleTool(m.cfg.F12)
 			}
 
 		case jumpMode:

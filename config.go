@@ -25,24 +25,21 @@ type Config struct {
 	F12 *ToolConfig `toml:"F12"`
 }
 
-func getConfigDir() (string, error) {
+func getConfigDir() string {
 	appData := os.Getenv("APPDATA")
 	if appData == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return "", err
+			return ""
 		}
 		appData = home
 	}
-	return filepath.Join(appData, ".mc"), nil
+	return filepath.Join(appData, ".mc")
 }
 
-func getConfigPath() (string, error) {
-	dir, err := getConfigDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "config.toml"), nil
+func getConfigPath() string {
+	dir := getConfigDir()
+	return filepath.Join(dir, "config.toml")
 }
 
 func loadConfig() (*Config, error) {
@@ -54,16 +51,10 @@ func loadConfig() (*Config, error) {
 		F8: &ToolConfig{Command: "code", Args: []string{}, Type: "dir"},
 	}
 
-	configPath, err := getConfigPath()
+	configPath := getConfigPath()
 
-	if err != nil {
-		return cfg, err
-	}
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+	if !pathExists(configPath) {
 		return cfg, nil
-	} else if err != nil {
-		return cfg, err
 	}
 
 	data, err := os.ReadFile(configPath)
@@ -77,4 +68,24 @@ func loadConfig() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func saveConfig(cfg *Config) error {
+	err := os.MkdirAll(getConfigDir(), 0755)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Create(getConfigPath())
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	err = toml.NewEncoder(f).Encode(cfg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

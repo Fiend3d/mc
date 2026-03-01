@@ -146,7 +146,7 @@ func (c *fileActionCommand) String() string {
 	case renameFileAction:
 		return fmt.Sprintf("rename paths:%d", len(c.pairs))
 	}
-	return "uknown command"
+	return "unknown command"
 }
 
 func (c *fileActionCommand) getDir() string {
