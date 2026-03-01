@@ -36,6 +36,8 @@ const (
 )
 
 type model struct {
+	cfg *Config
+
 	err        error
 	tabs       []*tab
 	currentTab int
@@ -383,7 +385,7 @@ func (m *model) getPage() *page { // probably redundant
 
 func newTextinput(style lipgloss.Style, grayColor lipgloss.Color) textinput.Model {
 	input := textinput.New()
-	input.CharLimit = 256 // hello, windows!
+	input.CharLimit = 255 // hello, windows!
 	input.Width = 0
 	input.PlaceholderStyle = style.Foreground(grayColor)
 	input.TextStyle = style
@@ -395,6 +397,11 @@ func newTextinput(style lipgloss.Style, grayColor lipgloss.Color) textinput.Mode
 }
 
 func initialModel(dirs []string) model {
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Printf("warning: failed to load config: %s\n\n", err.Error())
+	}
+
 	tabs := make([]*tab, len(dirs))
 	for i, dir := range dirs {
 		tabs[i] = newTab(dir, &page{})
@@ -408,6 +415,7 @@ func initialModel(dirs []string) model {
 	s.Style = theme.baseStyle.Foreground(theme.accentColor1)
 
 	return model{
+		cfg:        cfg,
 		tabs:       tabs,
 		currentTab: 0,
 		mode:       normalMode,

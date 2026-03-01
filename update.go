@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -225,6 +226,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tabsCursor = m.currentTab
 				m.updateTabsStart()
 				return m, nil
+			case "c":
+				m.mode = normalMode
+				return m, nil
+			case "C":
+				m.mode = normalMode
+				return m, nil
 			}
 
 		case helpMode:
@@ -422,6 +429,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handlePaste(false)
 			case "P":
 				return m.handlePaste(true)
+			case "f3":
+				paths := m.getPaths()
+				if len(paths) == 0 {
+					return m, m.addMessage(msgWarning, "nothing is selected")
+				}
+				args := append(m.cfg.F3.Args, paths...)
+				cmd := exec.Command(m.cfg.F3.Command, args...)
+				return m, tea.ExecProcess(cmd, nil)
+			case "f4":
+				paths := m.getPaths()
+				if len(paths) == 0 {
+					return m, m.addMessage(msgWarning, "nothing is selected")
+				}
+				args := append(m.cfg.F4.Args, paths...)
+				cmd := exec.Command(m.cfg.F4.Command, args...)
+				return m, tea.ExecProcess(cmd, nil)
 			}
 
 		case jumpMode:
