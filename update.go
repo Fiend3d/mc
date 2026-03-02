@@ -228,6 +228,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "c":
 				m.mode = normalMode
+				configDir := getConfigDir()
+				if !dirExists(configDir) {
+					err := os.MkdirAll(configDir, 0755)
+					if err != nil {
+						return m, m.addMessage(msgError, err.Error())
+					}
+				}
+				return m.changeDir(configDir)
+			case "C":
+				m.mode = normalMode
 				configPath := getConfigPath()
 				configExists := pathExists(configPath)
 				err := saveConfig(m.cfg)
@@ -247,17 +257,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					return m, m.addMessage(msgInfo, info)
 				}
-
-			case "C":
-				m.mode = normalMode
-				configDir := getConfigDir()
-				if !dirExists(configDir) {
-					err := os.MkdirAll(configDir, 0755)
-					if err != nil {
-						return m, m.addMessage(msgError, err.Error())
-					}
-				}
-				return m.changeDir(configDir)
 			}
 
 		case helpMode:
@@ -393,6 +392,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.left()
 			case "l":
 				return m.right()
+			case "ctrl+b":
+				tab := m.getTab()
+				if !tab.hasPrev() {
+					return m, m.addMessage(msgWarning, "no history, can't go back")
+				}
+				dir := tab.back()
+				return m, m.readDir(m.currentTab, dir)
+			case "ctrl+f":
+				tab := m.getTab()
+				if !tab.hasNext() {
+					return m, m.addMessage(msgWarning, "can't go forward")
+				}
+				dir := tab.next()
+				return m, m.readDir(m.currentTab, dir)
 			case "tab":
 				m.mode = jumpMode
 				return m, nil

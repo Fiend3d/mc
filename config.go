@@ -34,7 +34,7 @@ func getConfigDir() string {
 		}
 		appData = home
 	}
-	return filepath.Join(appData, ".mc")
+	return filepath.Join(appData, "mc")
 }
 
 func getConfigPath() string {

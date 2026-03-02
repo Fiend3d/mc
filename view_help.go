@@ -131,6 +131,10 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" h, left", " - Enter the parent directory.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+b", " - Go back in history.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+f", " - Go forward in history.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" v", " - Enter Visual mode.")
@@ -147,31 +151,31 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" `", " - Enter Message mode. The message history can be viewed here.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F3", " - Viewer tool (bat with less by default, configurable)")
+		" F3", " - Viewer tool (bat with less by default, configurable).")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F4", " - Editor (Helix by default, configurable)")
+		" F4", " - Editor (Helix by default, configurable).")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F5", " - Refresh current tab")
+		" F5", " - Refresh current tab.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F6", " - File explorer (configurable)")
+		" F6", " - File explorer (configurable).")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F7", " - VS Code paths (configurable)")
+		" F7", " - VS Code paths (configurable).")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F8", " - VS Code directory (configurable)")
+		" F8", " - VS Code directory (configurable).")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F9-F12", " - Unassigned (configurable)")
+		" F9-F12", " - Unassigned (configurable).")
 
 	goDocs := helpTopic{header: " Go Mode"}
 	goDocs.docs = makeDocs(goDocs.docs, m,
-		"", " Go mode is just a menu")
+		"", " Go mode is just a menu.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
-		" g", " - Enter Path mode")
+		" g", " - Enter Path mode.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
-		" t", " - Browse tabs")
+		" t", " - Browse tabs.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
-		" c", " - Save settings to config.toml for editing")
+		" c", " - Open settings directory.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
-		" C", " - Open settings directory")
+		" C", " - Save settings to config.toml for editing.")
 
 	pathDocs := helpTopic{header: " Path Mode"}
 	pathDocs.docs = makeDocs(pathDocs.docs, m,

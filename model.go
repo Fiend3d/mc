@@ -77,75 +77,6 @@ type model struct {
 	result string
 }
 
-type pageSettings struct {
-	start  int
-	cursor int
-}
-
-func (s *pageSettings) update(length int) {
-	if s.cursor >= length {
-		s.cursor = length - 1
-	}
-	if s.cursor < 0 {
-		s.cursor = 0
-	}
-	if s.start >= length {
-		s.start = length - 1
-	}
-	if s.start < 0 {
-		s.start = 0
-	}
-}
-
-type tab struct {
-	dir          string
-	page         *page
-	pageSettings map[string]*pageSettings
-	filterText   []string
-}
-
-func (t *tab) filter() {
-	if t.filterText == nil {
-		return
-	}
-	tempItems := make([]item, 0)
-loop:
-	for i := range t.page.items {
-		for j := range t.filterText {
-			if !strings.Contains(
-				strings.ToUpper(t.page.items[i].getName()),
-				strings.ToUpper(t.filterText[j]),
-			) {
-				continue loop
-			}
-		}
-		tempItems = append(tempItems, t.page.items[i])
-	}
-	t.page.tempItems = tempItems
-	settings := t.getPageSettings()
-	settings.cursor = 0
-	settings.start = 0
-}
-
-func newTab(dir string, page *page) *tab {
-	return &tab{dir: dir, page: page, pageSettings: make(map[string]*pageSettings)}
-}
-
-func (t *tab) getPageSettings() *pageSettings {
-	settings, ok := t.pageSettings[t.dir]
-	if !ok {
-		settings := &pageSettings{}
-		t.pageSettings[t.dir] = settings
-		return settings
-	}
-	return settings
-}
-
-type page struct {
-	items     []item
-	tempItems []item
-}
-
 func (m *model) getStartEnd() (int, int) {
 	settings := m.getTab().getPageSettings()
 	start := min(settings.cursor, m.visual)
@@ -350,9 +281,7 @@ func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
 func (m *model) left() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
 	parent := filepathDir(tab.dir)
-	tab.dir = parent
-	tab.page = &page{}
-	tab.filterText = nil
+	tab.set(parent)
 	return m, m.readDir(m.currentTab, parent)
 }
 
@@ -367,11 +296,9 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 	if !selectedItem.isDirectory() {
 		return m, nil
 	}
-	// dir := filepath.Join(tab.dir, selectedItem.name) // I dunno about that
-	tab.dir = selectedItem.getFullPath()
-	tab.page = &page{}
-	tab.filterText = nil
-	return m, m.readDir(m.currentTab, selectedItem.getFullPath())
+	dir := selectedItem.getFullPath()
+	tab.set(dir)
+	return m, m.readDir(m.currentTab, dir)
 }
 
 func (m *model) getTab() *tab {

@@ -134,14 +134,9 @@ func readItems(dir string) ([]item, error) {
 func (m *model) changeDir(dir string) (tea.Model, tea.Cmd) {
 	tab := m.getTab()
 	m.mode = normalMode
-	if tab.dir == dir {
+	if !tab.set(dir) {
 		return m, nil
 	}
-	if tab.page.isTemp() {
-		tab.filterText = nil
-	}
-	tab.dir = dir
-	tab.page = &page{}
 	return m, m.readDir(m.currentTab, dir)
 }
 

@@ -256,8 +256,8 @@ func (m model) View() string {
 		rows := [][]string{
 			{"g", " Change path "},
 			{"t", " View tabs "},
-			{"c", " Create default config "},
-			{"C", " Open config directory "},
+			{"c", " Open config directory "},
+			{"C", " Save current config "},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)
