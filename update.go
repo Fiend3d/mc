@@ -834,14 +834,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.bm.cursor == len(m.bm.dirs)-1 {
 					return m, nil
 				}
-				m.bm.dirs[m.bm.cursor], m.bm.dirs[m.bm.cursor+1] = m.bm.dirs[m.bm.cursor+1], m.bm.dirs[m.bm.cursor]
+				m.bm.dirs[m.bm.cursor], m.bm.dirs[m.bm.cursor+1] =
+					m.bm.dirs[m.bm.cursor+1], m.bm.dirs[m.bm.cursor]
 				m.bm.cursor++
 				return m, nil
 			case "K":
 				if m.bm.cursor == 0 {
 					return m, nil
 				}
-				m.bm.dirs[m.bm.cursor], m.bm.dirs[m.bm.cursor-1] = m.bm.dirs[m.bm.cursor-1], m.bm.dirs[m.bm.cursor]
+				m.bm.dirs[m.bm.cursor], m.bm.dirs[m.bm.cursor-1] =
+					m.bm.dirs[m.bm.cursor-1], m.bm.dirs[m.bm.cursor]
 				m.bm.cursor--
 				return m, nil
 			}
