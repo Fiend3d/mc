@@ -170,6 +170,14 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 				min(m.tabsStart, len(m.tabs)-actualHeight))
 		}
 		return m, nil
+	case bookmarksMode:
+		if m.height-2 <= len(m.bm.dirs) {
+			m.bm.start += steps
+			actualHeight := m.height - 2
+			m.bm.start = max(0,
+				min(m.bm.start, len(m.bm.dirs)-actualHeight))
+		}
+		return m, nil
 	case messagesMode:
 		if m.height <= len(m.log) {
 			m.logStart += steps

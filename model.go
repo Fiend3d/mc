@@ -31,7 +31,7 @@ const (
 	pathMode
 	copyMode
 	copyVisualMode
-	bookmarkMode
+	bookmarksMode
 )
 
 type model struct {
@@ -71,9 +71,7 @@ type model struct {
 	logStart int
 	ticks    int
 
-	bookmarks       []string
-	bookmarksCursor int
-	bookmarksStart  int
+	bm *bookmarks
 
 	theme theme
 
@@ -123,17 +121,6 @@ func (m *model) updateStart() {
 	actualHeight := m.height - 4
 	if settings.cursor > settings.start+actualHeight {
 		settings.start = settings.cursor - actualHeight
-	}
-}
-
-func (m *model) updateBookmarksStart() {
-	if m.bookmarksCursor < m.bookmarksStart {
-		m.bookmarksStart = m.bookmarksCursor
-		return
-	}
-	actualHeight := m.height - 3
-	if m.bookmarksCursor > m.bookmarksStart+actualHeight {
-		m.bookmarksStart = m.bookmarksCursor - actualHeight
 	}
 }
 
@@ -309,6 +296,14 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 	selectedItem := items[settings.cursor]
 	if !selectedItem.isDirectory() {
 		return m, nil
+	}
+	if tab.page.isTemp() {
+		for i := range tab.page.items {
+			if tab.page.items[i] == selectedItem {
+				settings.cursor = i
+				break
+			}
+		}
 	}
 	dir := selectedItem.getFullPath()
 	tab.set(dir)

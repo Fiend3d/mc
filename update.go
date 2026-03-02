@@ -127,6 +127,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							m.currentTab = m.tabsCursor
 						}
 					}
+				case bookmarksMode:
+					if m.click.y > 0 &&
+						m.click.y < m.height &&
+						m.click.y-1 < len(m.bm.dirs)-m.bm.start {
+						m.bm.cursor = m.click.y - 1 + m.bm.start
+						if m.click.doubleClick {
+							m.mode = normalMode
+							dir := m.bm.dirs[m.bm.cursor]
+							if m.bm.changed() {
+								err := saveBookmarks(m.bm.dirs)
+								if err != nil {
+									return m, m.addMessage(msgError, err.Error())
+								}
+							}
+							m.bm = nil
+							return m.changeDir(dir)
+						}
+					}
 				}
 				return m, nil
 			}
@@ -227,10 +245,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.mode = normalMode
 					return m, m.addMessage(msgError, err.Error())
 				}
-				m.bookmarks = bookmarks
-				m.bookmarksCursor = 0
-				m.bookmarksStart = 0
-				m.mode = bookmarkMode
+				m.bm = newBookmarks(bookmarks)
+				m.mode = bookmarksMode
 				return m, nil
 			case "t":
 				m.mode = tabsMode
@@ -763,36 +779,62 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case bookmarkMode:
+		case bookmarksMode:
 			switch msg.String() {
-			case "esc":
+			case "esc", "h":
 				m.mode = normalMode
-				m.bookmarks = nil // why not
+				if m.bm.changed() {
+					err := saveBookmarks(m.bm.dirs)
+					if err != nil {
+						return m, m.addMessage(msgError, err.Error())
+					}
+				}
+				m.bm = nil
 				return m, nil
 			case "down", "j":
-				m.bookmarksCursor++
-				m.bookmarksCursor = min(m.bookmarksCursor, len(m.bookmarks)-1)
-				m.updateBookmarksStart()
+				m.bm.moveCursor(1, m.height)
 				return m, nil
 			case "up", "k":
-				m.bookmarksCursor--
-				m.bookmarksCursor = max(m.bookmarksCursor, 0)
-				m.updateBookmarksStart()
+				m.bm.moveCursor(-1, m.height)
 				return m, nil
-			case "enter":
+			case "enter", "l":
 				m.mode = normalMode
-				return m, nil
+				if m.bm.changed() {
+					err := saveBookmarks(m.bm.dirs)
+					if err != nil {
+						return m, m.addMessage(msgError, err.Error())
+					}
+				}
+				dir := m.bm.dirs[m.bm.cursor]
+				m.bm = nil
+				return m.changeDir(dir)
 			case "d":
+				if len(m.bm.dirs) == 0 {
+					return m, nil
+				}
+				m.bm.dirs = slices.Delete(m.bm.dirs, m.bm.cursor, m.bm.cursor+1)
+				m.bm.cursor = min(len(m.bm.dirs)-1, m.bm.cursor)
+				m.bm.updateStart(m.height)
 				return m, nil
 			case "J":
+				if m.bm.cursor == len(m.bm.dirs)-1 {
+					return m, nil
+				}
+				m.bm.dirs[m.bm.cursor], m.bm.dirs[m.bm.cursor+1] = m.bm.dirs[m.bm.cursor+1], m.bm.dirs[m.bm.cursor]
+				m.bm.cursor++
 				return m, nil
 			case "K":
+				if m.bm.cursor == 0 {
+					return m, nil
+				}
+				m.bm.dirs[m.bm.cursor], m.bm.dirs[m.bm.cursor-1] = m.bm.dirs[m.bm.cursor-1], m.bm.dirs[m.bm.cursor]
+				m.bm.cursor--
 				return m, nil
 			}
 
 		case tabsMode:
 			switch msg.String() {
-			case "esc":
+			case "esc", "h":
 				m.mode = normalMode
 				return m, nil
 			case "down", "j":
@@ -805,7 +847,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tabsCursor = max(m.tabsCursor, 0)
 				m.updateTabsStart()
 				return m, nil
-			case "enter":
+			case "enter", "l":
 				m.mode = normalMode
 				m.currentTab = m.tabsCursor
 				return m, nil

@@ -94,26 +94,26 @@ func saveConfig(cfg *Config) error {
 	return nil
 }
 
-// should be good enough
-func readLines(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return strings.Split(string(data), "\n"), nil
-}
-
 func getBookmarksPath() string {
 	dir := getConfigDir()
 	return filepath.Join(dir, "bookmarks.list")
 }
+
+const noBookmarks = "--- NONE ---"
 
 func loadBookmarks() ([]string, error) {
 	path := getBookmarksPath()
 	if !pathExists(path) {
 		return nil, nil
 	}
-	return readLines(path)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if string(data) == noBookmarks {
+		return nil, nil
+	}
+	return strings.Split(string(data), "\n"), nil
 }
 
 func saveBookmarks(bookmarks []string) error {
@@ -125,6 +125,11 @@ func saveBookmarks(bookmarks []string) error {
 		}
 	}
 	path := getBookmarksPath()
-	data := strings.Join(bookmarks, "\n")
+	var data string
+	if len(bookmarks) == 0 {
+		data = noBookmarks
+	} else {
+		data = strings.Join(bookmarks, "\n")
+	}
 	return os.WriteFile(path, []byte(data), 0o644)
 }

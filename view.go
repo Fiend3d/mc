@@ -27,6 +27,8 @@ func (m model) View() string {
 		return viewHelp(&m)
 	case messagesMode:
 		return viewMessages(&m)
+	case bookmarksMode:
+		return viewBookmarks(&m)
 	case tabsMode:
 		return viewTabs(&m)
 	}
