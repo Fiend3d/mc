@@ -797,6 +797,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "up", "k":
 				m.bm.moveCursor(-1, m.height)
 				return m, nil
+			case "home":
+				m.bm.cursor = 0
+				m.bm.start = 0
+				return m, nil
+			case "end":
+				m.bm.cursor = len(m.bm.dirs) - 1
+				m.bm.updateStart(m.height)
+				return m, nil
+			case "pgdown":
+				m.bm.moveCursor((m.height-3)/2, m.height)
+				return m, nil
+			case "pgup":
+				m.bm.moveCursor(-(m.height-3)/2, m.height)
+				return m, nil
 			case "enter", "l":
 				m.mode = normalMode
 				if m.bm.changed() {
