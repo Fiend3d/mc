@@ -8,8 +8,8 @@ type tab struct {
 	pageSettings map[string]*pageSettings
 	filterText   []string
 
-	history []string
-	current int
+	history        []string
+	historyCurrent int
 }
 
 func (t *tab) set(dir string) bool {
@@ -17,12 +17,12 @@ func (t *tab) set(dir string) bool {
 		return false
 	}
 
-	if t.current < len(t.history)-1 {
-		t.history = t.history[:t.current+1]
+	if t.historyCurrent < len(t.history)-1 {
+		t.history = t.history[:t.historyCurrent+1]
 	}
 
 	t.history = append(t.history, dir)
-	t.current = len(t.history) - 1
+	t.historyCurrent = len(t.history) - 1
 
 	t.dir = dir
 	t.page = &page{}
@@ -36,8 +36,8 @@ func (t *tab) back() string {
 		return t.dir
 	}
 
-	t.current--
-	t.dir = t.history[t.current]
+	t.historyCurrent--
+	t.dir = t.history[t.historyCurrent]
 
 	t.page = &page{}
 	t.filterText = nil
@@ -50,8 +50,8 @@ func (t *tab) next() string {
 		return t.dir
 	}
 
-	t.current++
-	t.dir = t.history[t.current]
+	t.historyCurrent++
+	t.dir = t.history[t.historyCurrent]
 
 	t.page = &page{}
 	t.filterText = nil
@@ -60,11 +60,11 @@ func (t *tab) next() string {
 }
 
 func (t *tab) hasPrev() bool {
-	return t.current > 0
+	return t.historyCurrent > 0
 }
 
 func (t *tab) hasNext() bool {
-	return t.current < len(t.history)-1
+	return t.historyCurrent < len(t.history)-1
 }
 
 type page struct {
