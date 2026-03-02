@@ -221,6 +221,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.pathInput.Focus()
 				m.pathInputDir = "nope"
 				return m, textinput.Blink
+			case "b":
+				bookmarks, err := loadBookmarks()
+				if err != nil {
+					m.mode = normalMode
+					return m, m.addMessage(msgError, err.Error())
+				}
+				m.bookmarks = bookmarks
+				m.bookmarksCursor = 0
+				m.bookmarksStart = 0
+				m.mode = bookmarkMode
+				return m, nil
 			case "t":
 				m.mode = tabsMode
 				m.tabsCursor = m.currentTab
@@ -252,10 +263,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				dir := m.getTab().dir
+				cmd := m.addMessage(msgInfo, info)
 				if dir == getConfigDir() {
-					return m, tea.Batch(m.addMessage(msgInfo, info), m.update(dir))
+					return m, tea.Batch(cmd, m.update(dir))
 				} else {
-					return m, m.addMessage(msgInfo, info)
+					return m, cmd
 				}
 			}
 
@@ -490,6 +502,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleTool(m.cfg.F11)
 			case "f12":
 				return m.handleTool(m.cfg.F12)
+			case "b":
+				bookmarks, err := loadBookmarks()
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
+				dir := m.getTab().dir
+				if slices.Contains(bookmarks, dir) {
+					index := slices.Index(bookmarks, dir)
+					bookmarks = slices.Delete(bookmarks, index, index+1)
+				}
+				result := make([]string, 0, len(bookmarks)+1)
+				result = append(result, dir)
+				result = append(result, bookmarks...)
+				err = saveBookmarks(result)
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
+				cmd := m.addMessage(msgInfo, fmt.Sprintf(`"%s" bookmarked`, dir))
+				if dir == getConfigDir() {
+					return m, tea.Batch(cmd, m.update(dir))
+				} else {
+					return m, cmd
+				}
 			}
 
 		case jumpMode:
@@ -725,6 +760,33 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.pathInput.Reset()
 				m.pathInput.SetValue(dir)
+				return m, nil
+			}
+
+		case bookmarkMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				m.bookmarks = nil // why not
+				return m, nil
+			case "down", "j":
+				m.bookmarksCursor++
+				m.bookmarksCursor = min(m.bookmarksCursor, len(m.bookmarks)-1)
+				m.updateBookmarksStart()
+				return m, nil
+			case "up", "k":
+				m.bookmarksCursor--
+				m.bookmarksCursor = max(m.bookmarksCursor, 0)
+				m.updateBookmarksStart()
+				return m, nil
+			case "enter":
+				m.mode = normalMode
+				return m, nil
+			case "d":
+				return m, nil
+			case "J":
+				return m, nil
+			case "K":
 				return m, nil
 			}
 

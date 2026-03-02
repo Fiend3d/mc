@@ -32,7 +32,6 @@ const (
 	copyMode
 	copyVisualMode
 	bookmarkMode
-	bookmarkSelectMode
 )
 
 type model struct {
@@ -71,6 +70,10 @@ type model struct {
 	log      []message
 	logStart int
 	ticks    int
+
+	bookmarks       []string
+	bookmarksCursor int
+	bookmarksStart  int
 
 	theme theme
 
@@ -120,6 +123,17 @@ func (m *model) updateStart() {
 	actualHeight := m.height - 4
 	if settings.cursor > settings.start+actualHeight {
 		settings.start = settings.cursor - actualHeight
+	}
+}
+
+func (m *model) updateBookmarksStart() {
+	if m.bookmarksCursor < m.bookmarksStart {
+		m.bookmarksStart = m.bookmarksCursor
+		return
+	}
+	actualHeight := m.height - 3
+	if m.bookmarksCursor > m.bookmarksStart+actualHeight {
+		m.bookmarksStart = m.bookmarksCursor - actualHeight
 	}
 }
 

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -71,9 +72,12 @@ func loadConfig() (*Config, error) {
 }
 
 func saveConfig(cfg *Config) error {
-	err := os.MkdirAll(getConfigDir(), 0755)
-	if err != nil {
-		return err
+	dir := getConfigDir()
+	if !dirExists(dir) {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			return err
+		}
 	}
 
 	f, err := os.Create(getConfigPath())
@@ -88,4 +92,39 @@ func saveConfig(cfg *Config) error {
 	}
 
 	return nil
+}
+
+// should be good enough
+func readLines(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(string(data), "\n"), nil
+}
+
+func getBookmarksPath() string {
+	dir := getConfigDir()
+	return filepath.Join(dir, "bookmarks.list")
+}
+
+func loadBookmarks() ([]string, error) {
+	path := getBookmarksPath()
+	if !pathExists(path) {
+		return nil, nil
+	}
+	return readLines(path)
+}
+
+func saveBookmarks(bookmarks []string) error {
+	dir := getConfigDir()
+	if !dirExists(dir) {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	path := getBookmarksPath()
+	data := strings.Join(bookmarks, "\n")
+	return os.WriteFile(path, []byte(data), 0o644)
 }
