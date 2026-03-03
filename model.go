@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type mode int
@@ -319,16 +320,22 @@ func (m *model) getPage() *page { // probably redundant
 	return tab.page
 }
 
-func newTextinput(style lipgloss.Style, grayColor lipgloss.Color) textinput.Model {
+func newTextinput(style lipgloss.Style, grayColor color.Color) textinput.Model {
 	input := textinput.New()
 	input.CharLimit = 255 // hello, windows!
-	input.Width = 0
-	input.PlaceholderStyle = style.Foreground(grayColor)
-	input.TextStyle = style
-	input.PromptStyle = style
-	input.CompletionStyle = style.Foreground(grayColor)
-	input.Cursor.Style = style
-	input.Cursor.TextStyle = style
+	input.SetWidth(0)
+	styles := input.Styles()
+	styles.Focused.Placeholder = style.Foreground(grayColor)
+	styles.Focused.Text = style
+	styles.Focused.Suggestion = style.Foreground(grayColor)
+	styles.Focused.Prompt = style.Foreground(grayColor)
+	styles.Blurred.Placeholder = style.Foreground(grayColor)
+	styles.Blurred.Text = style
+	styles.Blurred.Suggestion = style.Foreground(grayColor)
+	styles.Blurred.Prompt = style.Foreground(grayColor)
+	styles.Cursor.Color = style.GetForeground()
+	styles.Cursor.Blink = true
+	input.SetStyles(styles)
 	return input
 }
 

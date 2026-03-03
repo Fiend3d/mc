@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -56,97 +56,98 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+		m.input.SetWidth(m.width - 3)
+		m.pathInput.SetWidth(m.width - 3)
 		return m, nil
 
-	case tea.MouseMsg:
-		switch msg.Action {
-		case tea.MouseActionPress:
-			switch msg.Button {
-			case tea.MouseButtonWheelUp:
-				return m.handleWheel(-3)
-			case tea.MouseButtonWheelDown:
-				return m.handleWheel(3)
-			}
-		case tea.MouseActionRelease:
-			m.click = newClick(msg.X, msg.Y, msg.Button, &m.click)
-			switch msg.Button {
-			case tea.MouseButtonLeft:
-				switch m.mode {
-				case normalMode, visualMode:
-					if m.click.y == 0 {
-						if m.mode == visualMode {
-							return m, nil
-						}
-						dir := m.getTab().dir
-						diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
-						matches := diskExp.FindStringSubmatch(dir)
-						start := 0
-						if len(matches) > 1 {
-							start = len(matches[1])
-							if m.click.x < start {
-								return m.changeDir(matches[1])
-							}
-						}
-						runes := []rune(dir)
-						if m.click.x < len(runes) && m.click.x >= start {
-							var history []string
-							current := dir
-							for {
-								history = append(history, current)
-								parent := filepathDir(current)
-								if parent == current {
-									break
-								}
-								current = parent
-							}
-							slices.Reverse(history)
+	case tea.MouseWheelMsg:
+		data := msg.Mouse()
+		switch data.Button {
+		case tea.MouseWheelUp:
+			return m.handleWheel(-3)
+		case tea.MouseWheelDown:
+			return m.handleWheel(3)
+		}
 
-							clickedPath := string(runes[:m.click.x+1])
-							clickedDir := filepathDir(clickedPath)
-
-							index := slices.Index(history, clickedDir)
-							return m.changeDir(history[index+1])
-						}
-					} else if m.click.y < m.height {
-						tab := m.getTab()
-						settings := tab.getPageSettings()
-						if m.click.y-1 < len(tab.page.getItems())-settings.start {
-							settings.cursor = m.click.y - 1 + settings.start
-							if m.click.doubleClick && m.mode != visualMode {
-								return m.right()
-							}
+	case tea.MouseClickMsg:
+		data := msg.Mouse()
+		switch data.Button {
+		case tea.MouseLeft:
+			m.click = newClick(data.X, data.Y, &m.click)
+			switch m.mode {
+			case normalMode, visualMode:
+				if m.click.y == 0 {
+					if m.mode == visualMode {
+						return m, nil
+					}
+					dir := m.getTab().dir
+					diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
+					matches := diskExp.FindStringSubmatch(dir)
+					start := 0
+					if len(matches) > 1 {
+						start = len(matches[1])
+						if m.click.x < start {
+							return m.changeDir(matches[1])
 						}
 					}
-				case tabsMode:
-					if m.click.y > 0 &&
-						m.click.y < m.height &&
-						m.click.y-1 < len(m.tabs)-m.tabsStart {
-						m.tabsCursor = m.click.y - 1 + m.tabsStart
-						if m.click.doubleClick {
-							m.mode = normalMode
-							m.currentTab = m.tabsCursor
-						}
-					}
-				case bookmarksMode:
-					if m.click.y > 0 &&
-						m.click.y < m.height &&
-						m.click.y-1 < len(m.bm.dirs)-m.bm.start {
-						m.bm.cursor = m.click.y - 1 + m.bm.start
-						if m.click.doubleClick {
-							m.mode = normalMode
-							dir := m.bm.dirs[m.bm.cursor]
-							if m.bm.changed() {
-								err := saveBookmarks(m.bm.dirs)
-								if err != nil {
-									return m, m.addMessage(msgError, err.Error())
-								}
+					runes := []rune(dir)
+					if m.click.x < len(runes) && m.click.x >= start {
+						var history []string
+						current := dir
+						for {
+							history = append(history, current)
+							parent := filepathDir(current)
+							if parent == current {
+								break
 							}
-							m.bm = nil
-							return m.changeDir(dir)
+							current = parent
+						}
+						slices.Reverse(history)
+
+						clickedPath := string(runes[:m.click.x+1])
+						clickedDir := filepathDir(clickedPath)
+
+						index := slices.Index(history, clickedDir)
+						return m.changeDir(history[index+1])
+					}
+				} else if m.click.y < m.height {
+					tab := m.getTab()
+					settings := tab.getPageSettings()
+					if m.click.y-1 < len(tab.page.getItems())-settings.start {
+						settings.cursor = m.click.y - 1 + settings.start
+						if m.click.doubleClick && m.mode != visualMode {
+							return m.right()
 						}
 					}
 				}
-				return m, nil
+			case tabsMode:
+				if m.click.y > 0 &&
+					m.click.y < m.height &&
+					m.click.y-1 < len(m.tabs)-m.tabsStart {
+					m.tabsCursor = m.click.y - 1 + m.tabsStart
+					if m.click.doubleClick {
+						m.mode = normalMode
+						m.currentTab = m.tabsCursor
+					}
+				}
+			case bookmarksMode:
+				if m.click.y > 0 &&
+					m.click.y < m.height &&
+					m.click.y-1 < len(m.bm.dirs)-m.bm.start {
+					m.bm.cursor = m.click.y - 1 + m.bm.start
+					if m.click.doubleClick {
+						m.mode = normalMode
+						dir := m.bm.dirs[m.bm.cursor]
+						if m.bm.changed() {
+							err := saveBookmarks(m.bm.dirs)
+							if err != nil {
+								return m, m.addMessage(msgError, err.Error())
+							}
+						}
+						m.bm = nil
+						return m.changeDir(dir)
+					}
+				}
 			}
 			return m, nil
 		}
@@ -197,7 +198,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				settings.cursor = tab.page.length() - 1
 				m.updateStart()
 				return m, nil
-			case " ":
+			case "space":
 				tab := m.getTab()
 				if m.mode == visualMode {
 					start, end := m.getStartEnd()
@@ -549,8 +550,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normalMode
 				return m, nil
 			default:
-				if len(msg.Runes) > 0 { // just in case, I dunno
-					r := unicode.ToUpper(msg.Runes[0])
+				runes := []rune(msg.String())
+				if len(runes) > 0 { // just in case, I dunno
+					r := unicode.ToUpper(runes[0])
 					items := m.getPage().getItems()
 					var matches []int
 					for i := range items {

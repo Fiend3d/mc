@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 var (
@@ -43,10 +43,7 @@ func main() {
 		dirs = []string{wd}
 	}
 
-	p := tea.NewProgram(
-		initialModel(dirs),
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion())
+	p := tea.NewProgram(initialModel(dirs))
 
 	m, err := p.Run()
 	if err != nil {

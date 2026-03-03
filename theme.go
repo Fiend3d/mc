@@ -1,23 +1,27 @@
 package main
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"image/color"
+
+	"charm.land/lipgloss/v2"
+)
 
 type theme struct {
 	baseStyle   lipgloss.Style
 	emptyStyle  lipgloss.Style
 	cursorStyle lipgloss.Style
 
-	whiteColor lipgloss.Color
-	blackColor lipgloss.Color
-	grayColor  lipgloss.Color
-	greenColor lipgloss.Color
-	redColor   lipgloss.Color
+	whiteColor color.Color
+	blackColor color.Color
+	grayColor  color.Color
+	greenColor color.Color
+	redColor   color.Color
 
-	accentColor1 lipgloss.Color
-	accentColor2 lipgloss.Color
-	accentColor3 lipgloss.Color
-	accentColor4 lipgloss.Color
-	accentColor5 lipgloss.Color
+	accentColor1 color.Color
+	accentColor2 color.Color
+	accentColor3 color.Color
+	accentColor4 color.Color
+	accentColor5 color.Color
 }
 
 func newTheme() theme {

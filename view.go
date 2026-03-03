@@ -5,32 +5,42 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 	overlay "github.com/rmhubbert/bubbletea-overlay"
 )
 
-func (m model) View() string {
+func (m model) View() tea.View {
+	var result tea.View
+	result.AltScreen = true
+	result.MouseMode = tea.MouseModeCellMotion
+
 	if m.err != nil {
 		msg := fmt.Sprintf("Error: %s", m.err)
-		return lipgloss.Place(
+		result.SetContent(lipgloss.Place(
 			m.width,
 			m.height,
 			lipgloss.Center,
 			lipgloss.Center,
 			msg,
-		)
+		))
+		return result
 	}
 
 	switch m.mode {
 	case helpMode, helpFilterMode:
-		return viewHelp(&m)
+		result.SetContent(viewHelp(&m))
+		return result
 	case messagesMode:
-		return viewMessages(&m)
+		result.SetContent(viewMessages(&m))
+		return result
 	case bookmarksMode:
-		return viewBookmarks(&m)
+		result.SetContent(viewBookmarks(&m))
+		return result
 	case tabsMode:
-		return viewTabs(&m)
+		result.SetContent(viewTabs(&m))
+		return result
 	}
 
 	base := &m.theme.baseStyle
@@ -235,6 +245,7 @@ func (m model) View() string {
 	switch m.mode {
 	case filterMode, renameMode, createMode:
 		widget := m.input.View()
+		widget = truncate(widget, m.width)
 		text := empty.Width(m.width).Render(widget)
 		s.WriteString(text)
 
@@ -341,7 +352,8 @@ func (m model) View() string {
 		ui = overlay.Composite(window, ui, overlay.Center, overlay.Center, 0, 0)
 	}
 
-	return ui
+	result.SetContent(ui)
+	return result
 }
 
 func (m *model) renderTableOverlay(headers []string, rows [][]string, ui string) string {
