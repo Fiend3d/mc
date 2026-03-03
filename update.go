@@ -492,24 +492,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handlePaste(false)
 			case "P":
 				return m.handlePaste(true)
-			case "f3":
-				return m.handleTool(m.cfg.F3)
-			case "f4":
-				return m.handleTool(m.cfg.F4)
-			case "f6":
-				return m.handleTool(m.cfg.F6)
-			case "f7":
-				return m.handleTool(m.cfg.F7)
-			case "f8":
-				return m.handleTool(m.cfg.F8)
-			case "f9":
-				return m.handleTool(m.cfg.F9)
-			case "f10":
-				return m.handleTool(m.cfg.F10)
-			case "f11":
-				return m.handleTool(m.cfg.F11)
-			case "f12":
-				return m.handleTool(m.cfg.F12)
+			case "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
+				return m.handleTool(msg.String())
 			case "b":
 				bookmarks, err := loadBookmarks()
 				if err != nil {
@@ -549,6 +533,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc", "tab":
 				m.mode = normalMode
 				return m, nil
+			case "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
+				return m.handleTool(msg.String())
 			default:
 				runes := []rune(msg.String())
 				if len(runes) > 0 { // just in case, I dunno

@@ -323,16 +323,18 @@ func (m *model) getPage() *page { // probably redundant
 func newTextinput(style lipgloss.Style, grayColor color.Color) textinput.Model {
 	input := textinput.New()
 	input.CharLimit = 255 // hello, windows!
-	input.SetWidth(0)
+	input.SetWidth(0)     // TODO: it's bugged right now, wait until it's fixed and clean up update then
 	styles := input.Styles()
-	styles.Focused.Placeholder = style.Foreground(grayColor)
 	styles.Focused.Text = style
+	styles.Focused.Placeholder = style.Foreground(grayColor)
 	styles.Focused.Suggestion = style.Foreground(grayColor)
 	styles.Focused.Prompt = style.Foreground(grayColor)
-	styles.Blurred.Placeholder = style.Foreground(grayColor)
+
 	styles.Blurred.Text = style
+	styles.Blurred.Placeholder = style.Foreground(grayColor)
 	styles.Blurred.Suggestion = style.Foreground(grayColor)
 	styles.Blurred.Prompt = style.Foreground(grayColor)
+
 	styles.Cursor.Color = style.GetForeground()
 	styles.Cursor.Blink = true
 	input.SetStyles(styles)

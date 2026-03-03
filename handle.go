@@ -374,7 +374,29 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Mod
 	return m, m.addMessage(msgError, "lol?")
 }
 
-func (m *model) handleTool(t *ToolConfig) (tea.Model, tea.Cmd) {
+func (m *model) handleTool(key string) (tea.Model, tea.Cmd) {
+	var t *ToolConfig
+	switch key {
+	case "f3":
+		t = m.cfg.F3
+	case "f4":
+		t = m.cfg.F4
+	case "f6":
+		t = m.cfg.F6
+	case "f7":
+		t = m.cfg.F7
+	case "f8":
+		t = m.cfg.F8
+	case "f9":
+		t = m.cfg.F9
+	case "f10":
+		t = m.cfg.F10
+	case "f11":
+		t = m.cfg.F11
+	case "f12":
+		t = m.cfg.F12
+	}
+
 	if t == nil {
 		return m, m.addMessage(msgWarning, "undefined tool")
 	}
