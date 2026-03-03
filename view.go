@@ -41,6 +41,9 @@ func (m model) View() tea.View {
 	case tabsMode:
 		result.SetContent(viewTabs(&m))
 		return result
+	case searchMode:
+		result.SetContent(viewSearch(&m))
+		return result
 	}
 
 	base := &m.theme.baseStyle
@@ -70,6 +73,7 @@ func (m model) View() tea.View {
 				empty.Bold(true).Foreground(m.theme.whiteColor),
 				empty.Bold(true).Foreground(m.theme.accentColor5),
 				m.width-tabsWidth)
+			dir = truncate(dir, m.width-tabsWidth)
 		}
 
 		s.WriteString(empty.Width(m.width - tabsWidth).Bold(true).Render(dir))

@@ -99,6 +99,10 @@ func numberOfDigits(n int) int {
 
 func fillAutocomplete(m *model) {
 	path := m.pathInput.Value()
+	if path == "" {
+		m.pathInput.ShowSuggestions = false // TODO: autocomplete drives maybe
+		return
+	}
 	if isUNC(path) { // because network is slow T_T
 		m.pathInput.ShowSuggestions = false
 		return

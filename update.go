@@ -56,8 +56,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.input.SetWidth(m.width - 3)
+		m.input.SetWidth(m.width - 3) // TODO: get rid of it
 		m.pathInput.SetWidth(m.width - 3)
+		if m.search != nil {
+			m.search.name.SetWidth(m.width - 4)
+			m.search.text.SetWidth(m.width - 4)
+		}
 		return m, nil
 
 	case tea.MouseWheelMsg:
@@ -526,6 +530,43 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					return m, cmd
 				}
+
+			case "s":
+				var cmd tea.Cmd
+				if m.search == nil {
+					m.search = newSearch(&m)
+				}
+				m.mode = searchMode
+				switch m.search.focus {
+				case 0:
+					cmd = textinput.Blink
+				case 1:
+					cmd = textinput.Blink
+				}
+				return m, cmd
+			}
+
+		case searchMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
+			case "tab":
+				m.search.focus = (m.search.focus + 1) % 3
+				switch m.search.focus {
+				case 0:
+					m.search.name.Focus()
+					m.search.text.Blur()
+					return m, textinput.Blink
+				case 1:
+					m.search.name.Blur()
+					m.search.text.Focus()
+					return m, textinput.Blink
+				case 2:
+					m.search.name.Blur()
+					m.search.text.Blur()
+				}
+				return m, nil
 			}
 
 		case jumpMode:
@@ -992,6 +1033,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.pathInput, cmd = m.pathInput.Update(msg)
 		fillAutocomplete(&m)
 		cmds = append(cmds, cmd)
+	case searchMode:
+		switch m.search.focus {
+		case 0:
+			var cmd tea.Cmd
+			m.search.name, cmd = m.search.name.Update(msg)
+			cmds = append(cmds, cmd)
+		case 1:
+			var cmd tea.Cmd
+			m.search.text, cmd = m.search.text.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 	}
 
 	return m, tea.Batch(cmds...)
