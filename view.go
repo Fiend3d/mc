@@ -126,9 +126,9 @@ func (m model) View() tea.View {
 
 		switch item.getAction() {
 		case itemActionCopy:
-			s.WriteString(style.Foreground(m.theme.accentColor3).Render("┃"))
+			s.WriteString(style.Foreground(m.theme.accentColor4).Render("┃"))
 		case itemActionCut:
-			s.WriteString(style.Foreground(m.theme.accentColor1).Render("┃"))
+			s.WriteString(style.Foreground(m.theme.accentColor2).Render("┃"))
 		default:
 			s.WriteString(style.Render(" "))
 		}
@@ -139,7 +139,7 @@ func (m model) View() tea.View {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
 		}
 		if item.isSelected() {
-			s.WriteString(style.Foreground(m.theme.grayColor).Render("┃"))
+			s.WriteString(style.Foreground(m.theme.accentColor5).Render("┃"))
 		} else {
 			s.WriteString(style.Render(" "))
 		}

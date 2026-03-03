@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"image/color"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -295,6 +296,12 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	selectedItem := items[settings.cursor]
+	if !selectedItem.isDirectory() &&
+		strings.HasSuffix(strings.ToUpper(selectedItem.getName()), ".EXE") { // probably a mistake
+		cmd := exec.Command(selectedItem.getFullPath())
+		cmd.Dir = tab.dir
+		return m, tea.ExecProcess(cmd, nil)
+	}
 	if !selectedItem.isDirectory() {
 		return m, nil
 	}
