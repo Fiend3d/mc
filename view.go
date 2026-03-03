@@ -257,7 +257,6 @@ func (m model) View() string {
 		headers := []string{" Button ", " Description "}
 		rows := [][]string{
 			{"g", " Change path "},
-			{"b", " Bookmarks "},
 			{"t", " View tabs "},
 			{"c", " Open config directory "},
 			{"C", " Save current config "},

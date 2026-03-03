@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func colorizeDir(dir string, sepStyle lipgloss.Style, dirStyle lipgloss.Style, width int) string {
@@ -22,4 +23,8 @@ func colorizeDir(dir string, sepStyle lipgloss.Style, dirStyle lipgloss.Style, w
 		dirBuilder.WriteString(dirStyle.Render(dir[start:]))
 	}
 	return truncate(dirBuilder.String(), width)
+}
+
+func truncate(s string, width int) string {
+	return ansi.Truncate(s, width, "…")
 }

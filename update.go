@@ -239,15 +239,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.pathInput.Focus()
 				m.pathInputDir = "nope"
 				return m, textinput.Blink
-			case "b":
-				bookmarks, err := loadBookmarks()
-				if err != nil {
-					m.mode = normalMode
-					return m, m.addMessage(msgError, err.Error())
-				}
-				m.bm = newBookmarks(bookmarks)
-				m.mode = bookmarksMode
-				return m, nil
 			case "t":
 				m.mode = tabsMode
 				m.tabsCursor = m.currentTab
@@ -519,6 +510,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "f12":
 				return m.handleTool(m.cfg.F12)
 			case "b":
+				bookmarks, err := loadBookmarks()
+				if err != nil {
+					m.mode = normalMode
+					return m, m.addMessage(msgError, err.Error())
+				}
+				m.bm = newBookmarks(bookmarks)
+				m.mode = bookmarksMode
+				return m, nil
+			case "B":
 				bookmarks, err := loadBookmarks()
 				if err != nil {
 					return m, m.addMessage(msgError, err.Error())

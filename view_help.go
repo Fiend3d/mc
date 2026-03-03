@@ -143,7 +143,9 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" c", " - Enter Copy mode to copy paths and names of selected items to the clipboard.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" b", " - Bookmark the directory.")
+		" B", " - Bookmark the directory.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" b", " - Browse bookmarks.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" esc", " - Exit Temp mode of the filtered items.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
@@ -172,8 +174,6 @@ func viewHelp(m *model) string {
 		"", " Go mode is just a menu.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
 		" g", " - Enter Path mode.")
-	goDocs.docs = makeDocs(goDocs.docs, m,
-		" b", " - Browse bookmarks.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
 		" t", " - Browse tabs.")
 	goDocs.docs = makeDocs(goDocs.docs, m,
