@@ -300,7 +300,7 @@ func (m model) View() tea.View {
 	case pathMode:
 		headers := []string{" Hotkey ", " Description "}
 		rows := [][]string{
-			{" ctrl+a ", " Clear all "},
+			{" ctrl+u ", " Clear all "},
 			{" ctrl+w ", " Delete a word "},
 			{" tab ", " Autocomplete "},
 			{" up/down ", " Next/previous autocomplete "},

@@ -7,15 +7,14 @@ import (
 )
 
 type searchItem struct {
-	name  string
 	path  string
 	isDir bool
 }
 
 type search struct {
-	focus int
-	name  textinput.Model
-	text  textinput.Model
+	focus    int
+	filename textinput.Model
+	text     textinput.Model
 
 	cursor int
 	start  int
@@ -23,13 +22,13 @@ type search struct {
 }
 
 func newSearch(m *model) *search {
-	name := newTextinput(m.theme)
-	name.Placeholder = "filename"
-	name.Focus()
+	filename := newTextinput(m.theme)
+	filename.Placeholder = "filename"
+	filename.Focus()
 	text := newTextinput(m.theme)
 	text.Placeholder = "text"
 	text.Blur()
-	return &search{name: name, text: text}
+	return &search{filename: filename, text: text}
 }
 
 func renderSearchFocus(widget int, s *strings.Builder, m *model) {
@@ -53,7 +52,7 @@ func viewSearch(m *model) string {
 	s.WriteString(empty.Width(m.width).Render(dir))
 	s.WriteRune('\n')
 	renderSearchFocus(0, &s, m)
-	nameWidget := m.search.name.View()
+	nameWidget := m.search.filename.View()
 	nameWidget = truncate(nameWidget, m.width-1)
 	s.WriteString(empty.Width(m.width - 1).Render(nameWidget))
 	s.WriteRune('\n')

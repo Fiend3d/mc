@@ -549,15 +549,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.search.focus = (m.search.focus + 1) % 3
 				switch m.search.focus {
 				case 0:
-					m.search.name.Focus()
+					m.search.filename.Focus()
 					m.search.text.Blur()
 					return m, textinput.Blink
 				case 1:
-					m.search.name.Blur()
+					m.search.filename.Blur()
 					m.search.text.Focus()
 					return m, textinput.Blink
 				case 2:
-					m.search.name.Blur()
+					m.search.filename.Blur()
 					m.search.text.Blur()
 				}
 				return m, nil
@@ -787,9 +787,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				path := m.pathInput.Value()
 				parent := filepath.Dir(path)
 				m.pathInput.SetValue(parent)
-				return m, nil
-			case "ctrl+a":
-				m.pathInput.SetValue("")
 				return m, nil
 			case "ctrl+e":
 				dir := m.pathInput.Value()
@@ -1031,7 +1028,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.search.focus {
 		case 0:
 			var cmd tea.Cmd
-			m.search.name, cmd = m.search.name.Update(msg)
+			m.search.filename, cmd = m.search.filename.Update(msg)
 			cmds = append(cmds, cmd)
 		case 1:
 			var cmd tea.Cmd

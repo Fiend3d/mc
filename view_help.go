@@ -185,7 +185,7 @@ func viewHelp(m *model) string {
 	pathDocs.docs = makeDocs(pathDocs.docs, m,
 		"", " Path mode allows changing the directory by typing. You can enter this mode from Normal mode by typing gg (press g twice).")
 	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" Ctrl+a", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.).")
+		" Ctrl+u", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.).")
 	pathDocs.docs = makeDocs(pathDocs.docs, m,
 		" Ctrl+w", " - Delete the last word.")
 	pathDocs.docs = makeDocs(pathDocs.docs, m,
