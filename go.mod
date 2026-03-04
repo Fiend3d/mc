@@ -16,6 +16,8 @@ require (
 	golang.org/x/sys v0.41.0
 )
 
+replace charm.land/bubbles/v2 => C:/projects/forks/bubbles
+
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect

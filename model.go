@@ -331,7 +331,7 @@ func newTextinput(t *theme) textinput.Model {
 	input := textinput.New()
 	input.Prompt = " > "
 	input.CharLimit = 255 // hello, windows!
-	input.SetWidth(0)     // TODO: it's bugged right now, wait until it's fixed and clean up update then
+	input.SetWidth(0)     // TODO: it's bugged right now
 	styles := input.Styles()
 	styles.Cursor.Shape = tea.CursorBar
 	styles.Focused.Text = t.emptyStyle

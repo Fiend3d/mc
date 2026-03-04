@@ -56,12 +56,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.input.SetWidth(m.width - 4) // TODO: get rid of it
-		m.pathInput.SetWidth(m.width - 4)
-		if m.search != nil {
-			m.search.name.SetWidth(m.width - 5)
-			m.search.text.SetWidth(m.width - 5)
-		}
 		return m, nil
 
 	case tea.MouseWheelMsg:
