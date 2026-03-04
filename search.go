@@ -69,8 +69,21 @@ func viewSearch(m *model) string {
 		s.WriteRune('\n')
 	}
 
-	s.WriteString(base.Width(m.width).Render())
+	modeStyle := base.
+		Background(m.theme.whiteColor).
+		Foreground(m.theme.blackColor).
+		Bold(true)
+	modeText := " SEARCH "
+	s.WriteString(modeStyle.Render(modeText))
+
+	if m.jobs > 0 {
+		s.WriteString(base.Render(m.spinner.View()))
+	} else {
+		s.WriteString(base.Render("  "))
+	}
+
+	s.WriteString(base.Width(m.width - len(modeText) - 2).Render())
 	s.WriteRune('\n')
-	s.WriteString(base.Width(m.width).Render())
+	s.WriteString(empty.Width(m.width).Render())
 	return s.String()
 }
