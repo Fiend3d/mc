@@ -25,10 +25,12 @@ type search struct {
 func newSearch(m *model) *search {
 	name := newTextinput(m.theme.emptyStyle, m.theme.grayColor)
 	name.Placeholder = "filename"
+	name.Prompt = " > "
 	name.SetWidth(m.width - 4)
 	name.Focus()
 	text := newTextinput(m.theme.emptyStyle, m.theme.grayColor)
 	text.Placeholder = "text"
+	text.Prompt = " > "
 	text.SetWidth(m.width - 4)
 	text.Blur()
 	return &search{name: name, text: text}
