@@ -154,26 +154,27 @@ func (m *model) readDir(tab int, dir string) tea.Cmd {
 type commandDoneMsg struct {
 	message string
 	dir     string
+	sel     *string
 	err     error
 }
 
-func (m model) execute(cmd command, dir string) tea.Cmd {
+func (m model) execute(cmd command) tea.Cmd {
 	return func() tea.Msg {
 		err := m.cm.execute(cmd)
-		return commandDoneMsg{fmt.Sprintf("%s", cmd), dir, err}
+		return commandDoneMsg{fmt.Sprintf("%s", cmd), cmd.getDir(), cmd.sel(), err}
 	}
 }
 
 func (m model) undo() tea.Cmd {
 	return func() tea.Msg {
 		cmd, err := m.cm.undo()
-		return commandDoneMsg{fmt.Sprintf("undo: %s", cmd), cmd.getDir(), err}
+		return commandDoneMsg{fmt.Sprintf("undo: %s", cmd), cmd.getDir(), cmd.sel(), err}
 	}
 }
 
 func (m model) redo() tea.Cmd {
 	return func() tea.Msg {
 		cmd, err := m.cm.redo()
-		return commandDoneMsg{fmt.Sprintf("redo: %s", cmd), cmd.getDir(), err}
+		return commandDoneMsg{fmt.Sprintf("redo: %s", cmd), cmd.getDir(), cmd.sel(), err}
 	}
 }

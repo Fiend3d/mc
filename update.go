@@ -35,6 +35,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				msgFail,
 				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.err))
 		} else {
+			if msg.sel != nil {
+				tab := m.getTab()
+				if tab.dir == msg.dir {
+					settings := tab.pageSettings[msg.dir]
+					settings.sel = msg.sel
+				}
+			}
 			return m, tea.Batch(
 				m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.message)),
 				m.update(msg.dir))
@@ -51,6 +58,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		settings := tab.getPageSettings()
 		settings.update(len(tab.page.getItems()))
+		if settings.sel != nil {
+			items := tab.page.getItems()
+			for i := range items {
+				if items[i].getFullPath() == *settings.sel {
+					settings.cursor = i
+					break
+				}
+			}
+			settings.sel = nil
+		}
 		return m, nil
 
 	case tea.WindowSizeMsg:

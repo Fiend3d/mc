@@ -75,6 +75,7 @@ type page struct {
 type pageSettings struct {
 	start  int
 	cursor int
+	sel    *string // it's for commands to select the item when finished
 }
 
 func (s *pageSettings) update(length int) {

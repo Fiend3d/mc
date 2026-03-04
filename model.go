@@ -257,7 +257,8 @@ func (m *model) addCommand(cmd command) tea.Cmd {
 	return tea.Batch(
 		m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
 		m.spinner.Tick,
-		m.execute(cmd, m.getTab().dir))
+		m.execute(cmd),
+	)
 }
 
 type tickMsg struct{}

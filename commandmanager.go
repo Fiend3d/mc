@@ -13,6 +13,7 @@ type command interface {
 	undo() error
 	String() string
 	getDir() string
+	sel() *string // select is a keyword
 }
 
 type commandManager struct {
@@ -93,6 +94,10 @@ func (c *deleteCommand) execute() error {
 
 func (c *deleteCommand) undo() error {
 	return fmt.Errorf("can't be undone")
+}
+
+func (c *deleteCommand) sel() *string {
+	return nil
 }
 
 type pathPair struct {
@@ -220,6 +225,13 @@ func (c *fileActionCommand) undo() error {
 	return nil
 }
 
+func (c *fileActionCommand) sel() *string {
+	if len(c.pairs) > 0 {
+		return &c.pairs[0].dst
+	}
+	return nil
+}
+
 type createCommand struct {
 	path  string
 	isDir bool
@@ -262,4 +274,8 @@ func (c *createCommand) getDir() string {
 
 func (c *createCommand) String() string {
 	return fmt.Sprintf("create %s", c.path)
+}
+
+func (c *createCommand) sel() *string {
+	return &c.path
 }
