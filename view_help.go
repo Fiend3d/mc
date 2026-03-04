@@ -155,6 +155,8 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" `", " - Enter Message mode. The message history can be viewed here.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" s", " - Enter Search mode.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" F3", " - Viewer tool (bat with less by default, configurable).")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" F4", " - Editor (Helix by default, configurable).")

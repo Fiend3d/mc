@@ -289,6 +289,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.help--
 				m.help = max(0, m.help)
 				return m, nil
+			case "pgdown":
+				m.help += (m.height - 1) / 2
+				return m, nil
+			case "pgup":
+				m.help -= (m.height - 1) / 2
+				m.help = max(0, m.help)
+				return m, nil
 			case "home":
 				m.help = 0
 				return m, nil
