@@ -15,6 +15,7 @@ func (m model) View() tea.View {
 	var result tea.View
 	result.AltScreen = true
 	result.MouseMode = tea.MouseModeCellMotion
+	result.WindowTitle = "Modal Commander"
 
 	if m.err != nil {
 		msg := fmt.Sprintf("Error: %s", m.err)

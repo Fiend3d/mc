@@ -338,7 +338,7 @@ func newTextinput(t *theme) textinput.Model {
 	styles.Focused.Text = t.emptyStyle
 	styles.Focused.Placeholder = t.emptyStyle.Foreground(t.grayColor)
 	styles.Focused.Suggestion = t.emptyStyle.Foreground(t.grayColor)
-	styles.Focused.Prompt = t.emptyStyle.Bold(true).Foreground(t.accentColor3)
+	styles.Focused.Prompt = t.emptyStyle.Bold(true).Foreground(t.greenColor)
 
 	styles.Blurred.Text = t.emptyStyle
 	styles.Blurred.Placeholder = t.emptyStyle.Foreground(t.grayColor)
