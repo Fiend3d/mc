@@ -24,7 +24,7 @@ type theme struct {
 	accentColor5 color.Color
 }
 
-func newTheme() theme {
+func newTheme() *theme {
 	white := lipgloss.Color("#ffffff")
 	black := lipgloss.Color("#000000")
 	gray := lipgloss.Color("#6272a4")
@@ -37,7 +37,7 @@ func newTheme() theme {
 	accent5 := lipgloss.Color("#ffb86c")
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
-	return theme{
+	return &theme{
 		baseStyle:   defaultStyle.Background(lipgloss.Color("#282a36")),
 		emptyStyle:  defaultStyle.Background(lipgloss.Color("#222430")),
 		cursorStyle: defaultStyle.Background(lipgloss.Color("#44475a")),

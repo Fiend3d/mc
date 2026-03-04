@@ -148,7 +148,7 @@ func (m model) View() tea.View {
 			s.WriteString(style.Render(" "))
 		}
 
-		item.render(&s, style, &m.theme, m.width-cursorWidth)
+		item.render(&s, style, m.theme, m.width-cursorWidth)
 		s.WriteRune('\n')
 		countItems++
 	}
@@ -255,7 +255,7 @@ func (m model) View() tea.View {
 
 	default:
 		if m.ticks > 0 {
-			logMsg := m.log[len(m.log)-1].render(&m.theme, false)
+			logMsg := m.log[len(m.log)-1].render(m.theme, false)
 			if lipgloss.Width(logMsg) > m.width {
 				logMsg = truncate(logMsg, m.width)
 			}
@@ -400,7 +400,7 @@ func viewMessages(m *model) string {
 		if last >= 0 && last < length {
 			s.WriteString(base.Width(numbersLength).Foreground(m.theme.accentColor4).Render(
 				strconv.Itoa(i + 1 + m.logStart)))
-			logMsg := m.log[last].render(&m.theme, true)
+			logMsg := m.log[last].render(m.theme, true)
 			if lipgloss.Width(logMsg) > m.width-numbersLength {
 				logMsg = truncate(logMsg, m.width-numbersLength)
 			}

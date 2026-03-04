@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"image/color"
 	"os/exec"
 	"strings"
 	"time"
@@ -10,7 +9,6 @@ import (
 	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 )
 
 type mode int
@@ -77,7 +75,7 @@ type model struct {
 	bm     *bookmarks
 	search *search
 
-	theme theme
+	theme *theme
 
 	result string
 }
@@ -329,23 +327,24 @@ func (m *model) getPage() *page { // probably redundant
 	return tab.page
 }
 
-func newTextinput(style lipgloss.Style, grayColor color.Color) textinput.Model {
-
+func newTextinput(t *theme) textinput.Model {
 	input := textinput.New()
+	input.Prompt = " > "
 	input.CharLimit = 255 // hello, windows!
 	input.SetWidth(0)     // TODO: it's bugged right now, wait until it's fixed and clean up update then
 	styles := input.Styles()
-	styles.Focused.Text = style
-	styles.Focused.Placeholder = style.Foreground(grayColor)
-	styles.Focused.Suggestion = style.Foreground(grayColor)
-	styles.Focused.Prompt = style.Foreground(grayColor)
+	styles.Cursor.Shape = tea.CursorBar
+	styles.Focused.Text = t.emptyStyle
+	styles.Focused.Placeholder = t.emptyStyle.Foreground(t.grayColor)
+	styles.Focused.Suggestion = t.emptyStyle.Foreground(t.grayColor)
+	styles.Focused.Prompt = t.emptyStyle.Bold(true).Foreground(t.accentColor3)
 
-	styles.Blurred.Text = style
-	styles.Blurred.Placeholder = style.Foreground(grayColor)
-	styles.Blurred.Suggestion = style.Foreground(grayColor)
-	styles.Blurred.Prompt = style.Foreground(grayColor)
+	styles.Blurred.Text = t.emptyStyle
+	styles.Blurred.Placeholder = t.emptyStyle.Foreground(t.grayColor)
+	styles.Blurred.Suggestion = t.emptyStyle.Foreground(t.grayColor)
+	styles.Blurred.Prompt = t.emptyStyle.Foreground(t.grayColor)
 
-	styles.Cursor.Color = style.GetForeground()
+	styles.Cursor.Color = t.emptyStyle.GetForeground()
 	styles.Cursor.Blink = true
 	input.SetStyles(styles)
 	return input
@@ -363,8 +362,8 @@ func initialModel(dirs []string) model {
 	}
 
 	theme := newTheme()
-	input := newTextinput(theme.emptyStyle, theme.grayColor)
-	pathInput := newTextinput(theme.emptyStyle, theme.grayColor)
+	input := newTextinput(theme)
+	pathInput := newTextinput(theme)
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = theme.baseStyle.Foreground(theme.accentColor1)
