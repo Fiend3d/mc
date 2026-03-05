@@ -13,6 +13,14 @@ type helpTopic struct {
 	docs   []string
 }
 
+func newHelpTopic(header string, data [][]string, m *model) helpTopic {
+	result := helpTopic{header: header}
+	for i := range data {
+		result.docs = makeDocs(result.docs, m, data[i][0], data[i][1])
+	}
+	return result
+}
+
 func addTopic(docs []string, topic *helpTopic, m *model) []string {
 	if len(topic.docs) == 0 {
 		return docs
@@ -81,125 +89,74 @@ func viewHelp(m *model) string {
 		true,
 	)
 
-	normalDocs := helpTopic{header: " Normal Mode"}
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" q", " - Quit, returning the current directory.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Q", " - Quit without returning anything.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" g", " - Enter Go mode.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+h", " - Hide/Unhide TUI.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" t", " - Duplicate the current tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" ]", " - Next tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" [", " - Previous tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" 1-0", " - Select tabs 1 to 10 (0 is tab 10).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" space", " - Select.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+a", " - Select all.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+d", " - Deselect all.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+r", " - Toggle selection (invert all).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+w", " - Close the current tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" T", " - Restore the last closed tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" d", " - Delete the selected items PERMANENTLY.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" r", " - Rename the selected items.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" y", " - Copy the selected items.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" x", " - Cut the selected items.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" p", " - Paste.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" u", " - Undo.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" U", " - Redo.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" j, down", " - Move the cursor down.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" k, up", " - Move the cursor up.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" l, right", " - Enter the selected directory.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" h, left", " - Enter the parent directory.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+b", " - Go back in history.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" Ctrl+f", " - Go forward in history.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" v", " - Enter Visual mode.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" f", " - Enter Filter mode. Filter mode filters the items in the current tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" c", " - Enter Copy mode to copy paths and names of selected items to the clipboard.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" B", " - Bookmark the directory.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" b", " - Browse bookmarks.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" esc", " - Exit Temp mode of the filtered items.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" ,", " - Enter Sort mode.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" a", " - Enter Create mode. You can create files and directories here.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" `", " - Enter Message mode. The message history can be viewed here.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" s", " - Enter Search mode.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F3", " - Viewer tool (bat with less by default, configurable).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F4", " - Editor (Helix by default, configurable).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F5", " - Refresh current tab.")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F6", " - File explorer (configurable).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F7", " - VS Code paths (configurable).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F8", " - VS Code directory (configurable).")
-	normalDocs.docs = makeDocs(normalDocs.docs, m,
-		" F9-F12", " - Unassigned (configurable).")
+	normalDocsData := [][]string{
+		{" q", " - Quit, returning the current directory."},
+		{" Q", " - Quit without returning anything."},
+		{" g", " - Enter Go mode."},
+		{" Ctrl+h", " - Hide/Unhide TUI."},
+		{" t", " - Duplicate the current tab."},
+		{" ]", " - Next tab."},
+		{" [", " - Previous tab."},
+		{" 1-0", " - Select tabs 1 to 10 (0 is tab 10)."},
+		{" space", " - Select."},
+		{" Ctrl+a", " - Select all."},
+		{" Ctrl+d", " - Deselect all."},
+		{" Ctrl+r", " - Toggle selection (invert all)."},
+		{" Ctrl+w", " - Close the current tab."},
+		{" T", " - Restore the last closed tab."},
+		{" d", " - Delete the selected items PERMANENTLY."},
+		{" r", " - Rename the selected items."},
+		{" y", " - Copy the selected items."},
+		{" x", " - Cut the selected items."},
+		{" p", " - Paste."},
+		{" u", " - Undo."},
+		{" U", " - Redo."},
+		{" j, down", " - Move the cursor down."},
+		{" k, up", " - Move the cursor up."},
+		{" l, right", " - Enter the selected directory."},
+		{" h, left", " - Enter the parent directory."},
+		{" Ctrl+b", " - Go back in history."},
+		{" Ctrl+f", " - Go forward in history."},
+		{" tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut."},
+		{" v", " - Enter Visual mode."},
+		{" f", " - Enter Filter mode. Filter mode filters the items in the current tab."},
+		{" c", " - Enter Copy mode to copy paths and names of selected items to the clipboard."},
+		{" B", " - Bookmark the directory."},
+		{" b", " - Browse bookmarks."},
+		{" esc", " - Exit Temp mode of the filtered items."},
+		{" ,", " - Enter Sort mode."},
+		{" a", " - Enter Create mode. You can create files and directories here."},
+		{" `", " - Enter Message mode. The message history can be viewed here."},
+		{" s", " - Enter Search mode."},
+		{" F3", " - Viewer tool (bat with less by default, configurable)."},
+		{" F4", " - Editor (Helix by default, configurable)."},
+		{" F5", " - Refresh current tab."},
+		{" F6", " - File explorer (configurable)."},
+		{" F7", " - VS Code paths (configurable)."},
+		{" F8", " - VS Code directory (configurable)."},
+		{" F9-F12", " - Unassigned (configurable)."},
+	}
+	normalDocs := newHelpTopic(" Normal Mode", normalDocsData, m)
 
-	goDocs := helpTopic{header: " Go Mode"}
-	goDocs.docs = makeDocs(goDocs.docs, m,
-		"", " Go mode is just a menu.")
-	goDocs.docs = makeDocs(goDocs.docs, m,
-		" g", " - Enter Path mode.")
-	goDocs.docs = makeDocs(goDocs.docs, m,
-		" t", " - Browse tabs.")
-	goDocs.docs = makeDocs(goDocs.docs, m,
-		" c", " - Open the settings directory. You can also find and delete bookmarks there, for example.")
-	goDocs.docs = makeDocs(goDocs.docs, m,
-		" C", " - Save settings to config.toml for editing.")
+	goDocsData := [][]string{
+		{"", " Go mode is just a menu."},
+		{" g", " - Enter Path mode."},
+		{" t", " - Browse tabs."},
+		{" c", " - Open the settings directory. You can also find and delete bookmarks there, for example."},
+		{" C", " - Save settings to config.toml for editing."},
+	}
+	goDocs := newHelpTopic(" Go Mode", goDocsData, m)
 
-	pathDocs := helpTopic{header: " Path Mode"}
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		"", " Path mode allows changing the directory by typing. You can enter this mode from Normal mode by typing gg (press g twice).")
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" Ctrl+u", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.).")
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" Ctrl+w", " - Delete the last word.")
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" Ctrl+e", " - Expand environment variables.")
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" Ctrl+n", " - Open the directory in a new tab.")
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" tab", " - Autocomplete.")
-	pathDocs.docs = makeDocs(pathDocs.docs, m,
-		" down/up", " - Next/Previous autocomplete.")
+	pathDocsData := [][]string{
+		{"", " Path mode allows changing the directory by typing. You can enter this mode from Normal mode by typing gg (press g twice)."},
+		{" Ctrl+u", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.)."},
+		{" Ctrl+w", " - Delete the last word."},
+		{" Ctrl+e", " - Expand environment variables."},
+		{" Ctrl+n", " - Open the directory in a new tab."},
+		{" tab", " - Autocomplete."},
+		{" down/up", " - Next/Previous autocomplete."},
+	}
+	pathDocs := newHelpTopic(" Path Mode", pathDocsData, m)
 
 	docs = addTopic(docs, &normalDocs, m)
 	docs = addTopic(docs, &goDocs, m)
