@@ -17,6 +17,12 @@ func (m model) View() tea.View {
 	result.MouseMode = tea.MouseModeCellMotion
 	result.WindowTitle = "Modal Commander"
 
+	if m.hide {
+		result.AltScreen = false
+		result.MouseMode = tea.MouseModeNone
+		return result
+	}
+
 	if m.err != nil {
 		msg := fmt.Sprintf("Error: %s", m.err)
 		result.SetContent(lipgloss.Place(

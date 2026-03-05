@@ -38,6 +38,8 @@ const (
 type model struct {
 	cfg *Config
 
+	hide bool
+
 	err        error
 	tabs       []*tab
 	currentTab int

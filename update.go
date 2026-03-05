@@ -368,6 +368,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.updateStart()
 				}
 				return m, nil
+			case "ctrl+h":
+				m.hide = !m.hide
+				return m, nil
 			case "g":
 				m.mode = goMode
 				return m, nil

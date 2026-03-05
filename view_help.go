@@ -89,6 +89,8 @@ func viewHelp(m *model) string {
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" g", " - Enter Go mode.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
+		" Ctrl+h", " - Hide/Unhide TUI.")
+	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" t", " - Duplicate the current tab.")
 	normalDocs.docs = makeDocs(normalDocs.docs, m,
 		" ]", " - Next tab.")
