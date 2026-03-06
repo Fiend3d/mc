@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -181,13 +183,217 @@ func (s *search) stop() {
 	s.working = false
 }
 
-func searchSkip(name string) bool {
+func checkDirSkip(name string) bool {
 	switch name {
 	case ".git":
-		return true
+		return false
 	case ".github":
+		return false
+	}
+	return true
+}
+
+type walkItem struct {
+	path string
+	info fs.FileInfo
+}
+
+func readLines(path string) func(func(string) bool) {
+	return func(yield func(string) bool) {
+		f, err := os.Open(path)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+
+		for scanner.Scan() {
+			if !yield(scanner.Text()) {
+				return
+			}
+		}
+	}
+}
+
+func walkDir(root string) func(func(walkItem) bool) {
+	return func(yield func(walkItem) bool) {
+
+		type rule struct {
+			pattern  string
+			negate   bool
+			dirOnly  bool
+			anchored bool
+		}
+
+		var walk func(string, string, []rule) bool
+
+		walk = func(dir, rel string, rules []rule) bool {
+
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				return true
+			}
+
+			localRules := append([]rule{}, rules...)
+
+			// Load .gitignore
+			for _, e := range entries {
+				if e.IsDir() || e.Name() != ".gitignore" {
+					continue
+				}
+
+				for line := range readLines(filepath.Join(dir, ".gitignore")) {
+
+					line = strings.TrimSpace(line)
+					if line == "" || strings.HasPrefix(line, "#") {
+						continue
+					}
+
+					r := rule{}
+
+					if strings.HasPrefix(line, "!") {
+						r.negate = true
+						line = line[1:]
+					}
+
+					if strings.HasSuffix(line, "/") {
+						r.dirOnly = true
+						line = strings.TrimSuffix(line, "/")
+					}
+
+					if strings.HasPrefix(line, "/") {
+						r.anchored = true
+						line = line[1:]
+					}
+
+					r.pattern = filepath.ToSlash(line)
+
+					localRules = append(localRules, r)
+				}
+			}
+
+			sort.Slice(entries, func(i, j int) bool {
+				a := entries[i]
+				b := entries[j]
+
+				if a.IsDir() != b.IsDir() {
+					return !a.IsDir()
+				}
+
+				return strings.ToLower(a.Name()) < strings.ToLower(b.Name())
+			})
+
+			for _, e := range entries {
+
+				name := e.Name()
+				path := filepath.Join(dir, name)
+				relPath := filepath.ToSlash(filepath.Join(rel, name))
+
+				ignored := false
+
+				for _, r := range localRules {
+
+					target := relPath
+					if !strings.Contains(r.pattern, "/") {
+						target = name
+					}
+
+					match := gitMatch(r.pattern, target, r.anchored)
+
+					if match {
+						if r.dirOnly && !e.IsDir() {
+							continue
+						}
+
+						if r.negate {
+							ignored = false
+						} else {
+							ignored = true
+						}
+					}
+				}
+
+				if ignored {
+					continue
+				}
+
+				info, err := e.Info()
+				if err != nil {
+					return false
+				}
+
+				if e.IsDir() {
+					if checkDirSkip(name) {
+						if !yield(walkItem{path, info}) {
+							return false
+						}
+					}
+				} else {
+					if !yield(walkItem{path, info}) {
+						return false
+					}
+				}
+
+				if e.IsDir() && checkDirSkip(name) {
+					if !walk(path, relPath, localRules) {
+						return false
+					}
+				}
+			}
+
+			return true
+		}
+
+		walk(root, "", nil)
+	}
+}
+
+func gitMatch(pattern, path string, anchored bool) bool {
+
+	pattern = filepath.ToSlash(pattern)
+	path = filepath.ToSlash(path)
+
+	if anchored {
+		ok, _ := filepath.Match(pattern, path)
+		return ok
+	}
+
+	// try full match
+	ok, _ := filepath.Match(pattern, path)
+	if ok {
 		return true
 	}
+
+	// match any path segment
+	parts := strings.Split(path, "/")
+	for i := range parts {
+		sub := strings.Join(parts[i:], "/")
+		ok, _ := filepath.Match(pattern, sub)
+		if ok {
+			return true
+		}
+	}
+
+	// basic ** handling
+	if strings.Contains(pattern, "**") {
+
+		p := strings.ReplaceAll(pattern, "**", "*")
+
+		ok, _ := filepath.Match(p, path)
+		if ok {
+			return true
+		}
+
+		for i := range parts {
+			sub := strings.Join(parts[i:], "/")
+			ok, _ := filepath.Match(p, sub)
+			if ok {
+				return true
+			}
+		}
+	}
+
 	return false
 }
 
@@ -202,69 +408,45 @@ func doSearch(
 	defer close(done)
 
 	textSet := text != ""
+	hasPattern := pattern != ""
 
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
+outer:
+	for item := range walkDir(dir) {
+		select {
+		case <-cancel:
+			break outer
+		default:
 		}
-
-		if path == dir {
-			return nil
-		}
-
-		isDir := d.IsDir()
-
-		name := d.Name()
-		if isDir && searchSkip(name) {
-			return filepath.SkipDir // it's kinda useless
-		}
-
+		name := item.info.Name()
+		isDir := item.info.IsDir()
 		if isDir && textSet {
-			return nil
+			continue
 		}
 
-		if pattern != "" {
+		if hasPattern {
 			matched, err := filepath.Match(pattern, name)
 			if err != nil || !matched {
-				return nil
+				continue
 			}
-		}
 
-		select {
-		case <-cancel:
-			return filepath.SkipAll
-		default:
 		}
-
 		if textSet && !isDir {
-			info, err := d.Info()
-			if err != nil {
-				return nil
+			if item.info.Size() > 5_242_880 { // 5M ought to be enough for anybody
+				continue
 			}
-			if info.Size() > 5_242_880 { // 5M ought to be enough for anybody
-				return nil
-			}
-			contains, err := fileContainsText(path, text)
+			contains, err := fileContainsText(item.path, text)
 			if err != nil || !contains {
-				return nil
+				continue
 			}
 		}
 
 		select {
-		case result <- searchItem{path: path, isDir: isDir}:
+		case result <- searchItem{path: item.path, isDir: isDir}:
 		case <-cancel:
-			return filepath.SkipAll
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		select {
-		case result <- searchItem{path: "Error: " + err.Error()}:
-		default:
+			break outer
 		}
 	}
+
 }
 
 func fileContainsText(path, text string) (bool, error) {
