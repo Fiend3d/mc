@@ -28,6 +28,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tick()
 		}
 
+	case searchTickMsg:
+		if !m.search.working {
+			return m, nil
+		}
+		found := make([]string, searchBufferSize)
+	outer:
+		for {
+			select {
+			case result := <-m.search.result:
+				found = append(found, result)
+			default:
+				break outer
+			}
+		}
+
+		for i := range found {
+			m.search.items = append(m.search.items, searchItem{path: found[i]})
+		}
+
+		return m, searchTick()
+
 	case commandDoneMsg:
 		m.jobs--
 		if msg.err != nil {
@@ -570,6 +591,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case searchMode:
 			switch msg.String() {
 			case "esc":
+				if m.search.working {
+					m.search.stop()
+					return m, nil
+				}
 				m.mode = normalMode
 				return m, nil
 			case "tab":
@@ -588,6 +613,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.search.text.Blur()
 				}
 				return m, nil
+			case "f5":
+				m.search.launch(m.getTab().dir)
+				return m, tea.Batch(m.spinner.Tick, searchTick())
 			}
 
 		case jumpMode:
@@ -744,6 +772,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						pairs:  pairs,
 					}
 					if finalPath != path {
+						m.jobs++
 						return m, tea.Batch(m.addCommand(cmd),
 							m.addMessage(msgWarning, fmt.Sprintf("%s already exists", path)))
 
@@ -1024,7 +1053,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 
-	if m.jobs > 0 {
+	searching := false
+	if m.search != nil {
+		searching = m.search.working
+	}
+
+	if m.jobs > 0 || searching {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)

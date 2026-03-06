@@ -1,9 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 type searchItem struct {
@@ -15,6 +18,10 @@ type search struct {
 	focus    int
 	filename textinput.Model
 	text     textinput.Model
+
+	working bool
+	result  chan string
+	done    chan bool
 
 	cursor int
 	start  int
@@ -69,14 +76,19 @@ func viewSearch(m *model) string {
 		s.WriteRune('\n')
 	}
 
+	modeColor := m.theme.whiteColor
+	modeText := " SEARCH "
+	if m.search.working {
+		modeColor = m.theme.accentColor2
+	}
 	modeStyle := base.
-		Background(m.theme.whiteColor).
+		Background(modeColor).
 		Foreground(m.theme.blackColor).
 		Bold(true)
-	modeText := " SEARCH "
+
 	s.WriteString(modeStyle.Render(modeText))
 
-	if m.jobs > 0 {
+	if m.search.working {
 		s.WriteString(base.Render(m.spinner.View()))
 	} else {
 		s.WriteString(base.Render("  "))
@@ -84,6 +96,47 @@ func viewSearch(m *model) string {
 
 	s.WriteString(base.Width(m.width - len(modeText) - 2).Render())
 	s.WriteRune('\n')
-	s.WriteString(empty.Width(m.width).Render())
+	s.WriteString(empty.Width(m.width).Render(fmt.Sprintf("%d items", len(m.search.items))))
 	return s.String()
+}
+
+const searchBufferSize = 1000
+
+func (s *search) launch(dir string) {
+	if s.done != nil {
+		close(s.done)
+	}
+	s.working = true
+	s.cursor = 0
+	s.start = 0
+	s.items = nil
+	s.result = make(chan string, searchBufferSize)
+	s.done = make(chan bool)
+	go doSearch(dir, s.done, s.result)
+}
+
+func (s *search) stop() {
+	close(s.done)
+	s.working = false
+}
+
+func doSearch(dir string, done chan bool, result chan string) {
+	for {
+		time.Sleep(time.Microsecond * 10)
+		select {
+		case done, ok := <-done:
+			if !ok || done {
+				return
+			}
+		case result <- dir + " HUHEUHEUHUE":
+		}
+	}
+}
+
+type searchTickMsg struct{}
+
+func searchTick() tea.Cmd {
+	return tea.Tick(time.Microsecond*100, func(time.Time) tea.Msg {
+		return searchTickMsg{}
+	})
 }
