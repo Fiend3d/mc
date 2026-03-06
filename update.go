@@ -32,22 +32,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.search.working {
 			return m, nil
 		}
-		found := make([]string, searchBufferSize)
+
+		items := make([]searchItem, 0, searchBufferSize)
+
 	outer:
 		for {
 			select {
+			case _, ok := <-m.search.cancel:
+				if !ok {
+					return m, nil
+				}
+
 			case result := <-m.search.result:
-				found = append(found, result)
+				items = append(items, result)
+
 			default:
 				break outer
 			}
 		}
 
-		for i := range found {
-			m.search.items = append(m.search.items, searchItem{path: found[i]})
+		m.search.items = append(m.search.items, items...)
+
+		done := false
+		select {
+		case _, ok := <-m.search.done:
+			done = !ok
+		default:
 		}
 
-		return m, searchTick()
+		if !done {
+			return m, searchTick()
+		} else {
+			m.search.stop()
+			return m, m.addMessage(msgInfo, "done searching")
+		}
 
 	case commandDoneMsg:
 		m.jobs--
@@ -614,8 +632,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "f5":
-				m.search.launch(m.getTab().dir)
-				return m, tea.Batch(m.spinner.Tick, searchTick())
+				dir := m.getTab().dir
+				m.search.launch(dir)
+				return m, tea.Batch(
+					m.spinner.Tick,
+					searchTick(),
+					m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
+				)
 			}
 
 		case jumpMode:
