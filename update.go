@@ -202,6 +202,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m.changeDir(dir)
 					}
 				}
+			case searchMode:
+				if m.click.y == 1 {
+					if m.search.focus != 0 {
+						if m.search.focus == 1 {
+							m.search.text.Blur()
+						}
+						m.search.focus = 0
+						m.search.filename.Focus()
+						return m, textinput.Blink
+					}
+				} else if m.click.y == 2 {
+					if m.search.focus != 1 {
+						if m.search.focus == 0 {
+							m.search.filename.Blur()
+						}
+						m.search.focus = 1
+						m.search.text.Focus()
+						return m, textinput.Blink
+					}
+				} else if m.click.y >= 3 &&
+					m.click.y < m.height-2 &&
+					m.click.y-3 < m.search.length()-m.search.start {
+					switch m.search.focus {
+					case 0:
+						m.search.filename.Blur()
+					case 1:
+						m.search.text.Blur()
+					}
+					m.search.focus = 2
+					m.search.cursor = m.click.y - 3 + m.search.start
+					return m, nil
+				}
 			}
 			return m, nil
 		}
@@ -647,7 +679,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "end":
 				if m.search.focus == 2 {
-					m.search.cursor = len(m.search.items) - 1
+					m.search.cursor = m.search.length() - 1
 					m.search.updateStart(m.height)
 				}
 			case "home":
@@ -1146,14 +1178,4 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
-}
-
-func (m *model) launchSearch() (tea.Model, tea.Cmd) {
-	dir := m.getTab().dir
-	m.search.launch(dir)
-	return m, tea.Batch(
-		m.spinner.Tick,
-		searchTick(),
-		m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
-	)
 }

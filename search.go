@@ -35,6 +35,20 @@ type search struct {
 	items  []searchItem
 }
 
+func (m *model) launchSearch() (tea.Model, tea.Cmd) {
+	dir := m.getTab().dir
+	m.search.launch(dir)
+	return m, tea.Batch(
+		m.spinner.Tick,
+		searchTick(),
+		m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
+	)
+}
+
+func (s *search) length() int {
+	return len(s.items)
+}
+
 func (s *search) moveCursor(move int, height int) {
 	s.cursor += move
 	length := len(s.items)

@@ -189,6 +189,11 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 		m.help += steps
 		m.help = max(0, m.help)
 		return m, nil
+	case searchMode:
+		m.search.start += steps
+		actualHeight := m.height - 5
+		m.search.start = max(0,
+			min(m.search.start, len(m.search.items)-actualHeight))
 	}
 	return m, nil
 }
