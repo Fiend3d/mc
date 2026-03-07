@@ -205,32 +205,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case searchMode:
 				if m.click.y == 1 {
 					if m.search.focus != 0 {
-						if m.search.focus == 1 {
-							m.search.text.Blur()
-						}
-						m.search.focus = 0
-						m.search.filename.Focus()
+						m.search.setFocus(0)
 						return m, textinput.Blink
 					}
 				} else if m.click.y == 2 {
 					if m.search.focus != 1 {
-						if m.search.focus == 0 {
-							m.search.filename.Blur()
-						}
-						m.search.focus = 1
-						m.search.text.Focus()
+						m.search.setFocus(1)
 						return m, textinput.Blink
 					}
 				} else if m.click.y >= 3 &&
 					m.click.y < m.height-2 &&
 					m.click.y-3 < m.search.length()-m.search.start {
-					switch m.search.focus {
-					case 0:
-						m.search.filename.Blur()
-					case 1:
-						m.search.text.Blur()
-					}
-					m.search.focus = 2
+					m.search.setFocus(2)
 					m.search.cursor = m.click.y - 3 + m.search.start
 					return m, nil
 				}
@@ -624,18 +610,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case "s":
-				var cmd tea.Cmd
 				if m.search == nil {
 					m.search = newSearch(&m)
 				}
 				m.mode = searchMode
-				switch m.search.focus {
-				case 0:
-					cmd = textinput.Blink
-				case 1:
-					cmd = textinput.Blink
-				}
-				return m, cmd
+				return m, m.search.blink()
 			}
 
 		case searchMode:
@@ -648,20 +627,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = normalMode
 				return m, nil
 			case "tab":
-				m.search.focus = (m.search.focus + 1) % 3
-				switch m.search.focus {
-				case 0:
-					m.search.filename.Focus()
-					m.search.text.Blur()
-					return m, textinput.Blink
-				case 1:
-					m.search.filename.Blur()
-					m.search.text.Focus()
-					return m, textinput.Blink
-				case 2:
-					m.search.filename.Blur()
-					m.search.text.Blur()
-				}
+				m.search.setFocus((m.search.focus + 1) % 3)
 				return m, nil
 			case "f5":
 				return m.launchSearch()
@@ -672,28 +638,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "j", "down":
 				if m.search.focus == 2 {
 					m.search.moveCursor(1, m.height)
+					return m, nil
 				}
 			case "k", "up":
 				if m.search.focus == 2 {
 					m.search.moveCursor(-1, m.height)
+					return m, nil
 				}
 			case "end":
 				if m.search.focus == 2 {
 					m.search.cursor = m.search.length() - 1
 					m.search.updateStart(m.height)
+					return m, nil
 				}
 			case "home":
 				if m.search.focus == 2 {
 					m.search.cursor = 0
 					m.search.updateStart(m.height)
+					return m, nil
 				}
 			case "pgdown":
 				if m.search.focus == 2 {
 					m.search.moveCursor((m.height-5)/2, m.height)
+					return m, nil
 				}
 			case "pgup":
 				if m.search.focus == 2 {
 					m.search.moveCursor(-((m.height - 5) / 2), m.height)
+					return m, nil
 				}
 			}
 

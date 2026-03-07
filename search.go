@@ -49,6 +49,37 @@ func (s *search) length() int {
 	return len(s.items)
 }
 
+func (s *search) blink() tea.Cmd {
+	switch s.focus {
+	case 0, 1:
+		return textinput.Blink
+	}
+	return nil
+}
+
+func (s *search) setFocus(focus int) {
+	switch focus {
+	case 0:
+		if s.focus == 1 {
+			s.text.Blur()
+		}
+		s.filename.Focus()
+	case 1:
+		if s.focus == 0 {
+			s.filename.Blur()
+		}
+		s.text.Focus()
+	case 2:
+		switch s.focus {
+		case 0:
+			s.filename.Blur()
+		case 1:
+			s.text.Blur()
+		}
+	}
+	s.focus = focus
+}
+
 func (s *search) moveCursor(move int, height int) {
 	s.cursor += move
 	length := len(s.items)
