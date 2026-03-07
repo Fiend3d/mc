@@ -35,6 +35,29 @@ type search struct {
 	items  []searchItem
 }
 
+func (s *search) moveCursor(move int, height int) {
+	s.cursor += move
+	length := len(s.items)
+	if s.cursor >= length {
+		s.cursor = length - 1
+	}
+	if s.cursor < 0 {
+		s.cursor = 0
+	}
+	s.updateStart(height)
+}
+
+func (s *search) updateStart(height int) {
+	if s.cursor < s.start {
+		s.start = s.cursor
+		return
+	}
+	actualHeight := height - 6
+	if s.cursor > s.start+actualHeight {
+		s.start = s.cursor - actualHeight
+	}
+}
+
 func newSearch(m *model) *search {
 	filename := newTextinput(m.theme)
 	filename.Placeholder = "filename"

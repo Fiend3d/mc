@@ -639,6 +639,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					searchTick(),
 					m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
 				)
+			case "j", "down":
+				if m.search.focus == 2 {
+					m.search.moveCursor(1, m.height)
+				}
+			case "k", "up":
+				if m.search.focus == 2 {
+					m.search.moveCursor(-1, m.height)
+				}
+			case "end":
+				if m.search.focus == 2 {
+					m.search.cursor = len(m.search.items) - 1
+					m.search.updateStart(m.height)
+				}
+			case "home":
+				if m.search.focus == 2 {
+					m.search.cursor = 0
+					m.search.updateStart(m.height)
+				}
+			case "pgdown":
+				if m.search.focus == 2 {
+					m.search.moveCursor((m.height-5)/2, m.height)
+				}
+			case "pgup":
+				if m.search.focus == 2 {
+					m.search.moveCursor(-((m.height - 5) / 2), m.height)
+				}
 			}
 
 		case jumpMode:
