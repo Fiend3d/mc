@@ -632,13 +632,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "f5":
-				dir := m.getTab().dir
-				m.search.launch(dir)
-				return m, tea.Batch(
-					m.spinner.Tick,
-					searchTick(),
-					m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
-				)
+				return m.launchSearch()
+			case "enter":
+				if m.search.focus == 0 || m.search.focus == 1 {
+					return m.launchSearch()
+				}
 			case "j", "down":
 				if m.search.focus == 2 {
 					m.search.moveCursor(1, m.height)
@@ -1148,4 +1146,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m *model) launchSearch() (tea.Model, tea.Cmd) {
+	dir := m.getTab().dir
+	m.search.launch(dir)
+	return m, tea.Batch(
+		m.spinner.Tick,
+		searchTick(),
+		m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
+	)
 }
