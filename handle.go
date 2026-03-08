@@ -193,7 +193,7 @@ func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 		m.search.start += steps
 		actualHeight := m.height - 5
 		m.search.start = max(0,
-			min(m.search.start, len(m.search.items)-actualHeight))
+			min(m.search.start, m.search.length()-actualHeight))
 	}
 	return m, nil
 }

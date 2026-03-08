@@ -635,6 +635,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.search.focus == 0 || m.search.focus == 1 {
 					return m.launchSearch()
 				}
+			case "h":
+				if m.search.focus == 2 {
+					if m.search.showLines {
+						item, _ := m.search.mapIndex(m.search.cursor)
+						m.search.cursor = item
+						m.search.showLines = false
+						m.search.start = 0
+						m.search.updateStart(m.height)
+						return m, nil
+					} else {
+						current := 0
+						for i := range m.search.items {
+							if i == m.search.cursor {
+								m.search.cursor = current
+								m.search.showLines = true
+								m.search.start = 0
+								m.search.updateStart(m.height)
+								return m, nil
+							}
+							current++
+							current += len(m.search.items[i].lines)
+						}
+					}
+				}
 			case "j", "down":
 				if m.search.focus == 2 {
 					m.search.moveCursor(1, m.height)

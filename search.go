@@ -3,10 +3,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,9 +18,17 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
+type searchLine struct {
+	line       string
+	lineNumber int
+	start      int
+	end        int
+}
+
 type searchItem struct {
 	path  string
 	isDir bool
+	lines []searchLine
 }
 
 type search struct {
@@ -30,9 +41,10 @@ type search struct {
 	cancel  chan struct{}
 	done    chan struct{}
 
-	cursor int
-	start  int
-	items  []searchItem
+	cursor    int
+	start     int
+	showLines bool
+	items     []searchItem
 }
 
 func (m *model) launchSearch() (tea.Model, tea.Cmd) {
@@ -46,7 +58,61 @@ func (m *model) launchSearch() (tea.Model, tea.Cmd) {
 }
 
 func (s *search) length() int {
-	return len(s.items)
+	if !s.showLines {
+		return len(s.items)
+	}
+
+	result := 0
+	for i := range s.items {
+		result++ // file
+		result += len(s.items[i].lines)
+	}
+	return result
+}
+
+func (s *search) isItem(index int) bool {
+	if !s.showLines {
+		return true
+	}
+
+	current := 0
+	for i := range s.items {
+		if current == index {
+			return true
+		}
+		current++
+
+		for range s.items[i].lines {
+			if current == index {
+				return false
+			}
+			current++
+		}
+	}
+	return false
+}
+
+func (s *search) mapIndex(index int) (int, int) {
+	if !s.showLines {
+		return index, -1
+	}
+
+	current := 0
+	for i := range s.items {
+		if current == index {
+			return i, -1 // file row
+		}
+		current++
+
+		for j := range s.items[i].lines {
+			if current == index {
+				return i, j // line row
+			}
+			current++
+		}
+	}
+
+	return -1, -1
 }
 
 func (s *search) blink() tea.Cmd {
@@ -82,7 +148,7 @@ func (s *search) setFocus(focus int) {
 
 func (s *search) moveCursor(move int, height int) {
 	s.cursor += move
-	length := len(s.items)
+	length := s.length()
 	if s.cursor >= length {
 		s.cursor = length - 1
 	}
@@ -110,7 +176,7 @@ func newSearch(m *model) *search {
 	text := newTextinput(m.theme)
 	text.Placeholder = "text"
 	text.Blur()
-	return &search{filename: filename, text: text}
+	return &search{filename: filename, text: text, showLines: true}
 }
 
 func renderSearchFocus(widget int, s *strings.Builder, m *model) {
@@ -145,8 +211,8 @@ func viewSearch(m *model) string {
 	s.WriteRune('\n')
 
 	countItems := 0
-	for i := range m.search.items {
-		if i+1 > m.height-5 || i+m.search.start >= len(m.search.items) {
+	for i := range m.search.length() {
+		if i+1 > m.height-5 || i+m.search.start >= m.search.length() {
 			break
 		}
 
@@ -165,19 +231,60 @@ func viewSearch(m *model) string {
 		renderSearchFocus(2, &s, m)
 		s.WriteString(style.Bold(true).Render(cursor))
 
-		item := m.search.items[index]
-		text := item.path
-		text = truncate(text, m.width-cursorWidth-1)
-		if item.isDir {
-			s.WriteString(style.Foreground(m.theme.accentColor4).Width(m.width - cursorWidth - 1).Render(text))
-		} else {
-			if strings.HasSuffix(strings.ToUpper(item.path), ".EXE") {
-				s.WriteString(style.Bold(true).Foreground(m.theme.accentColor3).Width(m.width - cursorWidth - 1).Render(text))
-			} else {
-				s.WriteString(style.Width(m.width - cursorWidth - 1).Render(text))
+		if m.search.isItem(index) {
+			actualIndex, _ := m.search.mapIndex(index)
+			item := m.search.items[actualIndex]
+			text := item.path
+			suffix := ""
+			if !m.search.showLines {
+				if len(item.lines) > 0 {
+					suffix = fmt.Sprintf(" [%d]", len(item.lines))
+				}
 			}
+			textBlock := ""
+			if item.isDir {
+				textBlock += style.Foreground(m.theme.accentColor4).Render(text)
+			} else {
+				if strings.HasSuffix(strings.ToUpper(item.path), ".EXE") {
+					textBlock += style.Bold(true).Foreground(m.theme.greenColor).Render(text)
+				} else {
+					if m.search.showLines && len(item.lines) > 0 {
+						textBlock += style.Foreground(m.theme.accentColor2).Render(text)
+					} else {
+						textBlock += style.Render(text)
+					}
+				}
+			}
+			if suffix != "" {
+				textBlock += style.Foreground(m.theme.greenColor).Render(suffix)
+			}
+			textBlock = truncate(textBlock, m.width-cursorWidth-1)
+			s.WriteString(style.Width(m.width - cursorWidth - 1).Render(textBlock))
+
+		} else {
+			actualIndex, lineIndex := m.search.mapIndex(index)
+			item := m.search.items[actualIndex]
+			line := item.lines[lineIndex]
+			if lineIndex != len(item.lines)-1 {
+				s.WriteString(style.Foreground(m.theme.grayColor).Render("├─"))
+			} else {
+				s.WriteString(style.Foreground(m.theme.grayColor).Render("└─"))
+			}
+			lineNumber := strconv.Itoa(line.lineNumber)
+			s.WriteString(style.Foreground(m.theme.greenColor).Render(lineNumber))
+			s.WriteString(style.Render(":"))
+			lineLength := 7 + len(lineNumber)
+			token1 := line.line[:line.start]
+			token2 := line.line[line.start:line.end]
+			token3 := line.line[line.end:]
+			tokens := style.Render(token1)
+			tokens += style.Foreground(m.theme.redColor).Render(token2)
+			tokens += style.Render(token3)
+			tokens = truncate(tokens, m.width-lineLength)
+			s.WriteString(style.Width(m.width - lineLength).Render(tokens))
 		}
 		s.WriteRune('\n')
+
 		countItems++
 	}
 
@@ -205,9 +312,17 @@ func viewSearch(m *model) string {
 		s.WriteString(base.Render("  "))
 	}
 
-	rightText := fmt.Sprintf(" [%d/%d] ", m.search.cursor+1, len(m.search.items))
+	helpText := base.Foreground(m.theme.grayColor).Render("Keys: ")
+	helpText += base.Render("F5")
+	helpText += base.Foreground(m.theme.grayColor).Render(" - search ")
+	if m.search.focus == 2 {
+		helpText += base.Render("h")
+		helpText += base.Foreground(m.theme.grayColor).Render(" - hide lines ")
+	}
 
-	s.WriteString(base.Width(m.width - len(modeText) - 2 - len(rightText)).Render())
+	rightText := fmt.Sprintf(" [%d/%d] ", m.search.cursor+1, m.search.length())
+	helpText = truncate(helpText, m.width-len(modeText)-2-len(rightText))
+	s.WriteString(base.Width(m.width - len(modeText) - 2 - len(rightText)).Render(helpText))
 	s.WriteString(base.Render(rightText))
 	s.WriteRune('\n')
 	if m.ticks > 0 {
@@ -498,18 +613,20 @@ outer:
 			}
 
 		}
+		var lines []searchLine
 		if textSet && !isDir {
 			if item.info.Size() > 5_242_880 { // 5M ought to be enough for anybody
 				continue
 			}
-			contains, err := fileContainsText(item.path, text)
+			contains, fileLines, err := fileContainsText(item.path, text)
 			if err != nil || !contains {
 				continue
 			}
+			lines = fileLines
 		}
 
 		select {
-		case result <- searchItem{path: item.path, isDir: isDir}:
+		case result <- searchItem{path: item.path, isDir: isDir, lines: lines}:
 		case <-cancel:
 			break outer
 		}
@@ -517,13 +634,68 @@ outer:
 
 }
 
-func fileContainsText(path, text string) (bool, error) {
-	content, err := os.ReadFile(path)
+func isBinaryFile(path string) (bool, error) {
+	f, err := os.Open(path)
 	if err != nil {
 		return false, err
 	}
+	defer f.Close()
 
-	return strings.Contains(string(content), text), nil
+	buf := make([]byte, 8000)
+	n, err := f.Read(buf)
+	if err != nil && err != io.EOF {
+		return false, err
+	}
+
+	buf = buf[:n]
+
+	if slices.Contains(buf, 0) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func fileContainsText(path, text string) (bool, []searchLine, error) {
+	binary, err := isBinaryFile(path)
+	if err != nil {
+		return false, nil, err
+	}
+	if binary {
+		return false, nil, err
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return false, nil, err
+	}
+	defer f.Close()
+
+	var results []searchLine
+	scanner := bufio.NewScanner(f)
+
+	lineNumber := 0
+
+	for scanner.Scan() {
+		lineNumber++
+		line := scanner.Text()
+
+		idx := strings.Index(line, text)
+		if idx != -1 {
+			results = append(results, searchLine{
+				line:       line,
+				lineNumber: lineNumber,
+				start:      idx,
+				end:        idx + len(text),
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return false, nil, err
+	}
+
+	return len(results) > 0, results, nil
 }
 
 type searchTickMsg struct{}
