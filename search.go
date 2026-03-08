@@ -309,12 +309,10 @@ func viewSearch(m *model) string {
 	s.WriteString(modeStyle.Render(modeText))
 
 	gitignoreText := " GITIGNORE:ON "
-	if m.search.gitignore {
-		s.WriteString(modeStyle.Background(m.theme.greenColor).Render(gitignoreText))
-	} else {
+	if !m.search.gitignore {
 		gitignoreText = " GITIGNORE:OFF "
-		s.WriteString(modeStyle.Background(m.theme.grayColor).Render(gitignoreText))
 	}
+	s.WriteString(modeStyle.Background(m.theme.grayColor).Render(gitignoreText))
 
 	if m.search.working {
 		s.WriteString(base.Render(m.spinner.View()))
@@ -622,7 +620,10 @@ outer:
 		}
 
 		if hasPattern {
-			matched, err := filepath.Match(pattern, name)
+			matched, err := filepath.Match(
+				strings.ToUpper(pattern),
+				strings.ToUpper(name),
+			)
 			if err != nil || !matched {
 				continue
 			}
