@@ -629,6 +629,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "tab":
 				m.search.setFocus((m.search.focus + 1) % 3)
 				return m, nil
+			case "f1":
+				m.search.gitignore = !m.search.gitignore
+				return m, nil
 			case "f5":
 				return m.launchSearch()
 			case "enter":

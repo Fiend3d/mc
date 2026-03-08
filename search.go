@@ -36,6 +36,8 @@ type search struct {
 	filename textinput.Model
 	text     textinput.Model
 
+	gitignore bool
+
 	working bool
 	result  chan searchItem
 	cancel  chan struct{}
@@ -176,7 +178,7 @@ func newSearch(m *model) *search {
 	text := newTextinput(m.theme)
 	text.Placeholder = "text"
 	text.Blur()
-	return &search{filename: filename, text: text, showLines: true}
+	return &search{filename: filename, text: text, gitignore: true, showLines: true}
 }
 
 func renderSearchFocus(widget int, s *strings.Builder, m *model) {
@@ -306,6 +308,14 @@ func viewSearch(m *model) string {
 
 	s.WriteString(modeStyle.Render(modeText))
 
+	gitignoreText := " GITIGNORE:ON "
+	if m.search.gitignore {
+		s.WriteString(modeStyle.Background(m.theme.greenColor).Render(gitignoreText))
+	} else {
+		gitignoreText = " GITIGNORE:OFF "
+		s.WriteString(modeStyle.Background(m.theme.grayColor).Render(gitignoreText))
+	}
+
 	if m.search.working {
 		s.WriteString(base.Render(m.spinner.View()))
 	} else {
@@ -315,14 +325,17 @@ func viewSearch(m *model) string {
 	helpText := base.Foreground(m.theme.grayColor).Render("Keys: ")
 	helpText += base.Render("F5")
 	helpText += base.Foreground(m.theme.grayColor).Render(" - search ")
+	helpText += base.Render("F1")
+	helpText += base.Foreground(m.theme.grayColor).Render(" - toggle gitignore ")
 	if m.search.focus == 2 {
 		helpText += base.Render("h")
 		helpText += base.Foreground(m.theme.grayColor).Render(" - hide lines ")
 	}
 
 	rightText := fmt.Sprintf(" [%d/%d] ", m.search.cursor+1, m.search.length())
-	helpText = truncate(helpText, m.width-len(modeText)-2-len(rightText))
-	s.WriteString(base.Width(m.width - len(modeText) - 2 - len(rightText)).Render(helpText))
+	modeLength := len(modeText) + len(gitignoreText)
+	helpText = truncate(helpText, m.width-modeLength-2-len(rightText))
+	s.WriteString(base.Width(m.width - modeLength - 2 - len(rightText)).Render(helpText))
 	s.WriteString(base.Render(rightText))
 	s.WriteRune('\n')
 	if m.ticks > 0 {
@@ -358,7 +371,7 @@ func (s *search) launch(dir string) {
 	s.done = make(chan struct{})
 	pattern := s.filename.Value()
 	text := s.text.Value()
-	go doSearch(dir, pattern, text, s.cancel, s.done, s.result)
+	go doSearch(dir, pattern, text, s.gitignore, s.cancel, s.done, s.result)
 }
 
 func (s *search) stop() {
@@ -399,7 +412,7 @@ func readLines(path string) func(func(string) bool) {
 	}
 }
 
-func walkDir(root string) func(func(walkItem) bool) {
+func walkDir(root string, gitignore bool) func(func(walkItem) bool) {
 	return func(yield func(walkItem) bool) {
 
 		type rule struct {
@@ -420,39 +433,40 @@ func walkDir(root string) func(func(walkItem) bool) {
 
 			localRules := append([]rule{}, rules...)
 
-			// Load .gitignore
-			for _, e := range entries {
-				if e.IsDir() || e.Name() != ".gitignore" {
-					continue
-				}
-
-				for line := range readLines(filepath.Join(dir, ".gitignore")) {
-
-					line = strings.TrimSpace(line)
-					if line == "" || strings.HasPrefix(line, "#") {
+			if gitignore {
+				for _, e := range entries {
+					if e.IsDir() || e.Name() != ".gitignore" {
 						continue
 					}
 
-					r := rule{}
+					for line := range readLines(filepath.Join(dir, ".gitignore")) {
 
-					if strings.HasPrefix(line, "!") {
-						r.negate = true
-						line = line[1:]
+						line = strings.TrimSpace(line)
+						if line == "" || strings.HasPrefix(line, "#") {
+							continue
+						}
+
+						r := rule{}
+
+						if strings.HasPrefix(line, "!") {
+							r.negate = true
+							line = line[1:]
+						}
+
+						if strings.HasSuffix(line, "/") {
+							r.dirOnly = true
+							line = strings.TrimSuffix(line, "/")
+						}
+
+						if strings.HasPrefix(line, "/") {
+							r.anchored = true
+							line = line[1:]
+						}
+
+						r.pattern = filepath.ToSlash(line)
+
+						localRules = append(localRules, r)
 					}
-
-					if strings.HasSuffix(line, "/") {
-						r.dirOnly = true
-						line = strings.TrimSuffix(line, "/")
-					}
-
-					if strings.HasPrefix(line, "/") {
-						r.anchored = true
-						line = line[1:]
-					}
-
-					r.pattern = filepath.ToSlash(line)
-
-					localRules = append(localRules, r)
 				}
 			}
 
@@ -584,6 +598,7 @@ func doSearch(
 	dir string,
 	pattern string,
 	text string,
+	gitignore bool,
 	cancel <-chan struct{},
 	done chan<- struct{},
 	result chan<- searchItem,
@@ -594,7 +609,7 @@ func doSearch(
 	hasPattern := pattern != ""
 
 outer:
-	for item := range walkDir(dir) {
+	for item := range walkDir(dir, gitignore) {
 		select {
 		case <-cancel:
 			break outer
