@@ -67,6 +67,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.addMessage(msgInfo, "done searching")
 		}
 
+	case selectItemMsg:
+		if m.currentTab == msg.tab {
+			tab := m.getTab()
+			items := tab.page.getItems()
+			settings := tab.getPageSettings()
+			for i := range items {
+				if items[i].getFullPath() == msg.path {
+					settings.cursor = i
+					return m, nil
+				}
+			}
+		}
+
 	case commandDoneMsg:
 		m.jobs--
 		if msg.err != nil {
@@ -141,7 +154,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if len(matches) > 1 {
 						start = len(matches[1])
 						if m.click.x < start {
-							return m.changeDir(matches[1])
+							return m, m.changeDir(matches[1])
 						}
 					}
 					runes := []rune(dir)
@@ -162,7 +175,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						clickedDir := filepathDir(clickedPath)
 
 						index := slices.Index(history, clickedDir)
-						return m.changeDir(history[index+1])
+						return m, m.changeDir(history[index+1])
 					}
 				} else if m.click.y < m.height {
 					tab := m.getTab()
@@ -199,7 +212,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							}
 						}
 						m.bm = nil
-						return m.changeDir(dir)
+						return m, m.changeDir(dir)
 					}
 				}
 			case searchMode:
@@ -218,6 +231,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.click.y-3 < m.search.length()-m.search.start {
 					m.search.setFocus(2)
 					m.search.cursor = m.click.y - 3 + m.search.start
+					if m.click.doubleClick {
+						return m.searchRight()
+					}
 					return m, nil
 				}
 			}
@@ -326,7 +342,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return m, m.addMessage(msgError, err.Error())
 					}
 				}
-				return m.changeDir(configDir)
+				return m, m.changeDir(configDir)
 			case "C":
 				m.mode = normalMode
 				configPath := getConfigPath()
@@ -635,8 +651,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "f5":
 				return m.launchSearch()
 			case "enter":
-				if m.search.focus == 0 || m.search.focus == 1 {
+				switch m.search.focus {
+				case 0, 1:
 					return m.launchSearch()
+				case 2:
+					return m.searchRight()
 				}
 			case "h":
 				if m.search.focus == 2 {
@@ -661,6 +680,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							current += len(m.search.items[i].lines)
 						}
 					}
+				}
+			case "l", "right":
+				if m.search.focus == 2 {
+					return m.searchRight()
 				}
 			case "j", "down":
 				if m.search.focus == 2 {
@@ -975,7 +998,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				dir := m.bm.dirs[m.bm.cursor]
 				m.bm = nil
-				return m.changeDir(dir)
+				return m, m.changeDir(dir)
 			case "d":
 				if len(m.bm.dirs) == 0 {
 					return m, nil

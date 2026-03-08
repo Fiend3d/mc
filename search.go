@@ -59,6 +59,28 @@ func (m *model) launchSearch() (tea.Model, tea.Cmd) {
 	)
 }
 
+type selectItemMsg struct {
+	tab  int
+	path string
+}
+
+func selectItem(tab int, path string) tea.Cmd {
+	return func() tea.Msg {
+		return selectItemMsg{tab, path}
+	}
+}
+
+func (m *model) searchRight() (tea.Model, tea.Cmd) {
+	if len(m.search.items) == 0 {
+		return m, nil
+	}
+	m.mode = normalMode
+	index, _ := m.search.mapIndex(m.search.cursor)
+	item := m.search.items[index]
+	dir := filepath.Dir(item.path)
+	return m, tea.Sequence(m.changeDir(dir), selectItem(m.currentTab, item.path))
+}
+
 func (s *search) length() int {
 	if !s.showLines {
 		return len(s.items)

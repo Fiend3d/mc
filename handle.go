@@ -118,7 +118,7 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 			m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
 			m.currentTab = len(m.tabs) - 1
 		}
-		return m.changeDir(dir)
+		return m, m.changeDir(dir)
 	}
 	if strings.HasSuffix(dir, ":") {
 		dir += "\\" // windows...
@@ -147,7 +147,7 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 		m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
 		m.currentTab = len(m.tabs) - 1
 	}
-	return m.changeDir(dir)
+	return m, m.changeDir(dir)
 }
 
 func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {

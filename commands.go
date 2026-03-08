@@ -131,13 +131,13 @@ func readItems(dir string) ([]item, error) {
 	return items, nil
 }
 
-func (m *model) changeDir(dir string) (tea.Model, tea.Cmd) {
+func (m *model) changeDir(dir string) tea.Cmd {
 	tab := m.getTab()
 	m.mode = normalMode
 	if !tab.set(dir) {
-		return m, nil
+		return nil
 	}
-	return m, m.readDir(m.currentTab, dir)
+	return m.readDir(m.currentTab, dir)
 }
 
 func (m *model) readDir(tab int, dir string) tea.Cmd {
