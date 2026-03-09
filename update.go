@@ -660,7 +660,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case ":":
 				shellHistory, err := loadShellHistory()
 				if err != nil {
-					return m, m.addMessage(msgError, fmt.Sprintf("failed to load shell histiy: %s", err))
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to load shell history: %s", err))
 				}
 				m.mode = shellMode
 				m.shellHistory = shellHistory

@@ -131,7 +131,7 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 				)
 			}
 		default:
-			return m, m.addMessage(msgError, "uknown type of item")
+			return m, m.addMessage(msgError, "unknown type of item")
 		}
 	}
 	return m, m.addMessage(msgError, "nothing to rename")
