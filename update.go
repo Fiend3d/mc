@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -648,6 +649,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "f1":
 				m.search.gitignore = !m.search.gitignore
 				return m, nil
+			case "f3":
+				if m.search.isItem(m.search.cursor) {
+					return m.handleTool(msg.String())
+				} else {
+					i, j := m.search.mapIndex(m.search.cursor)
+					item := m.search.items[i]
+					line := item.lines[j]
+					text := line.line[line.start:line.end]
+					cmd := exec.Command(
+						"bat",
+						"--color=always",
+						"-p",
+						"--pager",
+						fmt.Sprintf(`less -c -R -S +%dg/"%s"`, line.lineNumber, text),
+						item.path,
+					)
+					cmd.Dir = m.getTab().dir
+					return m, tea.ExecProcess(cmd, nil)
+				}
+			case "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
+				if m.search.isItem(m.search.cursor) {
+					return m.handleTool(msg.String())
+				}
 			case "f5":
 				return m.launchSearch()
 			case "enter":

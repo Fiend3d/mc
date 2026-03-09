@@ -216,12 +216,13 @@ func viewSearch(m *model) string {
 	base := &m.theme.baseStyle
 	empty := &m.theme.emptyStyle
 
-	dir := colorizeDir(m.getTab().dir,
+	dir := m.getTab().dir
+	dirBlock := colorizeDir(dir,
 		empty.Bold(true).Foreground(m.theme.whiteColor),
 		empty.Bold(true).Foreground(m.theme.accentColor5),
 		m.width)
-	dir = truncate(dir, m.width)
-	s.WriteString(empty.Width(m.width).Render(dir))
+	dirBlock = truncate(dirBlock, m.width)
+	s.WriteString(empty.Width(m.width).Render(dirBlock))
 	s.WriteRune('\n')
 	renderSearchFocus(0, &s, m)
 	nameWidget := m.search.filename.View()
@@ -259,6 +260,9 @@ func viewSearch(m *model) string {
 			actualIndex, _ := m.search.mapIndex(index)
 			item := m.search.items[actualIndex]
 			text := item.path
+			if strings.HasPrefix(text, dir) {
+				text = "." + text[len(dir):]
+			}
 			suffix := ""
 			if !m.search.showLines {
 				if len(item.lines) > 0 {

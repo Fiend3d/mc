@@ -197,6 +197,11 @@ func (m *message) render(theme *theme, renderTime bool) string {
 }
 
 func (m *model) getPaths() []string {
+	if m.mode == searchMode {
+		i, _ := m.search.mapIndex(m.search.cursor)
+		item := m.search.items[i]
+		return []string{item.path}
+	}
 	items := m.getPage().getItems()
 	if len(items) == 0 {
 		return nil
