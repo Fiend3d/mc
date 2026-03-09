@@ -662,6 +662,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.mode = searchMode
 				return m, m.search.blink()
+
+			case ":":
+				m.mode = shellMode
+				m.input.Placeholder = "powershell (#sl - pipe selected, #dir - pipe directory)"
+				m.input.Reset()
+				m.input.Focus()
+				return m, textinput.Blink
 			}
 
 		case searchMode:
@@ -771,6 +778,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.search.moveCursor(-((m.height - 5) / 2), m.height)
 					return m, nil
 				}
+			}
+
+		case shellMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
+			case "enter":
+				m.mode = normalMode
+				cmdText := m.input.Value()
+				tokens := strings.Split(cmdText, " ")
+				args := make([]string, 0)
+				for i := range tokens {
+					switch tokens[i] {
+					case "#sl":
+						args = append(args, m.getPaths()...)
+					case "#dir":
+						args = append(args, m.getTab().dir)
+					default:
+						args = append(args, tokens[i])
+					}
+				}
+				cmd := exec.Command(args[0], args[1:]...)
+				cmd.Dir = m.getTab().dir
+				return m, tea.ExecProcess(cmd, nil)
 			}
 
 		case jumpMode:
@@ -1220,7 +1252,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch m.mode {
-	case filterMode, helpFilterMode, renameMode, createMode:
+	case filterMode, helpFilterMode, renameMode, createMode, shellMode:
 		var cmd tea.Cmd
 		m.input, cmd = m.input.Update(msg)
 		switch msg.(type) {

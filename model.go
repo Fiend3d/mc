@@ -33,6 +33,7 @@ const (
 	copyVisualMode
 	bookmarksMode
 	searchMode
+	shellMode
 )
 
 type model struct {

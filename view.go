@@ -209,6 +209,9 @@ func (m model) View() tea.View {
 	case goMode:
 		modeStyle = modeStyle.Background(m.theme.grayColor)
 		modeStr = " GO "
+	case shellMode:
+		modeStyle = modeStyle.Background(m.theme.greenColor)
+		modeStr = " SHELL "
 	default:
 		modeStyle = modeStyle.Background(m.theme.whiteColor)
 		modeStr = " NONE "
@@ -254,7 +257,7 @@ func (m model) View() tea.View {
 	s.WriteRune('\n')
 
 	switch m.mode {
-	case filterMode, renameMode, createMode:
+	case filterMode, renameMode, createMode, shellMode:
 		widget := m.input.View()
 		widget = truncate(widget, m.width)
 		text := empty.Width(m.width).Render(widget)
