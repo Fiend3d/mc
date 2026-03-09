@@ -175,7 +175,7 @@ func viewHelp(m *model) string {
 		{" #sl", " - Macro that replaces #sl with selected files/directories in Shell mode."},
 		{" #dir", " - Macro that replaces #dir with current tab directory in Shell mode."},
 	}
-	shellDocs := newHelpTopic(" shell Mode", shellDocsData, m)
+	shellDocs := newHelpTopic(" Shell Mode", shellDocsData, m)
 
 	docs = addTopic(docs, &normalDocs, m)
 	docs = addTopic(docs, &goDocs, m)
