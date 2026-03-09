@@ -68,6 +68,30 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.addMessage(msgInfo, "done searching")
 		}
 
+	case massRenameMsg:
+		if m.getTab().dir == msg.dir {
+			lines := slices.Collect(readLines(msg.tempFile))
+			if slices.Equal(msg.lines, lines) {
+				return m, m.addMessage(msgError, "nothing changed")
+			}
+			if len(lines) != len(msg.lines) {
+				return m, m.addMessage(msgError, "number of lines is wrong")
+			}
+			pairs := make([]pathPair, len(lines))
+			for i := range lines {
+				dir := filepath.Dir(msg.paths[i])
+				dst := filepath.Join(dir, lines[i])
+				pairs[i] = pathPair{msg.paths[i], dst}
+			}
+			cmd := &fileActionCommand{
+				action: renameFileAction,
+				dir:    m.getTab().dir,
+				pairs:  pairs,
+			}
+			m.jobs++
+			return m, m.addCommand(cmd)
+		}
+
 	case selectItemMsg:
 		if m.currentTab == msg.tab {
 			tab := m.getTab()

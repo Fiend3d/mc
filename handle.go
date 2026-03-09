@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -70,6 +71,19 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 	return m, m.addCommand(cmd)
 }
 
+type massRenameMsg struct {
+	dir      string
+	tempFile string
+	lines    []string
+	paths    []string
+}
+
+func massRename(dir, tempFile string, lines, paths []string) tea.Cmd {
+	return func() tea.Msg {
+		return massRenameMsg{dir, tempFile, lines, paths}
+	}
+}
+
 func (m *model) handleRename() (tea.Model, tea.Cmd) {
 	items := m.getPage().getItems()
 	if len(items) > 0 {
@@ -82,16 +96,42 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 			return m, m.addMessage(msgError, "can't rename these")
 		case *filesystemItem:
 			paths := m.getPaths()
-			if len(paths) != 1 {
-				return m, m.addMessage(msgError, "only one path is supported at the moment")
+			if len(paths) == 1 {
+				m.mode = renameMode
+				m.renamePaths = paths
+				m.input.Placeholder = ""
+				m.input.Reset()
+				m.input.Focus()
+				m.input.SetValue(filepath.Base(paths[0]))
+				return m, textinput.Blink
+			} else {
+				tempFile, err := os.CreateTemp("", "rename-*.txt")
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
+				names := make([]string, len(paths))
+				for i := range paths {
+					names[i] = filepath.Base(paths[i])
+				}
+				origin := strings.Join(names, "\n")
+				_, err = tempFile.WriteString(origin)
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
+				err = tempFile.Close()
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
+				cmd := exec.Command(
+					m.cfg.F4.Command,
+					tempFile.Name(),
+				)
+				cmd.Dir = m.getTab().dir
+				return m, tea.Sequence(
+					tea.ExecProcess(cmd, nil),
+					massRename(m.getTab().dir, tempFile.Name(), strings.Split(origin, "\n"), paths),
+				)
 			}
-			m.mode = renameMode
-			m.renamePaths = paths
-			m.input.Placeholder = ""
-			m.input.Reset()
-			m.input.Focus()
-			m.input.SetValue(filepath.Base(paths[0]))
-			return m, textinput.Blink
 		default:
 			return m, m.addMessage(msgError, "uknown type of item")
 		}
