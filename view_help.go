@@ -158,9 +158,20 @@ func viewHelp(m *model) string {
 	}
 	pathDocs := newHelpTopic(" Path Mode", pathDocsData, m)
 
+	searchDocsData := [][]string{
+		{" F1", " - Toggle .gitignore filtering."},
+		{" F5", " - Start or restart search."},
+		{" F3", " - Open selected line with 'less' or F3 command from config."},
+		{" Esc", " - Exit Search mode or cancel searching."},
+		{" h", " - Hide or show lines."},
+		{" tab", " - Cycle focus (filename -> text -> results)."},
+	}
+	searchDocs := newHelpTopic(" Search Mode", searchDocsData, m)
+
 	docs = addTopic(docs, &normalDocs, m)
 	docs = addTopic(docs, &goDocs, m)
 	docs = addTopic(docs, &pathDocs, m)
+	docs = addTopic(docs, &searchDocs, m)
 	var s strings.Builder
 
 	for i := 0; i < m.height-1; i++ {
