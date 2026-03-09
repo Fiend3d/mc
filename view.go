@@ -17,7 +17,7 @@ func (m model) View() tea.View {
 	result.MouseMode = tea.MouseModeCellMotion
 	result.WindowTitle = "Modal Commander"
 
-	if m.hide {
+	if m.mode == hiddenMode {
 		result.AltScreen = false
 		result.MouseMode = tea.MouseModeNone
 		return result

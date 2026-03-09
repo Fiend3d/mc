@@ -15,6 +15,7 @@ type mode int
 
 const (
 	normalMode mode = iota
+	hiddenMode
 	visualMode
 	helpMode
 	helpFilterMode
@@ -38,8 +39,6 @@ const (
 
 type model struct {
 	cfg *Config
-
-	hide bool
 
 	err        error
 	tabs       []*tab

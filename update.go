@@ -473,7 +473,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			case "ctrl+h":
-				m.hide = !m.hide
+				m.mode = hiddenMode
 				return m, nil
 			case "g":
 				m.mode = goMode
@@ -669,6 +669,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Reset()
 				m.input.Focus()
 				return m, textinput.Blink
+			}
+
+		case hiddenMode:
+			switch msg.String() {
+			case "esc", "ctrl+h":
+				m.mode = normalMode
+				return m, nil
 			}
 
 		case searchMode:
