@@ -422,9 +422,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "f":
 				m.mode = helpFilterMode
-				m.input.Placeholder = "e.g., undo"
-				m.input.Reset()
-				m.input.Focus()
+				m.resetInput("e.g., undo")
 				return m, textinput.Blink
 			}
 
@@ -565,9 +563,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "f":
 				m.mode = filterMode
-				m.input.Placeholder = "e.g., term1;term2,term3"
-				m.input.Reset()
-				m.input.Focus()
+				m.resetInput("e.g., term1;term2,term3")
 				tab := m.getTab()
 				if tab.page.isTemp() {
 					m.input.SetValue(strings.Join(tab.filterText, ";"))
@@ -578,9 +574,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "a":
 				m.mode = createMode
-				m.input.Placeholder = "e.g., filename.txt or dirname/"
-				m.input.Reset()
-				m.input.Focus()
+				m.resetInput("e.g., filename.txt or dirname/")
 				return m, textinput.Blink
 			case "c":
 				m.mode = copyMode
@@ -664,10 +658,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.search.blink()
 
 			case ":":
+				shellHistory, err := loadShellHistory()
+				if err != nil {
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to load shell histiy: %s", err))
+				}
 				m.mode = shellMode
-				m.input.Placeholder = "powershell (#sl - pipe selected, #dir - pipe directory)"
-				m.input.Reset()
-				m.input.Focus()
+				m.shellHistory = shellHistory
+				m.shellHistoryCurrent = -1
+				m.resetInput(fmt.Sprintf("%s (#sl - pipe selected, #dir - pipe directory)", SHELL))
+				fillAutocomplete(&m)
 				return m, textinput.Blink
 			}
 
@@ -792,9 +791,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.mode = normalMode
 				return m, nil
+			case "ctrl+b":
+				if len(m.shellHistory) == 0 {
+					return m, m.addMessage(msgError, "no shell history")
+				}
+				m.shellHistoryCurrent++
+				m.shellHistoryCurrent = min(len(m.shellHistory)-1, m.shellHistoryCurrent)
+				m.input.SetValue(m.shellHistory[m.shellHistoryCurrent])
+				fillAutocomplete(&m)
+				return m, nil
+			case "ctrl+f":
+				if len(m.shellHistory) == 0 {
+					return m, m.addMessage(msgError, "no shell history")
+				}
+				m.shellHistoryCurrent--
+				m.shellHistoryCurrent = max(-1, m.shellHistoryCurrent)
+				if m.shellHistoryCurrent == -1 {
+					m.input.SetValue("")
+				} else {
+					m.input.SetValue(m.shellHistory[m.shellHistoryCurrent])
+				}
+				fillAutocomplete(&m)
+				return m, nil
 			case "enter":
 				m.mode = normalMode
 				cmdText := m.input.Value()
+				err := saveShellHistory(m.shellHistory, cmdText)
+				if err != nil {
+					return m, m.addMessage(msgError, fmt.Sprintf("failed to save shell history: %s", err))
+				}
 				tokens := strings.Split(cmdText, " ")
 				args := make([]string, 0)
 				for i := range tokens {
@@ -807,7 +832,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						args = append(args, tokens[i])
 					}
 				}
-				cmd := exec.Command(args[0], args[1:]...)
+				cmd := exec.Command(SHELL, args...)
 				cmd.Dir = m.getTab().dir
 				return m, tea.ExecProcess(cmd, nil)
 			}
@@ -1271,6 +1296,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case filterMode:
 				m.setFilter()
 				m.getTab().filter()
+			case shellMode:
+				fillAutocomplete(&m)
 			}
 		}
 		cmds = append(cmds, cmd)

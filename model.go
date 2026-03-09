@@ -65,6 +65,9 @@ type model struct {
 	pathInputDir string // to optimize autocomplete
 	input        textinput.Model
 
+	shellHistory        []string
+	shellHistoryCurrent int
+
 	renamePaths []string
 
 	tabsCursor int
@@ -80,6 +83,13 @@ type model struct {
 	theme *theme
 
 	result string
+}
+
+func (m *model) resetInput(placeholder string) {
+	m.input.Placeholder = placeholder
+	m.input.ShowSuggestions = false
+	m.input.Reset()
+	m.input.Focus()
 }
 
 func (m *model) getStartEnd() (int, int) {

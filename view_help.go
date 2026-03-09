@@ -149,8 +149,11 @@ func viewHelp(m *model) string {
 	goDocs := newHelpTopic(" Go Mode", goDocsData, m)
 
 	pathDocsData := [][]string{
-		{"", " Path mode allows changing the directory by typing. You can enter this mode from Normal mode by typing gg (press g twice)."},
-		{" Ctrl+u", " - Clear everything. An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.)."},
+		{"", " Path mode allows changing the directory by typing." +
+			" You can enter this mode from Normal mode by typing gg (press g twice)." +
+			" An empty string is also a valid path; it lists the available drives (C:\\, D:\\, etc.)."},
+		{" Ctrl+u", " - Clear everything left of cursor."},
+		{" Ctrl+k", " - Clear everything right of cursor."},
 		{" Ctrl+w", " - Delete the last word."},
 		{" Ctrl+e", " - Expand environment variables."},
 		{" Ctrl+n", " - Open the directory in a new tab."},
@@ -174,6 +177,8 @@ func viewHelp(m *model) string {
 		{"", " Reminder: UI's visibility can be toggled by pressing Ctrl+h in Normal mode."},
 		{" #sl", " - Macro that replaces #sl with selected files/directories in Shell mode."},
 		{" #dir", " - Macro that replaces #dir with current tab directory in Shell mode."},
+		{" Ctrl+b", " - Go back in shell history."},
+		{" Ctrl+f", " - Go forward in shell history."},
 	}
 	shellDocs := newHelpTopic(" Shell Mode", shellDocsData, m)
 

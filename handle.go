@@ -99,9 +99,7 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 			if len(paths) == 1 {
 				m.mode = renameMode
 				m.renamePaths = paths
-				m.input.Placeholder = ""
-				m.input.Reset()
-				m.input.Focus()
+				m.resetInput("")
 				m.input.SetValue(filepath.Base(paths[0]))
 				return m, textinput.Blink
 			} else {

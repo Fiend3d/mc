@@ -310,12 +310,26 @@ func (m model) View() tea.View {
 	case pathMode:
 		headers := []string{" Hotkey ", " Description "}
 		rows := [][]string{
-			{" ctrl+u ", " Clear all "},
+			{" ctrl+u ", " Clear all left of cursor "},
+			{" ctrl+k ", " Clear all right of cursor "},
 			{" ctrl+w ", " Delete a word "},
 			{" tab ", " Autocomplete "},
 			{" up/down ", " Next/previous autocomplete "},
 			{" ctrl+e ", " Expand environment variables "},
 			{" ctrl+n ", " Open the path in a new tab "},
+		}
+
+		ui = m.renderTableOverlay(headers, rows, ui)
+
+	case shellMode:
+		headers := []string{" Hotkey ", " Description "}
+		rows := [][]string{
+			{" ctrl+b ", " Go back in shell history "},
+			{" ctrl+f ", " Go forward in shell history "},
+			{" tab ", " Autocomplete "},
+			{" up/down ", " Select autocomplete "},
+			{" #sl ", ` "Selected" macro `},
+			{" #dir ", ` "Directory" macro `},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)

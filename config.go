@@ -133,3 +133,54 @@ func saveBookmarks(bookmarks []string) error {
 	}
 	return os.WriteFile(path, []byte(data), 0o644)
 }
+
+const SHELL = "powershell"
+
+func getShellHistoryPath() string {
+	dir := getConfigDir()
+	return filepath.Join(dir, "shell.list")
+}
+
+func loadShellHistory() ([]string, error) {
+	path := getShellHistoryPath()
+	if !pathExists(path) {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return strings.Split(string(data), "\n"), nil
+}
+
+func saveShellHistory(history []string, cmd string) error {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		return nil
+	}
+
+	if len(history) > 0 && history[0] == cmd {
+		return nil
+	}
+
+	dir := getConfigDir()
+	if !dirExists(dir) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+
+	path := getShellHistoryPath()
+
+	newHistory := make([]string, 0, 51)
+	newHistory = append(newHistory, cmd)
+
+	for _, h := range history {
+		if h != cmd && len(newHistory) < 50 {
+			newHistory = append(newHistory, h)
+		}
+	}
+
+	data := strings.Join(newHistory, "\n")
+	return os.WriteFile(path, []byte(data), 0o644)
+}

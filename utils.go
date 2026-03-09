@@ -98,41 +98,65 @@ func numberOfDigits(n int) int {
 }
 
 func fillAutocomplete(m *model) {
-	path := m.pathInput.Value()
-	if path == "" {
-		m.pathInput.ShowSuggestions = false // TODO: autocomplete drives maybe
-		return
-	}
-	if isUNC(path) { // because network is slow T_T
-		m.pathInput.ShowSuggestions = false
-		return
-	}
-	if strings.HasSuffix(path, ":") {
-		path = path + "\\"
-	}
-	dir := filepath.Dir(path)
-	if dir == m.pathInputDir {
-		return
-	} else {
-		m.pathInputDir = dir
-	}
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		m.pathInput.ShowSuggestions = false
-		return
-	}
-	var suggestions []string
-	for i := range entries {
-		if entries[i].IsDir() {
-			name := entries[i].Name()
-			if !checkName(name) {
-				continue
+	switch m.mode {
+	case pathMode:
+		path := m.pathInput.Value()
+		if path == "" {
+			m.pathInput.ShowSuggestions = false // TODO: autocomplete drives maybe
+			return
+		}
+		if isUNC(path) { // because network is slow T_T
+			m.pathInput.ShowSuggestions = false
+			return
+		}
+		if strings.HasSuffix(path, ":") {
+			path = path + "\\"
+		}
+		dir := filepath.Dir(path)
+		if dir == m.pathInputDir {
+			return
+		} else {
+			m.pathInputDir = dir
+		}
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			m.pathInput.ShowSuggestions = false
+			return
+		}
+		var suggestions []string
+		for i := range entries {
+			if entries[i].IsDir() {
+				name := entries[i].Name()
+				if !checkName(name) {
+					continue
+				}
+				suggestions = append(suggestions, filepath.Join(dir, name))
 			}
-			suggestions = append(suggestions, filepath.Join(dir, name))
+		}
+		m.pathInput.ShowSuggestions = true
+		m.pathInput.SetSuggestions(suggestions)
+	case shellMode:
+		items := m.getPage().getItems()
+		suggestions := make([]string, len(items)+2)
+		suggestions[len(suggestions)-1] = "#dir"
+		suggestions[len(suggestions)-2] = "#sl"
+		cmd := m.input.Value()
+		lastSpaceIndex := strings.LastIndex(cmd, " ")
+		if lastSpaceIndex == -1 {
+			for i := range items {
+				suggestions[i] = items[i].getName()
+			}
+			m.input.ShowSuggestions = true
+			m.input.SetSuggestions(suggestions)
+		} else {
+			prefix := cmd[:lastSpaceIndex+1]
+			for i := range items {
+				suggestions[i] = prefix + items[i].getName()
+			}
+			m.input.ShowSuggestions = true
+			m.input.SetSuggestions(suggestions)
 		}
 	}
-	m.pathInput.ShowSuggestions = true
-	m.pathInput.SetSuggestions(suggestions)
 }
 
 // true - ok
