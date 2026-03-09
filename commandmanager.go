@@ -133,7 +133,7 @@ func newFileActionCommand(action fileAction, paths []string, dst string, overrid
 			}
 			pairs = append(pairs, pathPair{paths[i], dstPath})
 		} else {
-			path := uniquePath(reserved, dstPath)
+			path := uniquePath(reserved, paths, dstPath)
 			reserved = append(reserved, path)
 			pairs = append(pairs, pathPair{paths[i], path})
 		}
@@ -245,7 +245,7 @@ func newCreateCommand(name string, dir string) *createCommand {
 		isDir = true
 		runes = runes[:len(runes)-1]
 	}
-	path := uniquePath(nil, filepath.Join(dir, string(runes)))
+	path := uniquePath(nil, nil, filepath.Join(dir, string(runes)))
 	return &createCommand{path, isDir, dir}
 }
 

@@ -85,7 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			reserved := make([]string, 0, len(lines))
 			for i := range pairs {
-				unique := uniquePath(reserved, pairs[i].dst)
+				unique := uniquePath(reserved, msg.paths, pairs[i].dst)
 				pairs[i].dst = unique
 				reserved = append(reserved, unique)
 			}
@@ -919,7 +919,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					value := m.input.Value()
 					dir := filepath.Dir(m.renamePaths[0])
 					path := filepath.Join(dir, value)
-					finalPath := uniquePath(nil, path)
+					finalPath := uniquePath(nil, nil, path)
 					pairs := []pathPair{{m.renamePaths[0], finalPath}}
 					cmd := &fileActionCommand{
 						action: renameFileAction,
