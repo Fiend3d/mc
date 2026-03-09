@@ -165,6 +165,7 @@ func viewHelp(m *model) string {
 		{" Esc", " - Exit Search mode or cancel searching."},
 		{" h", " - Hide or show lines."},
 		{" tab", " - Cycle focus (filename -> text -> results)."},
+		{" enter", " - Focus on filename or text: start search; focus on results: show file/directory in Normal mode."},
 	}
 	searchDocs := newHelpTopic(" Search Mode", searchDocsData, m)
 
