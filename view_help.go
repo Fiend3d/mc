@@ -128,6 +128,7 @@ func viewHelp(m *model) string {
 		{" a", " - Enter Create mode. You can create files and directories here."},
 		{" `", " - Enter Message mode. The message history can be viewed here."},
 		{" s", " - Enter Search mode."},
+		{" :", " - Enter Shell mode."},
 		{" F3", " - Viewer tool (bat with less by default, configurable)."},
 		{" F4", " - Editor (Helix by default, configurable)."},
 		{" F5", " - Refresh current tab."},
@@ -169,10 +170,19 @@ func viewHelp(m *model) string {
 	}
 	searchDocs := newHelpTopic(" Search Mode", searchDocsData, m)
 
+	shellDocsData := [][]string{
+		{"", " Reminder: UI's visibility can be toggled by pressing Ctrl+h in Normal mode."},
+		{" #sl", " - Macro that replaces #sl with selected files/directories in Shell mode."},
+		{" #dir", " - Macro that replaces #dir with current tab directory in Shell mode."},
+	}
+	shellDocs := newHelpTopic(" shell Mode", shellDocsData, m)
+
 	docs = addTopic(docs, &normalDocs, m)
 	docs = addTopic(docs, &goDocs, m)
 	docs = addTopic(docs, &pathDocs, m)
 	docs = addTopic(docs, &searchDocs, m)
+	docs = addTopic(docs, &shellDocs, m)
+
 	var s strings.Builder
 
 	for i := 0; i < m.height-1; i++ {
