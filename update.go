@@ -83,6 +83,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				dst := filepath.Join(dir, lines[i])
 				pairs[i] = pathPair{msg.paths[i], dst}
 			}
+			reserved := make([]string, 0, len(lines))
+			for i := range pairs {
+				unique := uniquePath(reserved, pairs[i].dst)
+				pairs[i].dst = unique
+				reserved = append(reserved, unique)
+			}
 			cmd := &fileActionCommand{
 				action: renameFileAction,
 				dir:    m.getTab().dir,

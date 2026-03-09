@@ -257,43 +257,54 @@ func realWindowsPath(path string) (string, error) {
 // uniquePath returns the next available numbered path
 // Like Maya's naming: if test01, test02 exist, returns test03
 func uniquePath(reserved []string, path string) string {
-	// If exact path doesn't exist, use it
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return path
-	}
-
 	dir := filepath.Dir(path)
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
 	name := strings.TrimSuffix(base, ext)
 
-	// Parse name into base and number
-	baseName, numWidth := parseName(name)
+	baseName, number, width, hasNumber := parseName(name)
 
-	// Collect all existing numbers
-	existingNums := findExistingNumbers(reserved, dir, baseName, ext)
-
-	// Find next available (smallest positive integer not in existing)
-	nextNum := 1
-	for {
-		if !slices.Contains(existingNums, nextNum) {
-			break
+	if !hasNumber {
+		if !pathExists(path) && !slices.Contains(reserved, path) {
+			return path
 		}
-		nextNum++
 	}
 
-	return filepath.Join(dir,
-		fmt.Sprintf("%s%0*d%s", baseName, numWidth, nextNum, ext))
+	existing := findExistingNumbers(reserved, dir, baseName, ext)
+
+	used := map[int]struct{}{}
+	for _, n := range existing {
+		used[n] = struct{}{}
+	}
+
+	next := number
+	if !hasNumber {
+		next = 1
+	}
+
+	for {
+		if _, ok := used[next]; !ok {
+			candidate := filepath.Join(dir,
+				fmt.Sprintf("%s%0*d%s", baseName, width, next, ext))
+
+			if !pathExists(candidate) && !slices.Contains(reserved, candidate) {
+				return candidate
+			}
+		}
+		next++
+	}
 }
 
-func parseName(name string) (baseName string, numWidth int) {
+func parseName(name string) (baseName string, number int, width int, hasNumber bool) {
 	re := regexp.MustCompile(`^(.*?)(\d+)$`)
-	matches := re.FindStringSubmatch(name)
+	m := re.FindStringSubmatch(name)
 
-	if len(matches) == 3 {
-		return matches[1], len(matches[2])
+	if len(m) == 3 {
+		n, _ := strconv.Atoi(m[2])
+		return m[1], n, len(m[2]), true
 	}
-	return name, 1
+
+	return name, 0, 1, false
 }
 
 func findExistingNumbers(reserved []string, dir, baseName, ext string) []int {
