@@ -12,4 +12,5 @@ $ldflags = @(
     "-X 'main.BuildTime=$buildTime'"
 ) -join " "
 
+#rsrc -ico .\assets\icon.ico
 go build -ldflags $ldflags
