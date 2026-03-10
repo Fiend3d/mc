@@ -240,6 +240,9 @@ func (m model) View() tea.View {
 	extraBlock := base.Foreground(m.theme.grayColor).Render(extraStr)
 
 	rightStr := fmt.Sprintf(" [%d/%d] ", settings.cursor+1, len(items))
+	if len(items) == 0 {
+		rightStr = " [empty] "
+	}
 	rightBlock := m.theme.baseStyle.Render(rightStr)
 	rightBlock = extraBlock + rightBlock
 	rightWidth := lipgloss.Width(rightBlock)

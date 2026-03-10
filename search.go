@@ -235,9 +235,10 @@ func viewSearch(m *model) string {
 	s.WriteString(empty.Width(m.width - 1).Render(textWidget))
 	s.WriteRune('\n')
 
+	searchLength := m.search.length()
 	countItems := 0
-	for i := range m.search.length() {
-		if i+1 > m.height-5 || i+m.search.start >= m.search.length() {
+	for i := range searchLength {
+		if i+1 > m.height-5 || i+m.search.start >= searchLength {
 			break
 		}
 
@@ -356,7 +357,10 @@ func viewSearch(m *model) string {
 		helpText += base.Foreground(m.theme.grayColor).Render(" - hide lines ")
 	}
 
-	rightText := fmt.Sprintf(" [%d/%d] ", m.search.cursor+1, m.search.length())
+	rightText := fmt.Sprintf(" [%d/%d] ", m.search.cursor+1, searchLength)
+	if searchLength == 0 {
+		rightText = " [empty] "
+	}
 	modeLength := len(modeText) + len(gitignoreText)
 	helpText = truncate(helpText, m.width-modeLength-2-len(rightText))
 	s.WriteString(base.Width(m.width - modeLength - 2 - len(rightText)).Render(helpText))
