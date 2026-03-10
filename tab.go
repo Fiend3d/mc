@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"os"
+	"strings"
+)
 
 type tab struct {
 	dir          string
@@ -27,6 +30,10 @@ func (t *tab) set(dir string) bool {
 	t.dir = dir
 	t.page = &page{}
 	t.filterText = nil
+
+	if dir != "" && !isUNCRoot(dir) { // these aren't valid directories
+		os.Chdir(dir)
+	}
 
 	return true
 }

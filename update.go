@@ -140,7 +140,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.addMessage(msgError, err.Error())
 		}
 		settings := tab.getPageSettings()
-		settings.update(len(tab.page.getItems()))
+		settings.update(tab.page.length())
 		if settings.sel != nil {
 			items := tab.page.getItems()
 			for i := range items {

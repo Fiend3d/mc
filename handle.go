@@ -170,17 +170,11 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 		return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
 	}
 
-	disk := isDisk(dir)
-	if disk {
-		dir = strings.ToUpper(dir)
+	dir, err = realWindowsPath(dir)
+	if err != nil {
+		return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
 	}
 
-	if !isUNC(dir) && !disk { // doesn't work with network disks
-		dir, err = realWindowsPath(dir)
-		if err != nil {
-			return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
-		}
-	}
 	if addTab {
 		m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
 		m.currentTab = len(m.tabs) - 1
