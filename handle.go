@@ -15,7 +15,7 @@ import (
 func (m *model) handleQuit(result bool) (tea.Model, tea.Cmd) {
 	if m.hasJobs() && !m.confirmQuit {
 		m.confirmQuit = true
-		return m, m.addMessage(msgError, "there are unfinished jobs, press again to confirm")
+		return m, m.addMessage(msgError, "unfinished jobs - press again to confirm")
 	}
 	if result {
 		m.result = m.getTab().dir
