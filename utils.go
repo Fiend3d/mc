@@ -331,3 +331,29 @@ func findExistingNumbers(reserved []string, exclude []string, dir, baseName, ext
 	sort.Ints(nums)
 	return nums
 }
+
+func calcDirSize(path string) (uint64, error) {
+	var size uint64
+
+	err := filepath.WalkDir(path, func(_ string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return nil // skip unreadable entries
+		}
+
+		if entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+
+		if !entry.IsDir() {
+			info, err := entry.Info()
+			if err != nil {
+				return nil
+			}
+			size += uint64(info.Size())
+		}
+
+		return nil
+	})
+
+	return size, err
+}

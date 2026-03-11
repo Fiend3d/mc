@@ -288,6 +288,7 @@ func (m model) View() tea.View {
 			{"t", " View tabs "},
 			{"c", " Open config directory "},
 			{"C", " Save current config "},
+			{"s", " Calculate size "},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)

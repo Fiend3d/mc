@@ -94,7 +94,7 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 			return m, m.addMessage(msgError, "not supported yet")
 		case *sharedItem:
 			return m, m.addMessage(msgError, "can't rename these")
-		case *filesystemItem:
+		case *filepathItem:
 			paths := m.getPaths()
 			if len(paths) == 1 {
 				m.mode = renameMode

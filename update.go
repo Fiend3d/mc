@@ -13,6 +13,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/dustin/go-humanize"
 )
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -28,6 +29,25 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ticks--
 			return m, tick()
 		}
+
+	case calcDirSizeMsg:
+		m.jobs--
+		tab := m.getTab()
+		if tab.dir == msg.dir {
+			items := tab.page.getItems()
+			for i := range msg.dirSizes {
+				for j := range items {
+					if msg.dirSizes[i].path == items[j].getFullPath() {
+						item, ok := items[j].(*filepathItem)
+						if ok {
+							item.size = msg.dirSizes[i].size
+							item.sizeStr = humanize.Bytes(msg.dirSizes[i].size)
+						}
+					}
+				}
+			}
+		}
+		return m, m.addMessage(msgDone, fmt.Sprintf("total size: %s", humanize.Bytes(msg.total)))
 
 	case searchTickMsg:
 		if !m.search.working {
@@ -400,6 +420,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					return m, cmd
 				}
+			case "s":
+				m.mode = normalMode
+				items := m.getPage().getItems()
+				if len(items) == 0 {
+					return m, m.addMessage(msgError, "nothing selected")
+				}
+				_, ok := items[0].(*filepathItem)
+				if !ok {
+					return m, m.addMessage(msgError, "only filepaths are supported")
+				}
+				selectedPaths := m.getPaths()
+				paths := make([]string, 0, len(selectedPaths))
+				for i := range items {
+					if items[i].isDirectory() && slices.Contains(selectedPaths, items[i].getFullPath()) {
+						paths = append(paths, items[i].getFullPath())
+					}
+				}
+				if len(paths) == 0 {
+					return m, m.addMessage(msgError, "please select at least one directory")
+				}
+				m.jobs++
+				return m, tea.Batch(calculateSize(m.getTab().dir, paths), m.spinner.Tick)
 			}
 
 		case helpMode:

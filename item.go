@@ -33,7 +33,7 @@ const (
 	itemActionCut
 )
 
-type filesystemItem struct {
+type filepathItem struct {
 	name     string
 	fullPath string
 	selected bool
@@ -50,13 +50,13 @@ type filesystemItem struct {
 	mode       string
 }
 
-func newFilesystemItem(clipboardFiles []string, op OpType, entry os.DirEntry, dir string) (*filesystemItem, error) {
+func newFilepathItem(clipboardFiles []string, op OpType, entry os.DirEntry, dir string) (*filepathItem, error) {
 	info, err := entry.Info()
 	if err != nil {
 		return nil, err
 	}
 
-	item := &filesystemItem{selected: false}
+	item := &filepathItem{selected: false}
 
 	item.name = entry.Name()
 	item.fullPath = filepath.Join(dir, item.name)
@@ -105,39 +105,39 @@ func newFilesystemItem(clipboardFiles []string, op OpType, entry os.DirEntry, di
 	return item, nil
 }
 
-func (i *filesystemItem) getName() string {
+func (i *filepathItem) getName() string {
 	return i.name
 }
 
-func (i *filesystemItem) getFullPath() string {
+func (i *filepathItem) getFullPath() string {
 	return i.fullPath
 }
 
-func (i *filesystemItem) isDirectory() bool {
+func (i *filepathItem) isDirectory() bool {
 	return i.isDir
 }
 
-func (i *filesystemItem) getSize() uint64 {
+func (i *filepathItem) getSize() uint64 {
 	return i.size
 }
 
-func (i *filesystemItem) getModTime() time.Time {
+func (i *filepathItem) getModTime() time.Time {
 	return i.modTime
 }
 
-func (i *filesystemItem) isSelected() bool {
+func (i *filepathItem) isSelected() bool {
 	return i.selected
 }
 
-func (i *filesystemItem) setSelected(selected bool) {
+func (i *filepathItem) setSelected(selected bool) {
 	i.selected = selected
 }
 
-func (i *filesystemItem) getAction() itemAction {
+func (i *filepathItem) getAction() itemAction {
 	return i.action
 }
 
-func (i *filesystemItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
+func (i *filepathItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
 	const (
 		sizeWidth = 8
 		timeWidth = 16
@@ -196,7 +196,7 @@ func (i *filesystemItem) render(s *strings.Builder, style *lipgloss.Style, t *th
 	s.WriteString(style.Render(i.sizeStr))
 }
 
-func (i *filesystemItem) getExtra() string {
+func (i *filepathItem) getExtra() string {
 	return i.mode
 }
 

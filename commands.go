@@ -121,7 +121,7 @@ func readItems(dir string) ([]item, error) {
 
 	items := make([]item, 0, len(filteredEntries))
 	for i := range filteredEntries {
-		item, err := newFilesystemItem(clipboardFiles, op, filteredEntries[i], dir)
+		item, err := newFilepathItem(clipboardFiles, op, filteredEntries[i], dir)
 		if err != nil {
 			return nil, err
 		}
@@ -176,5 +176,30 @@ func (m model) redo() tea.Cmd {
 	return func() tea.Msg {
 		cmd, err := m.cm.redo()
 		return commandDoneMsg{fmt.Sprintf("redo: %s", cmd), cmd.getDir(), cmd.sel(), err}
+	}
+}
+
+type dirSize struct {
+	path string
+	size uint64
+}
+
+type calcDirSizeMsg struct {
+	dir      string
+	dirSizes []dirSize
+	total    uint64
+}
+
+func calculateSize(dir string, paths []string) tea.Cmd {
+	return func() tea.Msg {
+		result := calcDirSizeMsg{dir: dir, dirSizes: make([]dirSize, 0, len(paths))}
+		for i := range paths {
+			size, err := calcDirSize(paths[i])
+			if err == nil {
+				result.dirSizes = append(result.dirSizes, dirSize{paths[i], size})
+				result.total += size
+			}
+		}
+		return result
 	}
 }
