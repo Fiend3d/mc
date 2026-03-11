@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strings"
 )
 
@@ -30,10 +29,6 @@ func (t *tab) set(dir string) bool {
 	t.dir = dir
 	t.page = &page{}
 	t.filterText = nil
-
-	if dir != "" && !isUNCRoot(dir) { // these aren't valid directories
-		os.Chdir(dir)
-	}
 
 	return true
 }

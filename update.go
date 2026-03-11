@@ -354,6 +354,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "g":
 				m.mode = pathMode
+				dir := m.getTab().dir
+				if dir != "" && !isUNCRoot(dir) { // these aren't valid directories
+					os.Chdir(dir)
+				}
 				m.pathInput.Reset()
 				m.pathInput.SetValue(m.getTab().dir)
 				m.pathInput.Focus()
