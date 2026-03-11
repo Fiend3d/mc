@@ -223,7 +223,7 @@ func (m model) View() tea.View {
 
 	}
 	modeWidth := lipgloss.Width(modeBlock) + 2
-	if m.jobs > 0 {
+	if m.hasJobs() {
 		modeBlock += m.spinner.View()
 	} else {
 		modeBlock += base.Render("  ")

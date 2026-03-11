@@ -56,8 +56,9 @@ type model struct {
 	yes bool
 	cmd command
 
-	jobs    int
-	spinner spinner.Model
+	jobs        int
+	confirmQuit bool
+	spinner     spinner.Model
 
 	cm *commandManager
 
@@ -83,6 +84,21 @@ type model struct {
 	theme *theme
 
 	result string
+}
+
+func (m *model) addJob() {
+	m.jobs++
+}
+
+func (m *model) jobDone() {
+	m.jobs--
+	if m.jobs == 0 {
+		m.confirmQuit = false
+	}
+}
+
+func (m *model) hasJobs() bool {
+	return m.jobs > 0
 }
 
 func (m *model) resetInput(placeholder string) {

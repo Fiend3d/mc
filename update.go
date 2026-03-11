@@ -31,7 +31,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case calcDirSizeMsg:
-		m.jobs--
+		m.jobDone()
 		tab := m.getTab()
 		if tab.dir == msg.dir {
 			items := tab.page.getItems()
@@ -114,7 +114,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				dir:    m.getTab().dir,
 				pairs:  pairs,
 			}
-			m.jobs++
+			m.addJob()
 			return m, m.addCommand(cmd)
 		}
 
@@ -132,7 +132,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case commandDoneMsg:
-		m.jobs--
+		m.jobDone()
 		if msg.err != nil {
 			return m, m.addMessage(
 				msgFail,
@@ -440,7 +440,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(paths) == 0 {
 					return m, m.addMessage(msgError, "please select at least one directory")
 				}
-				m.jobs++
+				m.addJob()
 				return m, tea.Batch(calculateSize(m.getTab().dir, paths), m.spinner.Tick)
 			}
 
@@ -643,7 +643,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.cm.canUndo() {
 					return m, m.addMessage(msgWarning, "nothing to undo")
 				}
-				m.jobs++
+				m.addJob()
 				return m, tea.Batch(
 					m.addMessage(msgInfo, "undo"),
 					m.spinner.Tick,
@@ -652,7 +652,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.cm.canRedo() {
 					return m, m.addMessage(msgWarning, "nothing to redo")
 				}
-				m.jobs++
+				m.addJob()
 				return m, tea.Batch(
 					m.addMessage(msgInfo, "redo"),
 					m.spinner.Tick,
@@ -1037,12 +1037,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						pairs:  pairs,
 					}
 					if finalPath != path {
-						m.jobs++
+						m.addJob()
 						return m, tea.Batch(m.addCommand(cmd),
 							m.addMessage(msgWarning, fmt.Sprintf("%s already exists", path)))
 
 					} else {
-						m.jobs++
+						m.addJob()
 						return m, m.addCommand(cmd)
 					}
 				} else {
@@ -1060,7 +1060,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				name := m.input.Value()
 				dir := m.getTab().dir
 				cmd := newCreateCommand(name, dir)
-				m.jobs++
+				m.addJob()
 				return m, m.addCommand(cmd)
 			}
 
@@ -1323,7 +1323,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		searching = m.search.working
 	}
 
-	if m.jobs > 0 || searching {
+	if m.hasJobs() || searching {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)

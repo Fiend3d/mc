@@ -145,6 +145,7 @@ func viewHelp(m *model) string {
 		{" t", " - Browse tabs."},
 		{" c", " - Open the settings directory. You can also find and delete bookmarks there, for example."},
 		{" C", " - Save settings to config.toml for editing."},
+		{" s", " - Calculate size for the selected directories."},
 	}
 	goDocs := newHelpTopic(" Go Mode", goDocsData, m)
 

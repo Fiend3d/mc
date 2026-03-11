@@ -13,8 +13,9 @@ import (
 )
 
 func (m *model) handleQuit(result bool) (tea.Model, tea.Cmd) {
-	if m.jobs > 0 {
-		return m, m.addMessage(msgError, "unfinished jobs")
+	if m.hasJobs() && !m.confirmQuit {
+		m.confirmQuit = true
+		return m, m.addMessage(msgError, "there are unfinished jobs, press again to confirm")
 	}
 	if result {
 		m.result = m.getTab().dir
@@ -35,7 +36,7 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if m.yes {
 				m.mode = normalMode
-				m.jobs++
+				m.addJob()
 				return m, m.addCommand(m.cmd)
 			} else {
 				m.mode = normalMode
@@ -43,7 +44,7 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "y":
 			m.mode = normalMode
-			m.jobs++
+			m.addJob()
 			return m, m.addCommand(m.cmd)
 		}
 	}
@@ -67,7 +68,7 @@ func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
 		m.confirm(cmd)
 		return m, nil
 	}
-	m.jobs++
+	m.addJob()
 	return m, m.addCommand(cmd)
 }
 
