@@ -137,15 +137,14 @@ func fillAutocomplete(m *model) {
 		m.pathInput.SetSuggestions(suggestions)
 	case shellMode:
 		items := m.getPage().getItems()
-		suggestions := make([]string, len(items)+2)
-		suggestions[len(suggestions)-1] = "#dir"
-		suggestions[len(suggestions)-2] = "#sl"
+		suggestions := make([]string, len(items)+1)
 		cmd := m.input.Value()
 		lastSpaceIndex := strings.LastIndex(cmd, " ")
 		if lastSpaceIndex == -1 {
 			for i := range items {
 				suggestions[i] = items[i].getName()
 			}
+			suggestions[len(suggestions)-1] = "#sl"
 			m.input.ShowSuggestions = true
 			m.input.SetSuggestions(suggestions)
 		} else {
@@ -153,6 +152,7 @@ func fillAutocomplete(m *model) {
 			for i := range items {
 				suggestions[i] = prefix + items[i].getName()
 			}
+			suggestions[len(suggestions)-1] = prefix + "#sl"
 			m.input.ShowSuggestions = true
 			m.input.SetSuggestions(suggestions)
 		}

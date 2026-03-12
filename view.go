@@ -333,7 +333,6 @@ func (m model) View() tea.View {
 			{" tab ", " Autocomplete "},
 			{" up/down ", " Select autocomplete "},
 			{" #sl ", ` "Selected" macro `},
-			{" #dir ", ` "Directory" macro `},
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)

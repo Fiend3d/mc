@@ -178,7 +178,6 @@ func viewHelp(m *model) string {
 	shellDocsData := [][]string{
 		{"", " Reminder: UI's visibility can be toggled by pressing Ctrl+h in Normal mode."},
 		{" #sl", " - Macro that replaces #sl with selected files/directories in Shell mode."},
-		{" #dir", " - Macro that replaces #dir with current tab directory in Shell mode."},
 		{" Ctrl+b", " - Go back in shell history."},
 		{" Ctrl+f", " - Go forward in shell history."},
 	}

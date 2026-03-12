@@ -713,7 +713,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.mode = shellMode
 				m.shellHistory = shellHistory
 				m.shellHistoryCurrent = -1
-				m.resetInput(fmt.Sprintf("%s (#sl - pipe selected, #dir - pipe directory)", SHELL))
+				m.resetInput(fmt.Sprintf("%s (#sl - pipe selected)", SHELL))
 				fillAutocomplete(&m)
 				return m, textinput.Blink
 			}
@@ -874,8 +874,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					switch tokens[i] {
 					case "#sl":
 						args = append(args, m.getPaths()...)
-					case "#dir":
-						args = append(args, m.getTab().dir)
 					default:
 						args = append(args, tokens[i])
 					}
