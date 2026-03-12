@@ -22,7 +22,7 @@ Here is how you can configure your powershell to `cd` to the directory when you 
 Pressing **F1** shows documentation that can be filtered by pressing **f**. I tried to make `mc` as intuitive as possible, and for the most part, everything is accessible with the mouse.
 
 ### Normal Mode
-The main mode of the program from witch most other modes can be entered.
+The main mode of the program, from which most other modes can be accessed.
 
 **q** - Quit, returning the current directory.<br/>
 **Q** - Quit without returning anything.<br/>
