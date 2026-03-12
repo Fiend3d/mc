@@ -24,29 +24,29 @@ Pressing F1 shows documentation that can be filtered by pressing F. I tried to m
 ### Normal Mode
 The main mode of the program from witch most other modes can be entered.
 
-- **q** - Quit, returning the current directory.
-- **Q** - Quit without returning anything.
-- **space** - Select.
-- **y** - Copy selected items. It's just normal Window's copied filepaths, so they can pasted in Explorer to.
-- **x** - Cut. 
-- **d** - Delete PERMANENTLY. It will prompt for confirmation. 
-- **r** - Rename. Selecting multiple items launched editor to edit their names. 
-- **p** - Paste.
-- **u** - Undo.
-- **U** - Redo. 
-- **t** - Copy current tab.
-- **Ctrl+w** - Close current tab.
-- **T** - Restore closed tab.
-- **Ctrl+t, Ctrl+n** - Open selected dir in a new tab.
-- **]** - Next tab. 
-- **[** - Next tab. 
-- **1-0** - Select tabs 1 to 10 (0 is tab 10).
-- **Ctrl+b**  - Go back in history.
-- **Ctrl+f** - Go forward in history.
-- **F5** - Update.
-
-- **B** - Bookmark the directory.
-- **b** - Browse bookmarks.
+**q** - Quit, returning the current directory.<br/>
+**Q** - Quit without returning anything.<br/>
+**space** - Select.<br/>
+**y** - Copy selected items. It's just normal Window's copied filepaths, so they can pasted in Explorer to.<br/>
+**x** - Cut.<br/>
+**d** - Delete PERMANENTLY. It will prompt for confirmation.<br/>
+**r** - Rename. Selecting multiple items launched editor to edit their names.<br/>
+**p** - Paste.<br/>
+**u** - Undo.<br/>
+**U** - Redo.<br/>
+**t** - Copy current tab.<br/>
+**Ctrl+w** - Close current tab.<br/>
+**T** - Restore closed tab.<br/>
+**Ctrl+t, Ctrl+n** - Open selected dir in a new tab.<br/>
+**]** - Next tab.<br/>
+**[** - Next tab.<br/>
+**1-0** - Select tabs 1 to 10 (0 is tab 10).<br/>
+**Ctrl+b**  - Go back in history.<br/>
+**Ctrl+f** - Go forward in history.<br/>
+**F5** - Update.<br/>
+<br/>
+**B** - Bookmark the directory.<br/>
+**b** - Browse bookmarks.<br/>
 
 ### Jump Mode
 Can be entered by pressing `tab` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item. 
@@ -60,24 +60,24 @@ Entered by pressing `f` in the normal mode. Current tab can be filtered.
 ### Copy Mode
 Entered by pressing `c`. Capital letters convert slashes from `\` to `/`. "Copy the filenames as arguments" means it can be used as arguments for terminal commands (if path has spaces it will be quoted).
 
-**c/C** - Copy the file path/Forward.
-**d/D** - Copy the directory/Forward.
-**f** - Copy the filename.
-**n** - Copy the filename without extension.
-**a/A** - Copy the file paths as arguments/Forward.
-**s** - Copy the filenames as arguments.
-**q/Q** - Copy the file paths as array/Forward.
-**w** - Copy the filenames as array.
+**c/C** - Copy the file path/Forward.<br/>
+**d/D** - Copy the directory/Forward.<br/>
+**f** - Copy the filename.<br/>
+**n** - Copy the filename without extension.<br/>
+**a/A** - Copy the file paths as arguments/Forward.<br/>
+**s** - Copy the filenames as arguments.<br/>
+**q/Q** - Copy the file paths as array/Forward.<br/>
+**w** - Copy the filenames as array.<br/>
 
 ### Sort Mode
 Entered by pressing `,`. Capital letters sort in reverse.
 
-**m/M** - Sort by modified time.
-**a/A** - Sort alphabetically.
-**n/N** - Sort normally.
-**e/E** - Sort by extension.
-**s/S** - Sort by size.
-**r** - Sort randomly.
+**m/M** - Sort by modified time.<br/>
+**a/A** - Sort alphabetically.<br/>
+**n/N** - Sort normally.<br/>
+**e/E** - Sort by extension.<br/>
+**s/S** - Sort by size.<br/>
+**r** - Sort randomly.<br/>
 
 ### Create Mode
 Entered by pressing `a`. If your name ends with a slash it's a directory.
@@ -94,37 +94,39 @@ Press `F3` on a line to open it with `bat`; it will jump directly to that line. 
 
 ### Shell Mode
 Press `:` to enter shell mode. You can hide and unhide TUI by pressing `Ctrl+h` to see the result of a command. `#sl` - is a macro that is converted to a list of selected items for a command. 
-**Ctrl+b** - Back in history. 
-**Ctrl+f** - Forward in history.
+
+**Ctrl+b** - Back in history.<br/>
+**Ctrl+f** - Forward in history.<br/>
 
 ### Go Mode
 Go mode is just a menu.
 
-**g** - Enter Path mode.
-**t** - Browse tabs.
-**c** - Open the settings directory. You can also find and delete bookmarks there, for example.
-**C** - Save settings to config.toml for editing.
-**s** - Calculate size for the selected directories.
+**g** - Enter Path mode.<br/>
+**t** - Browse tabs.<br/>
+**c** - Open the settings directory. You can also find and delete bookmarks there, for example.<br/>
+**C** - Save settings to config.toml for editing.<br/>
+**s** - Calculate size for the selected directories.<br/>
 
 ### Path Mode
 Press `gg` to enter path mode.
 
-**ctrl+u** - Clear all left of cursor.
-**ctrl+k** - Clear all right of cursor.
-**ctrl+w** - Delete a word.
-**tab** - Autocomplete.
-**up/down** - Next/previous autocomplete.
-**ctrl+e** - Expand environment variables.
-**ctrl+n** - Open the path in a new tab.
+**ctrl+u** - Clear all left of cursor.<br/>
+**ctrl+k** - Clear all right of cursor.<br/>
+**ctrl+w** - Delete a word.<br/>
+**tab** - Autocomplete.<br/>
+**up/down** - Next/previous autocomplete.<br/>
+**ctrl+e** - Expand environment variables.<br/>
+**ctrl+n** - Open the path in a new tab.<br/>
 
 ### Tools
 `F3-F4`, `F6-F12` - tools. They can be configured in `config.toml`. The default config can be saved by pressing `gC` (`g` and then `C`, and then `gc` to find it to edit).
-**F3** - Viewer. 
-**F4** - Editor.
-**F6** - Open the directory in Explorer.
-**F7** - Open the files in VS Code.
-**F8** - Open the directory in VS Code.
-**F9-F12** - Unassigned (configurable).
+
+**F3** - Viewer.<br/>
+**F4** - Editor.<br/>
+**F6** - Open the directory in Explorer.<br/>
+**F7** - Open the files in VS Code.<br/>
+**F8** - Open the directory in VS Code.<br/>
+**F9-F12** - Unassigned (configurable).<br/>
 
 ## How to Build
 
