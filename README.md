@@ -37,9 +37,9 @@ The main mode of the program from witch most other modes can be entered.
 **t** - Copy current tab.<br/>
 **Ctrl+w** - Close current tab.<br/>
 **T** - Restore closed tab.<br/>
-**Ctrl+t, Ctrl+n** - Open selected dir in a new tab.<br/>
+**Ctrl+t, Ctrl+n** - Open selected directory in a new tab.<br/>
 **]** - Next tab.<br/>
-**[** - Next tab.<br/>
+**[** - Previous tab.<br/>
 **1-0** - Select tabs 1 to 10 (0 is tab 10).<br/>
 **Ctrl+b**  - Go back in history.<br/>
 **Ctrl+f** - Go forward in history.<br/>
