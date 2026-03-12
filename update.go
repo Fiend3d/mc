@@ -234,7 +234,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.click.y-1 < len(tab.page.getItems())-settings.start {
 						settings.cursor = m.click.y - 1 + settings.start
 						if m.click.doubleClick && m.mode != visualMode {
-							return m.right()
+							return m.right(false)
 						}
 					}
 				}
@@ -362,7 +362,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "left":
 				return m.left()
 			case "right", "enter":
-				return m.right()
+				return m.right(false)
 			}
 		}
 
@@ -531,6 +531,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.addMessage(msgInfo, "tab copied"),
 					m.readDir(m.currentTab, dir),
 				)
+			case "ctrl+t", "ctrl+n":
+				return m.right(true)
 			case "]":
 				m.currentTab = (m.currentTab + 1) % len(m.tabs)
 				return m, m.addMessage(msgInfo, fmt.Sprintf("tab %d", m.currentTab+1))
@@ -584,7 +586,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "h":
 				return m.left()
 			case "l":
-				return m.right()
+				return m.right(false)
 			case "ctrl+b":
 				tab := m.getTab()
 				if !tab.hasPrev() {

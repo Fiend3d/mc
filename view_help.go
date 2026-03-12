@@ -95,6 +95,7 @@ func viewHelp(m *model) string {
 		{" g", " - Enter Go mode."},
 		{" Ctrl+h", " - Hide/Unhide TUI."},
 		{" t", " - Duplicate the current tab."},
+		{" Ctrl+t, Ctrl+n", " - Open selected directory in a new tab."},
 		{" ]", " - Next tab."},
 		{" [", " - Previous tab."},
 		{" 1-0", " - Select tabs 1 to 10 (0 is tab 10)."},

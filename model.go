@@ -322,7 +322,7 @@ func (m *model) left() (tea.Model, tea.Cmd) {
 	return m, m.readDir(m.currentTab, parent)
 }
 
-func (m *model) right() (tea.Model, tea.Cmd) {
+func (m *model) right(addNewTab bool) (tea.Model, tea.Cmd) {
 	tab := m.getTab()
 	settings := tab.getPageSettings()
 	items := tab.page.getItems()
@@ -338,6 +338,16 @@ func (m *model) right() (tea.Model, tea.Cmd) {
 	}
 	if !selectedItem.isDirectory() {
 		return m, nil
+	}
+	if addNewTab {
+		dir := selectedItem.getFullPath()
+		tabCopy := newTab(dir, &page{})
+		m.tabs = append(m.tabs, tabCopy)
+		m.currentTab = len(m.tabs) - 1
+		return m, tea.Batch(
+			m.addMessage(msgInfo, fmt.Sprintf("%s openned in a new tab", dir)),
+			m.readDir(m.currentTab, dir),
+		)
 	}
 	if tab.page.isTemp() {
 		for i := range tab.page.items {
