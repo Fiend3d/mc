@@ -27,7 +27,7 @@ The main mode of the program, from which most other modes can be accessed.
 **q** - Quit, returning the current directory.<br/>
 **Q** - Quit without returning anything.<br/>
 **space** - Select.<br/>
-**y** - Copy selected items. It's just normal Window's copied filepaths, so they can pasted in Explorer to.<br/>
+**y** - Copy selected items. This uses standard Windows file paths, so you can paste them directly into Explorer.<br/>
 **x** - Cut.<br/>
 **d** - Delete PERMANENTLY. It will prompt for confirmation.<br/>
 **r** - Rename. Selecting multiple items launched editor to edit their names.<br/>
