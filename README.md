@@ -24,29 +24,29 @@ Pressing F1 shows documentation that can be filtered by pressing F. I tried to m
 ### Normal Mode
 The main mode of the program from witch most other modes can be entered.
 
-* **q** - Quit, returning the current directory.
-* **Q** - Quit without returning anything.
-* **space** - Select.
-* **y** - Copy selected items. It's just normal Window's copied filepaths, so they can pasted in Explorer to.
-* **x** - Cut. 
-* **d** - Delete PERMANENTLY. It will prompt for confirmation. 
-* **r** - Rename. Selecting multiple items launched editor to edit their names. 
-* **p** - Paste.
-* **u** - Undo.
-* **U** - Redo. 
-* **t** - Copy current tab.
-* **Ctrl+w** - Close current tab.
-* **T** - Restore closed tab.
-* **Ctrl+t, Ctrl+n** - Open selected dir in a new tab.
-* **]** - Next tab. 
-* **[** - Next tab. 
-* **1-0** - Select tabs 1 to 10 (0 is tab 10).
-* **Ctrl+b**  - Go back in history.
-* **Ctrl+f** - Go forward in history.
-* **F5** - Update.
+- **q** - Quit, returning the current directory.
+- **Q** - Quit without returning anything.
+- **space** - Select.
+- **y** - Copy selected items. It's just normal Window's copied filepaths, so they can pasted in Explorer to.
+- **x** - Cut. 
+- **d** - Delete PERMANENTLY. It will prompt for confirmation. 
+- **r** - Rename. Selecting multiple items launched editor to edit their names. 
+- **p** - Paste.
+- **u** - Undo.
+- **U** - Redo. 
+- **t** - Copy current tab.
+- **Ctrl+w** - Close current tab.
+- **T** - Restore closed tab.
+- **Ctrl+t, Ctrl+n** - Open selected dir in a new tab.
+- **]** - Next tab. 
+- **[** - Next tab. 
+- **1-0** - Select tabs 1 to 10 (0 is tab 10).
+- **Ctrl+b**  - Go back in history.
+- **Ctrl+f** - Go forward in history.
+- **F5** - Update.
 
-* **B** - Bookmark the directory.
-* **b** - Browse bookmarks.
+- **B** - Bookmark the directory.
+- **b** - Browse bookmarks.
 
 ### Jump Mode
 Can be entered by pressing `tab` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item. 
