@@ -30,7 +30,7 @@ The main mode of the program, from which most other modes can be accessed.
 **y** - Copy selected items. This uses standard Windows file paths, so you can paste them directly into Explorer.<br/>
 **x** - Cut.<br/>
 **d** - Delete PERMANENTLY. It will prompt for confirmation.<br/>
-**r** - Rename. Selecting multiple items launched editor to edit their names.<br/>
+**r** - Rename. When multiple items are selected, an editor opens so you can edit all the names at once.<br/>
 **p** - Paste.<br/>
 **u** - Undo.<br/>
 **U** - Redo.<br/>
