@@ -134,7 +134,7 @@ func (m model) View() tea.View {
 			}
 		}
 
-		item := items[i+settings.start] // it might crash here
+		item := items[index]
 
 		switch item.getAction() {
 		case itemActionCopy:
@@ -151,7 +151,7 @@ func (m model) View() tea.View {
 			s.WriteString(style.Bold(true).Foreground(m.theme.whiteColor).Render(cursor))
 		}
 		if item.isSelected() {
-			s.WriteString(style.Foreground(m.theme.accentColor5).Render("┃"))
+			s.WriteString(style.Foreground(m.theme.whiteColor).Render("┃"))
 		} else {
 			s.WriteString(style.Render(" "))
 		}
