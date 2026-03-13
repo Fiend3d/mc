@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -135,4 +136,12 @@ func (t *tab) getPageSettings() *pageSettings {
 		return settings
 	}
 	return settings
+}
+
+func (m *model) multipleTabs() bool {
+	return len(m.tabs) > 1
+}
+
+func (m *model) getTabInfo() string {
+	return fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs))
 }

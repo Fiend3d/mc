@@ -64,12 +64,13 @@ func (m model) View() tea.View {
 	if m.mode != pathMode {
 		tabsWidth := 0
 		tabsWidget := ""
-		if len(m.tabs) > 1 {
+		if m.multipleTabs() {
+			tabsStr := m.getTabInfo()
 			tabsWidget = empty.
 				Foreground(m.theme.accentColor3).
 				Bold(true).
-				Render(fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs)))
-			tabsWidth = lipgloss.Width(tabsWidget)
+				Render(tabsStr)
+			tabsWidth = len(tabsStr)
 		}
 
 		dir := m.getTab().dir

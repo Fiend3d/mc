@@ -199,6 +199,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.mode == visualMode {
 						return m, nil
 					}
+					if m.multipleTabs() && m.click.x > m.width-len(m.getTabInfo()) {
+						m.mode = tabsMode
+						return m, nil
+					}
 					dir := m.getTab().dir
 					diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
 					matches := diskExp.FindStringSubmatch(dir)
