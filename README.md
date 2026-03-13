@@ -19,7 +19,7 @@ Here is how you can configure your powershell to `cd` to the directory when you 
 
 ## How to use
 
-Pressing **F1** shows documentation that can be filtered by pressing **f**. I tried to make `mc` as intuitive as possible, and for the most part, everything is accessible with the mouse.
+Pressing `F1` shows documentation that can be filtered by pressing `f`. I tried to make `mc` as intuitive as possible, and for the most part, everything is accessible with the mouse.
 
 ### Normal Mode
 The main mode of the program, from which most other modes can be accessed.
@@ -32,6 +32,7 @@ The main mode of the program, from which most other modes can be accessed.
 **d** - Delete PERMANENTLY. It will prompt for confirmation.<br/>
 **r** - Rename. When multiple items are selected, an editor opens so you can edit all the names at once.<br/>
 **p** - Paste.<br/>
+**P** - Paste with override. Prompts for confirmation if there's a collision.<br/>
 **u** - Undo.<br/>
 **U** - Redo.<br/>
 **t** - Copy current tab.<br/>
@@ -49,16 +50,16 @@ The main mode of the program, from which most other modes can be accessed.
 **b** - Browse bookmarks.<br/>
 
 ### Jump Mode
-Can be entered by pressing **tab** in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item. 
+Can be entered by pressing `tab` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item. 
 
 ### Visual Mode
-Can be entered by pressing **v**. It's for range selecting. 
+Can be entered by pressing `v`. It's for range selecting. 
 
 ### Filter Mode
-Entered by pressing **f** in the normal mode. Current tab can be filtered. 
+Entered by pressing `f` in the normal mode. Current tab can be filtered. 
 
 ### Copy Mode
-Entered by pressing **c**. Capital letters convert slashes from `\` to `/`. "Copy the filenames as arguments" means it can be used as arguments for terminal commands (if path has spaces it will be quoted).
+Entered by pressing `c`. Capital letters convert slashes from `\` to `/`. "Copy the filenames as arguments" means it can be used as arguments for terminal commands (if path has spaces it will be quoted).
 
 **c/C** - Copy the file path/Forward.<br/>
 **d/D** - Copy the directory/Forward.<br/>
@@ -70,7 +71,7 @@ Entered by pressing **c**. Capital letters convert slashes from `\` to `/`. "Cop
 **w** - Copy the filenames as array.<br/>
 
 ### Sort Mode
-Entered by pressing **,** (comma). Capital letters sort in reverse.
+Entered by pressing `,` (comma). Capital letters sort in reverse.
 
 **m/M** - Sort by modified time.<br/>
 **a/A** - Sort alphabetically.<br/>
@@ -80,20 +81,20 @@ Entered by pressing **,** (comma). Capital letters sort in reverse.
 **r** - Sort randomly.<br/>
 
 ### Create Mode
-Entered by pressing **a**. If your name ends with a slash it's a directory.
+Entered by pressing `a`. If your name ends with a slash it's a directory.
 
 ### Message Mode
-Entered by pressing **\`** (backtick). The message history can be viewed here.
+Entered by pressing `\`` (backtick). The message history can be viewed here.
 
 ### Search Mode
-Press **s** to enter search mode. Use **tab** to cycle through focus. By default, search respects `.gitignore`, but you can disable this by pressing **F1** while in search mode.
+Press `s` to enter search mode. Use `tab` to cycle through focus. By default, search respects `.gitignore`, but you can disable this by pressing `F1` while in search mode.
 
-Press **F3** on a line to open it with `bat`; it will jump directly to that line. Press **n** to jump to the next match (or **N** to go backwards). Press **h** to hide all matched lines.
+Press `F3` on a line to open it with `bat`; it will jump directly to that line. Press `n` to jump to the next match (or `N` to go backwards). Press `h` to hide all matched lines.
 
-**F5** or **Enter** while focussing a text input - start searching.
+`F5` or `Enter` while focussing a text input - start searching.
 
 ### Shell Mode
-Press **:** to enter shell mode. You can hide and show TUI by pressing **Ctrl+h** to see the result of a command. `#sl` - is a macro that is converted to a list of selected items for a command. 
+Press `:` to enter shell mode. You can hide and show TUI by pressing `Ctrl+h` to see the result of a command. `#sl` - is a macro that is converted to a list of selected items for a command. 
 
 **Ctrl+b** - Back in history.<br/>
 **Ctrl+f** - Forward in history.<br/>
@@ -108,7 +109,7 @@ Go mode is just a menu.
 **s** - Calculate size for the selected directories.<br/>
 
 ### Path Mode
-Press **gg** to enter path mode.
+Press `gg` to enter path mode.
 
 **ctrl+u** - Clear all left of cursor.<br/>
 **ctrl+k** - Clear all right of cursor.<br/>
@@ -119,7 +120,7 @@ Press **gg** to enter path mode.
 **ctrl+n** - Open the path in a new tab.<br/>
 
 ### Tools
-**F3-F4**, **F6-F12** - tools. They can be configured in `config.toml`. The default config can be saved by pressing **gC** (**g** and then **C**, and then **gc** to find it).
+`F3-F4`, `F6-F12` - tools. They can be configured in `config.toml`. The default config can be saved by pressing `gC` (`g` and then `C`, and then `gc` to find it).
 
 **F3** - Viewer.<br/>
 **F4** - Editor.<br/>

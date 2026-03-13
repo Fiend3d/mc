@@ -126,6 +126,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			for i := range items {
 				if items[i].getFullPath() == msg.path {
 					settings.cursor = i
+					m.updateStart()
 					return m, nil
 				}
 			}

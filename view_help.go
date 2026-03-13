@@ -110,6 +110,7 @@ func viewHelp(m *model) string {
 		{" y", " - Copy the selected items."},
 		{" x", " - Cut the selected items."},
 		{" p", " - Paste."},
+		{" P", " - Paste with override. Prompts for confirmation if there's a collision."},
 		{" u", " - Undo."},
 		{" U", " - Redo."},
 		{" j, down", " - Move the cursor down."},

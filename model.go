@@ -317,9 +317,13 @@ func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
 
 func (m *model) left() (tea.Model, tea.Cmd) {
 	tab := m.getTab()
+	dir := tab.dir
 	parent := filepathDir(tab.dir)
 	tab.set(parent)
-	return m, m.readDir(m.currentTab, parent)
+	return m, tea.Sequence(
+		m.readDir(m.currentTab, parent),
+		selectItem(m.currentTab, dir),
+	)
 }
 
 func (m *model) right(addNewTab bool) (tea.Model, tea.Cmd) {
