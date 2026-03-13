@@ -84,7 +84,7 @@ Entered by pressing `,` (comma). Capital letters sort in reverse.
 Entered by pressing `a`. If your name ends with a slash it's a directory.
 
 ### Message Mode
-Entered by pressing `\`` (backtick). The message history can be viewed here.
+Entered by pressing `` ` `` (backtick). The message history can be viewed here.
 
 ### Search Mode
 Press `s` to enter search mode. Use `tab` to cycle through focus. By default, search respects `.gitignore`, but you can disable this by pressing `F1` while in search mode.
