@@ -455,6 +455,7 @@ func (m *model) handleTool(key string) (tea.Model, tea.Cmd) {
 	default:
 		return m, m.addMessage(msgError, "unknown type of tool (not path/dir/none)")
 	}
-	cmd.Dir = m.getTab().dir
-	return m, tea.ExecProcess(cmd, nil)
+	dir := m.getTab().dir
+	cmd.Dir = dir
+	return m, runCmd(cmd, dir)
 }

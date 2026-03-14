@@ -303,6 +303,17 @@ func tick() tea.Cmd {
 }
 
 func (m *model) fillPage(tab int, items []item) error {
+	// restore selection
+	for i := range m.tabs[tab].page.items {
+		for j := range items {
+			if m.tabs[tab].page.items[i].getFullPath() ==
+				items[j].getFullPath() {
+				if m.tabs[tab].page.items[i].isSelected() {
+					items[j].setSelected(true)
+				}
+			}
+		}
+	}
 	m.tabs[tab].page.items = items
 	m.tabs[tab].filter()
 	return nil
@@ -338,7 +349,7 @@ func (m *model) right(addNewTab bool) (tea.Model, tea.Cmd) {
 		strings.HasSuffix(strings.ToUpper(selectedItem.getName()), ".EXE") { // probably a mistake
 		cmd := exec.Command(selectedItem.getFullPath())
 		cmd.Dir = tab.dir
-		return m, tea.ExecProcess(cmd, nil)
+		return m, runCmd(cmd, tab.dir)
 	}
 	if !selectedItem.isDirectory() {
 		return m, nil

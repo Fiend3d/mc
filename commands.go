@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -202,4 +203,14 @@ func calculateSize(dir string, paths []string) tea.Cmd {
 		}
 		return result
 	}
+}
+
+type processDoneMsg struct {
+	dir string
+}
+
+func runCmd(cmd *exec.Cmd, dir string) tea.Cmd {
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		return processDoneMsg{dir: dir}
+	})
 }

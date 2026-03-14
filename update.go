@@ -30,6 +30,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tick()
 		}
 
+	case processDoneMsg:
+		return m, m.update(msg.dir)
+
 	case calcDirSizeMsg:
 		m.jobDone()
 		tab := m.getTab()
@@ -152,6 +155,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case readDirMsg:
+		if msg.tab >= len(m.tabs) { // just in case
+			return m, nil
+		}
 		tab := m.tabs[msg.tab]
 		if tab.dir != msg.dir {
 			return m, nil
@@ -884,8 +890,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 				cmd := exec.Command(SHELL, args...)
-				cmd.Dir = m.getTab().dir
-				return m, tea.ExecProcess(cmd, nil)
+				dir := m.getTab().dir
+				cmd.Dir = dir
+				return m, runCmd(cmd, dir)
 			}
 
 		case jumpMode:

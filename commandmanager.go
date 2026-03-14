@@ -168,7 +168,8 @@ func (c *fileActionCommand) execute() error {
 			if err != nil {
 				return err
 			}
-			if c.action == cutFileAction {
+			switch c.action {
+			case cutFileAction, renameFileAction:
 				err := os.RemoveAll(c.pairs[i].src)
 				if err != nil {
 					return err
@@ -203,14 +204,19 @@ func (c *fileActionCommand) undo() error {
 		if c.pairs[i].src == c.pairs[i].dst {
 			continue
 		}
-		if c.action == copyFileAction {
+		switch c.action {
+		case copyFileAction:
 			err := os.RemoveAll(c.pairs[i].dst)
 			if err != nil {
 				return err
 			}
-		} else {
+		case cutFileAction, renameFileAction:
 			if fileutils.IsDir(c.pairs[i].dst) {
 				err := fileutils.CopyDir(c.pairs[i].dst, c.pairs[i].src)
+				if err != nil {
+					return err
+				}
+				err = os.RemoveAll(c.pairs[i].dst)
 				if err != nil {
 					return err
 				}
