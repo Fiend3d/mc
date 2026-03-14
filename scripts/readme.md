@@ -1,4 +1,4 @@
-# edit powershell's config
+# How to edit PowerShell's config
 
 I like using Helix for this. You should use whatever you prefer.
 
@@ -32,4 +32,6 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 A useful script that launches Windows Terminal in the current working directory. By default, Windows Terminal doesn't do this. Simply typing `t` is convenient and easy to remember.
 
 # zz
-`zz` is a zip bomb detector. It safely unzips archives using 7z (https://www.7-zip.org/download.html).
+`zz` is a zip bomb detector. It safely unzips archives using `7z` (https://www.7-zip.org/download.html).
+
+There's no need to check the contents of an archive before unzipping.
