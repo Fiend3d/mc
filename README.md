@@ -28,6 +28,9 @@ The main mode of the program, from which most other modes can be accessed.
 **q** - Quit, returning the current directory.<br/>
 **Q** - Quit without returning anything.<br/>
 **space** - Select.<br/>
+**Ctrl+a** - Select all.<br/>
+**Ctrl+d** - Deselect all.<br/>
+**Ctrl+r** - Toggle selection (invert all).<br/>
 **y** - Copy selected items. This uses standard Windows file paths, so you can paste them directly into Explorer.<br/>
 **x** - Cut.<br/>
 **d** - Delete PERMANENTLY. It will prompt for confirmation.<br/>
