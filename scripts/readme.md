@@ -27,3 +27,9 @@ And it doesn't work `¯\_(ツ)_/¯` You need to enable powershell for some reaso
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
+
+# t.bat
+A useful script that launches Windows Terminal in the current working directory. By default, Windows Terminal doesn't do this. Simply typing `t` is convenient and easy to remember.
+
+# zz
+`zz` is a zip bomb detector. It safely unzips archives using 7z (https://www.7-zip.org/download.html).
