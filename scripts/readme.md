@@ -28,6 +28,8 @@ And it doesn't work `¯\_(ツ)_/¯` You need to enable powershell for some reaso
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
+Now you can just type `m` in the terminal and it will launch **mc**. When you quit, it will `cd` to the selected directory.
+
 # t.bat
 A useful script that launches Windows Terminal in the current working directory. By default, Windows Terminal doesn't do this. Simply typing `t` is convenient and easy to remember.
 
