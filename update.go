@@ -239,7 +239,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						index := slices.Index(history, clickedDir)
 						return m, m.changeDir(history[index+1])
 					}
-				} else if m.click.y < m.height {
+				} else if m.click.y < m.height-2 {
 					tab := m.getTab()
 					settings := tab.getPageSettings()
 					if m.click.y-1 < len(tab.page.getItems())-settings.start {
@@ -251,7 +251,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case tabsMode:
 				if m.click.y > 0 &&
-					m.click.y < m.height &&
+					m.click.y < m.height-1 &&
 					m.click.y-1 < len(m.tabs)-m.tabsStart {
 					m.tabsCursor = m.click.y - 1 + m.tabsStart
 					if m.click.doubleClick {
@@ -261,7 +261,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case bookmarksMode:
 				if m.click.y > 0 &&
-					m.click.y < m.height &&
+					m.click.y < m.height-1 &&
 					m.click.y-1 < len(m.bm.dirs)-m.bm.start {
 					m.bm.cursor = m.click.y - 1 + m.bm.start
 					if m.click.doubleClick {
