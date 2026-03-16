@@ -153,7 +153,7 @@ Because I fixed a few issues in [github.com/charmbracelet/bubbles](https://githu
 You can do this using:
 
 ```powershell
-get_forks
+.\get_forks.ps1
 ```
 
 If that doesn't work, you may need to enable PowerShell scripts first:
@@ -166,5 +166,5 @@ Then simply run:
 
 
 ```powershell
-build
+.\build.ps1
 ```
