@@ -131,6 +131,7 @@ func viewHelp(m *model) string {
 		{" a", " - Enter Create mode. You can create files and directories here."},
 		{" s", " - Enter Search mode."},
 		{" :", " - Enter Shell mode."},
+		{" F2", " - Dependency walker (deps by default, configurable)."},
 		{" F3", " - Viewer tool (bat with less by default, configurable)."},
 		{" F4", " - Editor (Helix by default, configurable)."},
 		{" F5", " - Refresh current tab."},

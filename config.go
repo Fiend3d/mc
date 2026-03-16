@@ -15,6 +15,7 @@ type ToolConfig struct {
 }
 
 type Config struct {
+	F2  *ToolConfig `toml:"F2"`
 	F3  *ToolConfig `toml:"F3"`
 	F4  *ToolConfig `toml:"F4"`
 	F6  *ToolConfig `toml:"F6"`
@@ -45,6 +46,7 @@ func getConfigPath() string {
 
 func loadConfig() (*Config, error) {
 	cfg := &Config{
+		F2: &ToolConfig{Command: "deps", Args: []string{}, Type: "path"},
 		F3: &ToolConfig{Command: "bat", Args: []string{"--color=always", "-p", "--pager", "less -c -R -S"}, Type: "path"},
 		F4: &ToolConfig{Command: "hx", Args: []string{}, Type: "path"},
 		F6: &ToolConfig{Command: "explorer", Args: []string{}, Type: "dir"},

@@ -674,7 +674,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handlePaste(false)
 			case "P":
 				return m.handlePaste(true)
-			case "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
+			case "f2", "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
 				return m.handleTool(msg.String())
 			case "b":
 				bookmarks, err := loadBookmarks()
@@ -900,7 +900,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc", "tab":
 				m.mode = normalMode
 				return m, nil
-			case "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
+			case "f2", "f3", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
 				return m.handleTool(msg.String())
 			default:
 				runes := []rune(msg.String())

@@ -136,8 +136,9 @@ Press `gg` to enter path mode.
 
 ### Tools
 
-`F3-F4`, `F6-F12` - tools. They can be configured in `config.toml`. The default config can be saved by pressing `gC` (`g` and then `C`, and then `gc` to find it).
+`F2-F4`, `F6-F12` - tools. They can be configured in `config.toml`. The default config can be saved by pressing `gC` (`g` and then `C`, and then `gc` to find it).
 
+**F2** - Dependency walker. [deps](https://github.com/Fiend3d/deps) by default, but everything is configurable.<br/>
 **F3** - Viewer.<br/>
 **F4** - Editor.<br/>
 **F6** - Open the directory in Explorer.<br/>
