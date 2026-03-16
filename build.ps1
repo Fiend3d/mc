@@ -1,3 +1,15 @@
+$icon = $false
+$dist = $false
+
+foreach ($arg in $args) {
+    if ($arg -eq "icon") {
+        $icon = $true
+    }
+    if ($arg -eq "dist") {
+        $dist = $true
+    }
+}
+
 $commit    = git rev-parse --short HEAD
 $buildTime = Get-Date -Format "dd.MM.yyyy HH:mm"
 $version   = git describe --tags --abbrev=0
@@ -12,5 +24,21 @@ $ldflags = @(
     "-X 'main.BuildTime=$buildTime'"
 ) -join " "
 
-#rsrc -ico .\assets\icon.ico
+if ($icon) {
+    # go install github.com/akavel/rsrc@latest
+    rsrc -ico .\assets\icon.ico
+}
 go build -ldflags $ldflags
+
+if ($dist) {
+    $distPath = ".\dist"
+    if (Test-Path $distPath) {
+        Remove-Item $distPath -Recurse
+    }
+    New-Item -Path $distPath -ItemType Directory
+    Copy-Item .\mc.exe -Destination $distPath
+    Get-ChildItem -Path ".\scripts" -Include "*.bat", "*.ps1" -Recurse | 
+        Copy-Item -Destination $distPath
+    Copy-Item "..\deps\deps.exe" -Destination $distPath
+    7z a "$distPath\mc_$version.zip" "$distPath\*"
+}

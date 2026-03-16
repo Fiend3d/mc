@@ -415,6 +415,8 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Mod
 func (m *model) handleTool(key string) (tea.Model, tea.Cmd) {
 	var t *ToolConfig
 	switch key {
+	case "f2":
+		t = m.cfg.F2
 	case "f3":
 		t = m.cfg.F3
 	case "f4":
