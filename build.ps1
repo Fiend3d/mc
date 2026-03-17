@@ -39,6 +39,9 @@ if ($dist) {
     Copy-Item .\mc.exe -Destination $distPath
     Get-ChildItem -Path ".\scripts" -Include "*.bat", "*.ps1" -Recurse | 
         Copy-Item -Destination $distPath
-    Copy-Item "..\deps\deps.exe" -Destination $distPath
+    $deps = "..\deps\deps.exe"
+    if (Test-Path $deps) {
+        Copy-Item $deps -Destination $distPath
+    }
     7z a "$distPath\mc_$version.zip" "$distPath\*"
 }

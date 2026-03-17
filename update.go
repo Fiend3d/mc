@@ -884,12 +884,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				for i := range tokens {
 					switch tokens[i] {
 					case "#sl":
-						args = append(args, m.getPaths()...)
+						paths := m.getPaths()
+						for j := range paths {
+							if strings.Contains(paths[j], " ") {
+								paths[j] = fmt.Sprintf(`"%s"`, paths[j])
+							}
+						}
+						args = append(args, paths...)
 					default:
 						args = append(args, tokens[i])
 					}
 				}
-				cmd := exec.Command(SHELL, args...)
+				cmd := exec.Command(SHELL, "/C", strings.Join(args, " "))
 				dir := m.getTab().dir
 				cmd.Dir = dir
 				return m, runCmd(cmd, dir)
