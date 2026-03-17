@@ -7,6 +7,7 @@ Modal Commander (mc) is a TUI file manager for Windows (though it might be porte
 ![RECLibboard](assets/demo/demo01.png)
 ![RECLibboard](assets/demo/demo02.png)
 ![RECLibboard](assets/demo/demo03.png)
+![RECLibboard](assets/demo/demo04.png)
 ![RECLibboard](assets/demo/demo.gif)
 
 ## How to install
