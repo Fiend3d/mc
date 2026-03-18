@@ -84,9 +84,6 @@ func getDriveInfo(letter string) (drive, error) {
 	}
 
 	volumeLabel := windows.UTF16ToString(volumeName[:])
-	if volumeLabel == "" {
-		volumeLabel = "(no label)"
-	}
 
 	// Get disk space
 	var freeBytesAvailable, totalBytes, totalFreeBytes uint64

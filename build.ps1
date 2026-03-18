@@ -28,7 +28,15 @@ if ($icon) {
     # go install github.com/akavel/rsrc@latest
     rsrc -ico .\assets\icon.ico
 }
-go build -ldflags $ldflags
+
+$output = "mc.exe"
+if (Test-Path $output) { 
+    # Go doesn't rebuild if no source changes, which could leave outdated version flags
+    # Force clean build to ensure accurate version and dirty state
+    Remove-Item $output
+}
+
+go build -ldflags $ldflags -o $output
 
 if ($dist) {
     $distPath = ".\dist"
