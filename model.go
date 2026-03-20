@@ -420,7 +420,7 @@ func initialModel(dirs []string) model {
 		tabs[i] = newTab(dir, &page{})
 	}
 
-	theme := newTheme(githubTheme)
+	theme := newTheme(monokaiTheme)
 	input := newTextinput(theme)
 	pathInput := newTextinput(theme)
 	s := spinner.New()

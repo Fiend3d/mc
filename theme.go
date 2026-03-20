@@ -30,6 +30,7 @@ const (
 	draculaTheme colorPreset = iota
 	autumnTheme
 	githubTheme
+	monokaiTheme
 )
 
 func newTheme(preset colorPreset) *theme {
@@ -96,6 +97,22 @@ func newTheme(preset colorPreset) *theme {
 		accent3 = lipgloss.Color("#96d0ff")
 		accent4 = lipgloss.Color("#eac55f")
 		accent5 = lipgloss.Color("#f69d50")
+
+	case monokaiTheme:
+		base = lipgloss.Color("#272822")
+		empty = lipgloss.Color("#1e1f1c")
+		cursor = lipgloss.Color("#414339")
+
+		white = lipgloss.Color("#f8f8f2")
+		black = lipgloss.Color("#1c2128")
+		gray = lipgloss.Color("#878b91")
+		green = lipgloss.Color("#a6e22e")
+		red = lipgloss.Color("#f48771")
+		accent1 = lipgloss.Color("#C586C0")
+		accent2 = lipgloss.Color("#F92672")
+		accent3 = lipgloss.Color("#75beff")
+		accent4 = lipgloss.Color("#e6db74")
+		accent5 = lipgloss.Color("#fd971f")
 	}
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
