@@ -196,9 +196,9 @@ func newTheme(name string) *theme {
 		red = lipgloss.Color("#ff757f")
 		accent1 = lipgloss.Color("#ff966c")
 		accent2 = lipgloss.Color("#ffc777")
-		accent3 = lipgloss.Color("#65bcff")
-		accent4 = lipgloss.Color("#c099ff")
-		accent5 = lipgloss.Color("#4fd6be")
+		accent3 = lipgloss.Color("#4fd6be")
+		accent4 = lipgloss.Color("#65bcff")
+		accent5 = lipgloss.Color("#c099ff")
 	}
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
