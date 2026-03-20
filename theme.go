@@ -29,6 +29,7 @@ type colorPreset int
 const (
 	draculaTheme colorPreset = iota
 	autumnTheme
+	githubTheme
 )
 
 func newTheme(preset colorPreset) *theme {
@@ -79,6 +80,22 @@ func newTheme(preset colorPreset) *theme {
 		accent3 = lipgloss.Color("#72a59e")
 		accent4 = lipgloss.Color("#cfba8b")
 		accent5 = lipgloss.Color("#FAD566")
+
+	case githubTheme:
+		base = lipgloss.Color("#22272e")
+		empty = lipgloss.Color("#22272e")
+		cursor = lipgloss.Color("#373e47")
+
+		white = lipgloss.Color("#adbac7")
+		black = lipgloss.Color("#1c2128")
+		gray = lipgloss.Color("#768390")
+		green = lipgloss.Color("#57ab5a")
+		red = lipgloss.Color("#e5534b")
+		accent1 = lipgloss.Color("#c96198")
+		accent2 = lipgloss.Color("#8256d0")
+		accent3 = lipgloss.Color("#96d0ff")
+		accent4 = lipgloss.Color("#eac55f")
+		accent5 = lipgloss.Color("#f69d50")
 	}
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
