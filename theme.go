@@ -30,6 +30,7 @@ const (
 	autumnTheme colorPreset = iota
 	base16Theme
 	draculaTheme
+	ferraTheme
 	githubTheme
 	monokaiTheme
 )
@@ -40,6 +41,7 @@ var themeMap = map[string]colorPreset{
 	"autumn":  autumnTheme,
 	"base16":  base16Theme,
 	"dracula": draculaTheme,
+	"ferra":   ferraTheme,
 	"github":  githubTheme,
 	"monokai": monokaiTheme,
 }
@@ -113,6 +115,22 @@ func newTheme(name string) *theme {
 		accent3 = lipgloss.Color("#8be9fd")
 		accent4 = lipgloss.Color("#f1fa8c")
 		accent5 = lipgloss.Color("#ffb86c")
+
+	case ferraTheme:
+		base = lipgloss.Color("#2b292d")
+		empty = lipgloss.Color("#2b292d")
+		cursor = lipgloss.Color("#383539")
+
+		white = lipgloss.Color("#D1D1E0")
+		black = lipgloss.Color("#000000")
+		gray = lipgloss.Color("#4d424b")
+		green = lipgloss.Color("#B1B695")
+		red = lipgloss.Color("#e06b75")
+		accent1 = lipgloss.Color("#F5D76E")
+		accent2 = lipgloss.Color("#F6B6C9")
+		accent3 = lipgloss.Color("#D1D1E0")
+		accent4 = lipgloss.Color("#fecdb2")
+		accent5 = lipgloss.Color("#ffa07a")
 
 	case githubTheme:
 		base = lipgloss.Color("#22272e")
