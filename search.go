@@ -323,7 +323,7 @@ func viewSearch(m *model) string {
 		s.WriteRune('\n')
 	}
 
-	modeColor := m.theme.whiteColor
+	modeColor := m.theme.accentColor1
 	modeText := " SEARCH "
 	if m.search.working {
 		modeColor = m.theme.accentColor2

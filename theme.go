@@ -27,13 +27,24 @@ type theme struct {
 type colorPreset int
 
 const (
-	draculaTheme colorPreset = iota
-	autumnTheme
+	autumnTheme colorPreset = iota
+	base16Theme
+	draculaTheme
 	githubTheme
 	monokaiTheme
 )
 
-func newTheme(preset colorPreset) *theme {
+const defaultTheme = draculaTheme
+
+var themeMap = map[string]colorPreset{
+	"autumn":  autumnTheme,
+	"base16":  base16Theme,
+	"dracula": draculaTheme,
+	"github":  githubTheme,
+	"monokai": monokaiTheme,
+}
+
+func newTheme(name string) *theme {
 	var base color.Color
 	var empty color.Color
 	var cursor color.Color
@@ -49,23 +60,12 @@ func newTheme(preset colorPreset) *theme {
 	var accent4 color.Color
 	var accent5 color.Color
 
+	preset, ok := themeMap[name]
+	if !ok {
+		preset = defaultTheme
+	}
+
 	switch preset {
-	case draculaTheme:
-		base = lipgloss.Color("#282a36")
-		empty = lipgloss.Color("#222430")
-		cursor = lipgloss.Color("#44475a")
-
-		white = lipgloss.Color("#ffffff")
-		black = lipgloss.Color("#000000")
-		gray = lipgloss.Color("#6272a4")
-		green = lipgloss.Color("#94d716")
-		red = lipgloss.Color("#ea1212")
-		accent1 = lipgloss.Color("#ff79c6")
-		accent2 = lipgloss.Color("#bd93f9")
-		accent3 = lipgloss.Color("#8be9fd")
-		accent4 = lipgloss.Color("#f1fa8c")
-		accent5 = lipgloss.Color("#ffb86c")
-
 	case autumnTheme:
 		base = lipgloss.Color("#232323")
 		empty = lipgloss.Color("#212121")
@@ -81,6 +81,38 @@ func newTheme(preset colorPreset) *theme {
 		accent3 = lipgloss.Color("#72a59e")
 		accent4 = lipgloss.Color("#cfba8b")
 		accent5 = lipgloss.Color("#FAD566")
+
+	case base16Theme:
+		base = lipgloss.NoColor{}
+		empty = lipgloss.NoColor{}
+		cursor = lipgloss.NoColor{}
+
+		white = lipgloss.NoColor{}
+		black = lipgloss.Color("#000000") // there is no other way
+		gray = lipgloss.BrightBlack
+		green = lipgloss.Green
+		red = lipgloss.Red
+		accent1 = lipgloss.Cyan
+		accent2 = lipgloss.BrightCyan
+		accent3 = lipgloss.BrightBlue
+		accent4 = lipgloss.Yellow
+		accent5 = lipgloss.BrightRed
+
+	case draculaTheme:
+		base = lipgloss.Color("#282a36")
+		empty = lipgloss.Color("#222430")
+		cursor = lipgloss.Color("#44475a")
+
+		white = lipgloss.Color("#ffffff")
+		black = lipgloss.Color("#000000")
+		gray = lipgloss.Color("#6272a4")
+		green = lipgloss.Color("#94d716")
+		red = lipgloss.Color("#ea1212")
+		accent1 = lipgloss.Color("#ff79c6")
+		accent2 = lipgloss.Color("#bd93f9")
+		accent3 = lipgloss.Color("#8be9fd")
+		accent4 = lipgloss.Color("#f1fa8c")
+		accent5 = lipgloss.Color("#ffb86c")
 
 	case githubTheme:
 		base = lipgloss.Color("#22272e")
