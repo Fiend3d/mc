@@ -33,17 +33,21 @@ const (
 	ferraTheme
 	githubTheme
 	monokaiTheme
+	nordTheme
+	tokyonightTheme
 )
 
 const defaultTheme = draculaTheme
 
 var themeMap = map[string]colorPreset{
-	"autumn":  autumnTheme,
-	"base16":  base16Theme,
-	"dracula": draculaTheme,
-	"ferra":   ferraTheme,
-	"github":  githubTheme,
-	"monokai": monokaiTheme,
+	"autumn":     autumnTheme,
+	"base16":     base16Theme,
+	"dracula":    draculaTheme,
+	"ferra":      ferraTheme,
+	"github":     githubTheme,
+	"monokai":    monokaiTheme,
+	"nord":       nordTheme,
+	"tokyonight": tokyonightTheme,
 }
 
 func newTheme(name string) *theme {
@@ -163,6 +167,38 @@ func newTheme(name string) *theme {
 		accent3 = lipgloss.Color("#75beff")
 		accent4 = lipgloss.Color("#e6db74")
 		accent5 = lipgloss.Color("#fd971f")
+
+	case nordTheme:
+		base = lipgloss.Color("#2e3440")
+		empty = lipgloss.Color("#2e3440")
+		cursor = lipgloss.Color("#3b4252")
+
+		white = lipgloss.Color("#ECEFF4")
+		black = lipgloss.Color("#1e2129")
+		gray = lipgloss.Color("#4C566A")
+		green = lipgloss.Color("#A3BE8C")
+		red = lipgloss.Color("#BF616A")
+		accent1 = lipgloss.Color("#5E81AC")
+		accent2 = lipgloss.Color("#81A1C1")
+		accent3 = lipgloss.Color("#D08770")
+		accent4 = lipgloss.Color("#88C0D0")
+		accent5 = lipgloss.Color("#B48EAD")
+
+	case tokyonightTheme:
+		base = lipgloss.Color("#222436")
+		empty = lipgloss.Color("#1e2030")
+		cursor = lipgloss.Color("#2f334d")
+
+		white = lipgloss.Color("#c8d3f5")
+		black = lipgloss.Color("#1b1d2b")
+		gray = lipgloss.Color("#636da6")
+		green = lipgloss.Color("#4fd6be")
+		red = lipgloss.Color("#ff757f")
+		accent1 = lipgloss.Color("#4fd6be")
+		accent2 = lipgloss.Color("#c099ff")
+		accent3 = lipgloss.Color("#65bcff")
+		accent4 = lipgloss.Color("#ffc777")
+		accent5 = lipgloss.Color("#ff966c")
 	}
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
