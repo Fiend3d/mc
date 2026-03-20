@@ -24,23 +24,68 @@ type theme struct {
 	accentColor5 color.Color
 }
 
-func newTheme() *theme {
-	white := lipgloss.Color("#ffffff")
-	black := lipgloss.Color("#000000")
-	gray := lipgloss.Color("#6272a4")
-	green := lipgloss.Color("#94d716")
-	red := lipgloss.Color("#ea1212")
-	accent1 := lipgloss.Color("#ff79c6")
-	accent2 := lipgloss.Color("#bd93f9")
-	accent3 := lipgloss.Color("#8be9fd")
-	accent4 := lipgloss.Color("#f1fa8c")
-	accent5 := lipgloss.Color("#ffb86c")
+type colorPreset int
+
+const (
+	draculaTheme colorPreset = iota
+	autumnTheme
+)
+
+func newTheme(preset colorPreset) *theme {
+	var base color.Color
+	var empty color.Color
+	var cursor color.Color
+
+	var white color.Color
+	var black color.Color
+	var gray color.Color
+	var green color.Color
+	var red color.Color
+	var accent1 color.Color
+	var accent2 color.Color
+	var accent3 color.Color
+	var accent4 color.Color
+	var accent5 color.Color
+
+	switch preset {
+	case draculaTheme:
+		base = lipgloss.Color("#282a36")
+		empty = lipgloss.Color("#222430")
+		cursor = lipgloss.Color("#44475a")
+
+		white = lipgloss.Color("#ffffff")
+		black = lipgloss.Color("#000000")
+		gray = lipgloss.Color("#6272a4")
+		green = lipgloss.Color("#94d716")
+		red = lipgloss.Color("#ea1212")
+		accent1 = lipgloss.Color("#ff79c6")
+		accent2 = lipgloss.Color("#bd93f9")
+		accent3 = lipgloss.Color("#8be9fd")
+		accent4 = lipgloss.Color("#f1fa8c")
+		accent5 = lipgloss.Color("#ffb86c")
+
+	case autumnTheme:
+		base = lipgloss.Color("#232323")
+		empty = lipgloss.Color("#212121")
+		cursor = lipgloss.Color("#404040")
+
+		white = lipgloss.Color("#F3F2CC")
+		black = lipgloss.Color("#212121")
+		gray = lipgloss.Color("#646f69")
+		green = lipgloss.Color("#99be70")
+		red = lipgloss.Color("#F05E48")
+		accent1 = lipgloss.Color("#86c1b9")
+		accent2 = lipgloss.Color("#727ca5")
+		accent3 = lipgloss.Color("#72a59e")
+		accent4 = lipgloss.Color("#cfba8b")
+		accent5 = lipgloss.Color("#FAD566")
+	}
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
 	return &theme{
-		baseStyle:   defaultStyle.Background(lipgloss.Color("#282a36")),
-		emptyStyle:  defaultStyle.Background(lipgloss.Color("#222430")),
-		cursorStyle: defaultStyle.Background(lipgloss.Color("#44475a")),
+		baseStyle:   defaultStyle.Background(base),
+		emptyStyle:  defaultStyle.Background(empty),
+		cursorStyle: defaultStyle.Background(cursor),
 
 		whiteColor: white,
 		blackColor: black,

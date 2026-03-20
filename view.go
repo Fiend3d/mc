@@ -181,9 +181,9 @@ func (m model) View() tea.View {
 		Bold(true)
 
 	switch m.mode {
-	case normalMode:
+	case normalMode, confirmDialogMode:
 		modeStr = " NORMAL "
-	case visualMode:
+	case visualMode, confirmDialogVisualMode:
 		modeStyle = modeStyle.Background(m.theme.accentColor4)
 		modeStr = " VISUAL "
 	case jumpMode:
