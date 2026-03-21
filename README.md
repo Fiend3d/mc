@@ -2,6 +2,18 @@
 
 Modal Commander (mc) is a TUI file manager for Windows (though it might be ported to other platforms in the future). It's heavily inspired by Yazi, Helix, and Total Commander. 
 
+## Version 1.1
+
+Themes have been added.
+
+![RECLibboard](assets/demo/themes.gif)
+
+The theme can be set in Go mode (`g` -> `T`). The config can be saved by pressing `g` -> `C`. Alternatively, the theme can be set by editing `$env:APPDATA\mc\config.toml`:
+
+```toml
+theme = "tokyonight"
+```
+
 ## Demo
 
 ![RECLibboard](assets/demo/demo01.png)
@@ -119,6 +131,7 @@ Go mode is just a menu.
 
 **g** - Enter Path mode.<br/>
 **t** - Browse tabs.<br/>
+**T** - Set theme.<br/>
 **c** - Open the settings directory. You can also find and delete bookmarks there, for example.<br/>
 **C** - Save settings to config.toml for editing.<br/>
 **s** - Calculate size for the selected directories.<br/>

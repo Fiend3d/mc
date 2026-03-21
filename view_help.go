@@ -146,6 +146,7 @@ func viewHelp(m *model) string {
 		{"", " Go mode is just a menu."},
 		{" g", " - Enter Path mode."},
 		{" t", " - Browse tabs."},
+		{" T", " - Set theme."},
 		{" c", " - Open the settings directory. You can also find and delete bookmarks there, for example."},
 		{" C", " - Save settings to config.toml for editing."},
 		{" s", " - Calculate size for the selected directories."},
