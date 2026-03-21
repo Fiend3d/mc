@@ -35,6 +35,7 @@ const (
 	bookmarksMode
 	searchMode
 	shellMode
+	themeMode
 )
 
 type model struct {
@@ -81,7 +82,8 @@ type model struct {
 	bm     *bookmarks
 	search *search
 
-	theme *theme
+	theme       *theme
+	themeCursor int
 
 	result string
 }

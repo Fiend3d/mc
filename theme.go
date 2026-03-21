@@ -202,6 +202,7 @@ func newTheme(name string) *theme {
 	}
 
 	defaultStyle := lipgloss.NewStyle().Foreground(white)
+
 	return &theme{
 		baseStyle:   defaultStyle.Background(base),
 		emptyStyle:  defaultStyle.Background(empty),

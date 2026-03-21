@@ -399,6 +399,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.tabsCursor = m.currentTab
 				m.updateTabsStart()
 				return m, nil
+			case "T":
+				m.mode = themeMode
+				m.themeCursor = 0
+				return m, nil
 			case "c":
 				m.mode = normalMode
 				configDir := getConfigDir()
@@ -1297,6 +1301,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleQuit(true)
 			case "Q":
 				return m.handleQuit(false)
+			}
+
+		case themeMode:
+			switch msg.String() {
+			case "esc":
+				m.mode = normalMode
+				return m, nil
 			}
 
 		case messagesMode:

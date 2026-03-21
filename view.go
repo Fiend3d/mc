@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -213,6 +214,8 @@ func (m model) View() tea.View {
 	case shellMode:
 		modeStyle = modeStyle.Background(m.theme.greenColor)
 		modeStr = " SHELL "
+	case themeMode:
+		modeStr = " THEME "
 	default:
 		modeStyle = modeStyle.Background(m.theme.whiteColor)
 		modeStr = " NONE "
@@ -287,6 +290,7 @@ func (m model) View() tea.View {
 		rows := [][]string{
 			{"g", " Change path "},
 			{"t", " View tabs "},
+			{"T", " Set theme "},
 			{"c", " Open config directory "},
 			{"C", " Save current config "},
 			{"s", " Calculate size "},
@@ -349,6 +353,24 @@ func (m model) View() tea.View {
 			{" s ", " Copy the filenames as arguments "},
 			{" q/Q ", " Copy the file paths as array/Forward "},
 			{" w ", " Copy the filenames as array "},
+		}
+
+		ui = m.renderTableOverlay(headers, rows, ui)
+
+	case themeMode:
+		headers := []string{" Sel ", " Theme "}
+		rows := make([][]string, len(themeMap))
+		keys := make([]string, 0, len(themeMap))
+		for key := range themeMap {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		for i, key := range keys {
+			cursor := "   "
+			if i == m.themeCursor {
+				cursor = " > "
+			}
+			rows[i] = []string{cursor, fmt.Sprintf(" %s ", key)}
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)
