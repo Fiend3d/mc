@@ -39,15 +39,29 @@ const (
 
 const defaultTheme = draculaTheme
 
-var themeMap = map[string]colorPreset{
-	"autumn":     autumnTheme,
-	"base16":     base16Theme,
-	"dracula":    draculaTheme,
-	"ferra":      ferraTheme,
-	"github":     githubTheme,
-	"monokai":    monokaiTheme,
-	"nord":       nordTheme,
-	"tokyonight": tokyonightTheme,
+type themeItem struct {
+	name   string
+	preset colorPreset
+}
+
+var themeList = []themeItem{
+	{"autumn", autumnTheme},
+	{"base16", base16Theme},
+	{"dracula", draculaTheme},
+	{"ferra", ferraTheme},
+	{"github", githubTheme},
+	{"monokai", monokaiTheme},
+	{"nord", nordTheme},
+	{"tokyonight", tokyonightTheme},
+}
+
+func findPreset(name string) colorPreset {
+	for i := range themeList {
+		if themeList[i].name == name {
+			return themeList[i].preset
+		}
+	}
+	return defaultTheme
 }
 
 func newTheme(name string) *theme {
@@ -66,10 +80,7 @@ func newTheme(name string) *theme {
 	var accent4 color.Color
 	var accent5 color.Color
 
-	preset, ok := themeMap[name]
-	if !ok {
-		preset = defaultTheme
-	}
+	preset := findPreset(name)
 
 	switch preset {
 	case autumnTheme:

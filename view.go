@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -359,18 +358,13 @@ func (m model) View() tea.View {
 
 	case themeMode:
 		headers := []string{" Sel ", " Theme "}
-		rows := make([][]string, len(themeMap))
-		keys := make([]string, 0, len(themeMap))
-		for key := range themeMap {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		for i, key := range keys {
+		rows := make([][]string, len(themeList))
+		for i := range themeList {
 			cursor := "   "
 			if i == m.themeCursor {
 				cursor = " > "
 			}
-			rows[i] = []string{cursor, fmt.Sprintf(" %s ", key)}
+			rows[i] = []string{cursor, fmt.Sprintf(" %s ", themeList[i].name)}
 		}
 
 		ui = m.renderTableOverlay(headers, rows, ui)
