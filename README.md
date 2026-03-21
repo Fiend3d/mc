@@ -20,6 +20,8 @@ theme = "tokyonight"
 ![RECLibboard](assets/demo/demo02.png)
 ![RECLibboard](assets/demo/demo03.png)
 ![RECLibboard](assets/demo/demo04.png)
+`mc` can easily calculate the sizes of directories and sort them by size:
+![RECLibboard](assets/demo/demo05.png)
 ![RECLibboard](assets/demo/demo.gif)
 
 ## How to install
