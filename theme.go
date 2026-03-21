@@ -64,6 +64,25 @@ func findPreset(name string) colorPreset {
 	return defaultTheme
 }
 
+func findPresetIndex(name string) int {
+	for i := range themeList {
+		if themeList[i].name == name {
+			return i
+		}
+	}
+	return 0
+}
+
+func (m *model) updateTheme() {
+	setTextinputStyle(&m.input, m.theme)
+	setTextinputStyle(&m.pathInput, m.theme)
+	setSpinnerStyle(&m.spinner, m.theme)
+	if m.search != nil {
+		setTextinputStyle(&m.search.filename, m.theme)
+		setTextinputStyle(&m.search.text, m.theme)
+	}
+}
+
 func newTheme(name string) *theme {
 	var base color.Color
 	var empty color.Color

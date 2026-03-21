@@ -83,6 +83,7 @@ type model struct {
 	search *search
 
 	theme       *theme
+	themeOld    *theme
 	themeCursor int
 
 	result string
@@ -388,11 +389,7 @@ func (m *model) getPage() *page { // probably redundant
 	return tab.page
 }
 
-func newTextinput(t *theme) textinput.Model {
-	input := textinput.New()
-	input.Prompt = " > "
-	input.CharLimit = 255 // hello, windows!
-	input.SetWidth(0)     // TODO: it's bugged right now
+func setTextinputStyle(input *textinput.Model, t *theme) {
 	styles := input.Styles()
 	styles.Cursor.Shape = tea.CursorBar
 	styles.Focused.Text = t.emptyStyle
@@ -408,6 +405,19 @@ func newTextinput(t *theme) textinput.Model {
 	styles.Cursor.Color = t.emptyStyle.GetForeground()
 	styles.Cursor.Blink = true
 	input.SetStyles(styles)
+}
+
+func setSpinnerStyle(s *spinner.Model, t *theme) {
+	s.Spinner = spinner.Dot
+	s.Style = t.baseStyle.Foreground(t.accentColor1)
+}
+
+func newTextinput(t *theme) textinput.Model {
+	input := textinput.New()
+	input.Prompt = " > "
+	input.CharLimit = 255 // hello, windows!
+	input.SetWidth(0)     // TODO: it's bugged right now
+	setTextinputStyle(&input, t)
 	return input
 }
 
@@ -422,12 +432,11 @@ func initialModel(dirs []string) model {
 		tabs[i] = newTab(dir, &page{})
 	}
 
-	theme := newTheme("tokyonight")
+	theme := newTheme(cfg.Theme)
 	input := newTextinput(theme)
 	pathInput := newTextinput(theme)
 	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = theme.baseStyle.Foreground(theme.accentColor1)
+	setSpinnerStyle(&s, theme)
 
 	return model{
 		cfg:        cfg,

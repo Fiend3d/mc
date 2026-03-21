@@ -15,16 +15,17 @@ type ToolConfig struct {
 }
 
 type Config struct {
-	F2  *ToolConfig `toml:"F2"`
-	F3  *ToolConfig `toml:"F3"`
-	F4  *ToolConfig `toml:"F4"`
-	F6  *ToolConfig `toml:"F6"`
-	F7  *ToolConfig `toml:"F7"`
-	F8  *ToolConfig `toml:"F8"`
-	F9  *ToolConfig `toml:"F9"`
-	F10 *ToolConfig `toml:"F10"`
-	F11 *ToolConfig `toml:"F11"`
-	F12 *ToolConfig `toml:"F12"`
+	Theme string      `toml:"theme"`
+	F2    *ToolConfig `toml:"F2"`
+	F3    *ToolConfig `toml:"F3"`
+	F4    *ToolConfig `toml:"F4"`
+	F6    *ToolConfig `toml:"F6"`
+	F7    *ToolConfig `toml:"F7"`
+	F8    *ToolConfig `toml:"F8"`
+	F9    *ToolConfig `toml:"F9"`
+	F10   *ToolConfig `toml:"F10"`
+	F11   *ToolConfig `toml:"F11"`
+	F12   *ToolConfig `toml:"F12"`
 }
 
 func getConfigDir() string {
@@ -46,12 +47,13 @@ func getConfigPath() string {
 
 func loadConfig() (*Config, error) {
 	cfg := &Config{
-		F2: &ToolConfig{Command: "deps", Args: []string{}, Type: "path"},
-		F3: &ToolConfig{Command: "bat", Args: []string{"--color=always", "-p", "--pager", "less -c -R -S"}, Type: "path"},
-		F4: &ToolConfig{Command: "hx", Args: []string{}, Type: "path"},
-		F6: &ToolConfig{Command: "explorer", Args: []string{}, Type: "dir"},
-		F7: &ToolConfig{Command: "code", Args: []string{}, Type: "path"},
-		F8: &ToolConfig{Command: "code", Args: []string{}, Type: "dir"},
+		Theme: "dracula",
+		F2:    &ToolConfig{Command: "deps", Args: []string{}, Type: "path"},
+		F3:    &ToolConfig{Command: "bat", Args: []string{"--color=always", "-p", "--pager", "less -c -R -S"}, Type: "path"},
+		F4:    &ToolConfig{Command: "hx", Args: []string{}, Type: "path"},
+		F6:    &ToolConfig{Command: "explorer", Args: []string{}, Type: "dir"},
+		F7:    &ToolConfig{Command: "code", Args: []string{}, Type: "path"},
+		F8:    &ToolConfig{Command: "code", Args: []string{}, Type: "dir"},
 	}
 
 	configPath := getConfigPath()

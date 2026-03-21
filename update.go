@@ -401,7 +401,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "T":
 				m.mode = themeMode
-				m.themeCursor = 0
+				m.themeCursor = findPresetIndex(m.cfg.Theme)
+				m.themeOld = m.theme
 				return m, nil
 			case "c":
 				m.mode = normalMode
@@ -1307,7 +1308,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "esc":
 				m.mode = normalMode
+				m.theme = m.themeOld
+				m.themeOld = nil
 				return m, nil
+			case "j", "down":
+				m.themeCursor++
+				m.themeCursor = min(len(themeList)-1, m.themeCursor)
+				m.theme = newTheme(themeList[m.themeCursor].name)
+				return m, nil
+			case "k", "up":
+				m.themeCursor--
+				m.themeCursor = max(0, m.themeCursor)
+				m.theme = newTheme(themeList[m.themeCursor].name)
+				return m, nil
+			case "l", "enter":
+				m.mode = normalMode
+				m.themeOld = nil
+				name := themeList[m.themeCursor].name
+				m.cfg.Theme = name
+				m.updateTheme()
+				return m, m.addMessage(msgInfo, fmt.Sprintf("%s theme set; don't forget to save the current config", name))
 			}
 
 		case messagesMode:
