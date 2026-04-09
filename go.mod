@@ -4,16 +4,16 @@ go 1.26.1
 
 require (
 	charm.land/bubbles/v2 v2.0.0
-	charm.land/bubbletea/v2 v2.0.1
-	charm.land/lipgloss/v2 v2.0.0
+	charm.land/bubbletea/v2 v2.0.2
+	charm.land/lipgloss/v2 v2.0.2
 	github.com/BurntSushi/toml v1.6.0
 	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/dustin/go-humanize v1.0.1
 	github.com/go-pkgz/fileutils v0.4.0
 	github.com/gonutz/w32 v1.0.0
-	github.com/rmhubbert/bubbletea-overlay v0.6.4
+	github.com/rmhubbert/bubbletea-overlay v0.6.6
 	golang.design/x/clipboard v0.7.1
-	golang.org/x/sys v0.41.0
+	golang.org/x/sys v0.43.0
 )
 
 replace charm.land/bubbles/v2 => ./forks/bubbles

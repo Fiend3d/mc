@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-pkgz/fileutils"
 	"golang.org/x/sys/windows"
 )
 
@@ -371,4 +372,23 @@ func isDirEmpty(path string) (bool, error) {
 		return true, nil // empty
 	}
 	return false, err // not empty or actual error
+}
+
+func copyDir(src, dst string) error {
+	empty, err := isDirEmpty(src)
+	if err != nil {
+		return err
+	}
+	if empty {
+		err := os.MkdirAll(dst, 0755)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := fileutils.CopyDir(src, dst)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
