@@ -185,7 +185,7 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 
 func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
 	switch m.mode {
-	case normalMode:
+	case normalMode, visualMode, jumpMode:
 		tab := m.getTab()
 		if m.height-3 <= tab.page.length() {
 			settings := tab.getPageSettings()

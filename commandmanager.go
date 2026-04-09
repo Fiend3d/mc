@@ -164,9 +164,20 @@ func (c *fileActionCommand) execute() error {
 			continue
 		}
 		if fileutils.IsDir(c.pairs[i].src) {
-			err := fileutils.CopyDir(c.pairs[i].src, c.pairs[i].dst)
+			empty, err := isDirEmpty(c.pairs[i].src)
 			if err != nil {
 				return err
+			}
+			if empty {
+				err := os.MkdirAll(c.pairs[i].dst, 0755)
+				if err != nil {
+					return err
+				}
+			} else {
+				err := fileutils.CopyDir(c.pairs[i].src, c.pairs[i].dst)
+				if err != nil {
+					return err
+				}
 			}
 			switch c.action {
 			case cutFileAction, renameFileAction:

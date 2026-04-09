@@ -200,7 +200,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.MouseLeft:
 			m.click = newClick(data.X, data.Y, &m.click)
 			switch m.mode {
-			case normalMode, visualMode:
+			case normalMode, visualMode, jumpMode:
 				if m.click.y == 0 {
 					if m.mode == visualMode {
 						return m, nil
