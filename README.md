@@ -166,23 +166,6 @@ Press `gg` to enter path mode.
 
 ## How to Build
 
-Because I fixed a few issues in [github.com/charmbracelet/bubbles](https://github.com/charmbracelet/bubbles), you'll need to get my fork first.
-
-You can do this using:
-
-```powershell
-.\get_forks.ps1
-```
-
-If that doesn't work, you may need to enable PowerShell scripts first:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-Then simply run:
-
-
 ```powershell
 .\build.ps1
 ```

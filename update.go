@@ -11,7 +11,7 @@ import (
 	"strings"
 	"unicode"
 
-	"charm.land/bubbles/v2/textinput"
+	"mc/widgets/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/dustin/go-humanize"
 )

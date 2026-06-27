@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/spinner"
-	"charm.land/bubbles/v2/textinput"
+	"mc/widgets/spinner"
+	"mc/widgets/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 

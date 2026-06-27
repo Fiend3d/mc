@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
+	"mc/widgets/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
