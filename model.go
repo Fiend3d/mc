@@ -363,7 +363,7 @@ func (m *model) right(addNewTab bool) (tea.Model, tea.Cmd) {
 		m.tabs = append(m.tabs, tabCopy)
 		m.currentTab = len(m.tabs) - 1
 		return m, tea.Batch(
-			m.addMessage(msgInfo, fmt.Sprintf("%s openned in a new tab", dir)),
+			m.addMessage(msgInfo, fmt.Sprintf("%s opened in a new tab", dir)),
 			m.readDir(m.currentTab, dir),
 		)
 	}

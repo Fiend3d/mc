@@ -425,7 +425,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				var info string
 				if configExists {
-					info = fmt.Sprintf("config overriden: %s", configPath)
+					info = fmt.Sprintf("config overridden: %s", configPath)
 				} else {
 					info = fmt.Sprintf("config saved: %s", configPath)
 				}

@@ -169,7 +169,7 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 	}
 	dir = filepath.Clean(dir)
 	if !shutil.DirExists(dir) {
-		return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
+		return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exist", dir))
 	}
 
 	dir, err = realWindowsPath(dir)
