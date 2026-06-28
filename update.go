@@ -238,6 +238,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						clickedDir := filepathDir(clickedPath)
 
 						index := slices.Index(history, clickedDir)
+						if index < 0 || index+1 >= len(history) {
+							return m, nil
+						}
 						return m, m.changeDir(history[index+1])
 					}
 				} else if m.click.y < m.height-2 {
