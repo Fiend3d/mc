@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -154,30 +153,44 @@ func (m *model) readDir(tab int, dir string) tea.Cmd {
 }
 
 type commandDoneMsg struct {
-	message string
-	dir     string
-	sel     *string
-	err     error
+	cmd command
+	dir string
+	sel *string
+	err error
+}
+
+type undoDoneMsg struct {
+	cmd command
+	dir string
+	sel *string
+	err error
+}
+
+type redoDoneMsg struct {
+	cmd command
+	dir string
+	sel *string
+	err error
 }
 
 func (m model) execute(cmd command) tea.Cmd {
 	return func() tea.Msg {
-		err := m.cm.execute(cmd)
-		return commandDoneMsg{fmt.Sprintf("%s", cmd), cmd.getDir(), cmd.sel(), err}
+		err := cmd.execute()
+		return commandDoneMsg{cmd, cmd.getDir(), cmd.sel(), err}
 	}
 }
 
-func (m model) undo() tea.Cmd {
+func (m model) runUndo(cmd command) tea.Cmd {
 	return func() tea.Msg {
-		cmd, err := m.cm.undo()
-		return commandDoneMsg{fmt.Sprintf("undo: %s", cmd), cmd.getDir(), cmd.sel(), err}
+		err := cmd.undo()
+		return undoDoneMsg{cmd, cmd.getDir(), cmd.sel(), err}
 	}
 }
 
-func (m model) redo() tea.Cmd {
+func (m model) runRedo(cmd command) tea.Cmd {
 	return func() tea.Msg {
-		cmd, err := m.cm.redo()
-		return commandDoneMsg{fmt.Sprintf("redo: %s", cmd), cmd.getDir(), cmd.sel(), err}
+		err := cmd.execute()
+		return redoDoneMsg{cmd, cmd.getDir(), cmd.sel(), err}
 	}
 }
 

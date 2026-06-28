@@ -28,37 +28,9 @@ func newCommandManager() *commandManager {
 	}
 }
 
-func (cm *commandManager) execute(cmd command) error {
-	err := cmd.execute()
+func (cm *commandManager) pushHistory(cmd command) {
 	cm.history = append(cm.history, cmd)
 	cm.redoStack = cm.redoStack[:0]
-	return err
-}
-
-func (cm *commandManager) undo() (command, error) {
-	if len(cm.history) == 0 {
-		return nil, nil
-	}
-
-	lastCmd := cm.history[len(cm.history)-1]
-	err := lastCmd.undo()
-
-	cm.history = cm.history[:len(cm.history)-1]
-	cm.redoStack = append(cm.redoStack, lastCmd)
-	return lastCmd, err
-}
-
-func (cm *commandManager) redo() (command, error) {
-	if len(cm.redoStack) == 0 {
-		return nil, nil
-	}
-
-	lastCmd := cm.redoStack[len(cm.redoStack)-1]
-	err := lastCmd.execute()
-
-	cm.redoStack = cm.redoStack[:len(cm.redoStack)-1]
-	cm.history = append(cm.history, lastCmd)
-	return lastCmd, err
 }
 
 func (cm *commandManager) canUndo() bool {
@@ -67,6 +39,32 @@ func (cm *commandManager) canUndo() bool {
 
 func (cm *commandManager) canRedo() bool {
 	return len(cm.redoStack) > 0
+}
+
+func (cm *commandManager) peekUndo() (command, error) {
+	if len(cm.history) == 0 {
+		return nil, fmt.Errorf("nothing to undo")
+	}
+	return cm.history[len(cm.history)-1], nil
+}
+
+func (cm *commandManager) commitUndo() {
+	lastCmd := cm.history[len(cm.history)-1]
+	cm.history = cm.history[:len(cm.history)-1]
+	cm.redoStack = append(cm.redoStack, lastCmd)
+}
+
+func (cm *commandManager) peekRedo() (command, error) {
+	if len(cm.redoStack) == 0 {
+		return nil, fmt.Errorf("nothing to redo")
+	}
+	return cm.redoStack[len(cm.redoStack)-1], nil
+}
+
+func (cm *commandManager) commitRedo() {
+	lastCmd := cm.redoStack[len(cm.redoStack)-1]
+	cm.redoStack = cm.redoStack[:len(cm.redoStack)-1]
+	cm.history = append(cm.history, lastCmd)
 }
 
 type deleteCommand struct {

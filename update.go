@@ -141,19 +141,57 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, m.addMessage(
 				msgFail,
-				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.err))
-		} else {
-			if msg.sel != nil {
-				tab := m.getTab()
-				if tab.dir == msg.dir {
-					settings := tab.pageSettings[msg.dir]
-					settings.sel = msg.sel
-				}
-			}
-			return m, tea.Batch(
-				m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.message)),
-				m.update(msg.dir))
+				fmt.Sprintf("command \"%s\" failed: %s", msg.cmd, msg.err))
 		}
+		m.cm.pushHistory(msg.cmd)
+		if msg.sel != nil {
+			tab := m.getTab()
+			if tab.dir == msg.dir {
+				settings := tab.pageSettings[msg.dir]
+				settings.sel = msg.sel
+			}
+		}
+		return m, tea.Batch(
+			m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.cmd)),
+			m.update(msg.dir))
+
+	case undoDoneMsg:
+		m.jobDone()
+		if msg.err != nil {
+			return m, m.addMessage(
+				msgFail,
+				fmt.Sprintf("undo \"%s\" failed: %s", msg.cmd, msg.err))
+		}
+		m.cm.commitUndo()
+		if msg.sel != nil {
+			tab := m.getTab()
+			if tab.dir == msg.dir {
+				settings := tab.pageSettings[msg.dir]
+				settings.sel = msg.sel
+			}
+		}
+		return m, tea.Batch(
+			m.addMessage(msgDone, fmt.Sprintf("undo: %s", msg.cmd)),
+			m.update(msg.dir))
+
+	case redoDoneMsg:
+		m.jobDone()
+		if msg.err != nil {
+			return m, m.addMessage(
+				msgFail,
+				fmt.Sprintf("redo \"%s\" failed: %s", msg.cmd, msg.err))
+		}
+		m.cm.commitRedo()
+		if msg.sel != nil {
+			tab := m.getTab()
+			if tab.dir == msg.dir {
+				settings := tab.pageSettings[msg.dir]
+				settings.sel = msg.sel
+			}
+		}
+		return m, tea.Batch(
+			m.addMessage(msgDone, fmt.Sprintf("redo: %s", msg.cmd)),
+			m.update(msg.dir))
 
 	case readDirMsg:
 		if msg.tab >= len(m.tabs) { // just in case
@@ -667,20 +705,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.cm.canUndo() {
 					return m, m.addMessage(msgWarning, "nothing to undo")
 				}
+				cmd, err := m.cm.peekUndo()
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
 				m.addJob()
 				return m, tea.Batch(
-					m.addMessage(msgInfo, "undo"),
+					m.addMessage(msgInfo, fmt.Sprintf("undo: %s", cmd)),
 					m.spinner.Tick,
-					m.undo())
+					m.runUndo(cmd))
 			case "U":
 				if !m.cm.canRedo() {
 					return m, m.addMessage(msgWarning, "nothing to redo")
 				}
+				cmd, err := m.cm.peekRedo()
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
 				m.addJob()
 				return m, tea.Batch(
-					m.addMessage(msgInfo, "redo"),
+					m.addMessage(msgInfo, fmt.Sprintf("redo: %s", cmd)),
 					m.spinner.Tick,
-					m.redo())
+					m.runRedo(cmd))
 			case "p":
 				return m.handlePaste(false)
 			case "P":
