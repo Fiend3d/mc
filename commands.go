@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"mc/shutil"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -195,7 +196,7 @@ func calculateSize(dir string, paths []string) tea.Cmd {
 	return func() tea.Msg {
 		result := calcDirSizeMsg{dir: dir, dirSizes: make([]dirSize, 0, len(paths))}
 		for i := range paths {
-			size, err := calcDirSize(paths[i])
+			size, err := shutil.CalcDirSize(paths[i])
 			if err == nil {
 				result.dirSizes = append(result.dirSizes, dirSize{paths[i], size})
 				result.total += size

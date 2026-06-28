@@ -11,6 +11,7 @@ import (
 	"strings"
 	"unicode"
 
+	"mc/shutil"
 	"mc/widgets/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/dustin/go-humanize"
@@ -108,7 +109,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			reserved := make([]string, 0, len(lines))
 			for i := range pairs {
-				unique := uniquePath(reserved, msg.paths, pairs[i].dst)
+				unique := shutil.UniquePath(reserved, msg.paths, pairs[i].dst)
 				pairs[i].dst = unique
 				reserved = append(reserved, unique)
 			}
@@ -407,7 +408,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "c":
 				m.mode = normalMode
 				configDir := getConfigDir()
-				if !dirExists(configDir) {
+				if !shutil.DirExists(configDir) {
 					err := os.MkdirAll(configDir, 0755)
 					if err != nil {
 						return m, m.addMessage(msgError, err.Error())
@@ -417,7 +418,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "C":
 				m.mode = normalMode
 				configPath := getConfigPath()
-				configExists := pathExists(configPath)
+				configExists := shutil.PathExists(configPath)
 				err := saveConfig(m.cfg)
 				if err != nil {
 					return m, m.addMessage(msgError, err.Error())
@@ -1052,7 +1053,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					value := m.input.Value()
 					dir := filepath.Dir(m.renamePaths[0])
 					path := filepath.Join(dir, value)
-					finalPath := uniquePath(nil, nil, path)
+					finalPath := shutil.UniquePath(nil, nil, path)
 					pairs := []pathPair{{m.renamePaths[0], finalPath}}
 					cmd := &fileActionCommand{
 						action: renameFileAction,

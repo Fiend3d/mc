@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go-pkgz/fileutils"
+	"mc/shutil"
 )
 
 type command interface {
@@ -128,12 +128,12 @@ func newFileActionCommand(action fileAction, paths []string, dst string, overrid
 		name := filepath.Base(paths[i])
 		dstPath := filepath.Join(dst, name)
 		if override {
-			if pathExists(dstPath) {
+			if shutil.PathExists(dstPath) {
 				collision = true
 			}
 			pairs = append(pairs, pathPair{paths[i], dstPath})
 		} else {
-			path := uniquePath(reserved, paths, dstPath)
+			path := shutil.UniquePath(reserved, paths, dstPath)
 			reserved = append(reserved, path)
 			pairs = append(pairs, pathPair{paths[i], path})
 		}
@@ -163,8 +163,8 @@ func (c *fileActionCommand) execute() error {
 		if c.pairs[i].src == c.pairs[i].dst {
 			continue
 		}
-		if fileutils.IsDir(c.pairs[i].src) {
-			err := copyDir(c.pairs[i].src, c.pairs[i].dst)
+		if shutil.IsDir(c.pairs[i].src) {
+			err := shutil.CopyDir(c.pairs[i].src, c.pairs[i].dst)
 			if err != nil {
 				return err
 			}
@@ -179,12 +179,12 @@ func (c *fileActionCommand) execute() error {
 		} else {
 			switch c.action {
 			case copyFileAction:
-				err := fileutils.CopyFile(c.pairs[i].src, c.pairs[i].dst)
+				err := shutil.CopyFile(c.pairs[i].src, c.pairs[i].dst)
 				if err != nil {
 					return err
 				}
 			case cutFileAction, renameFileAction:
-				err := fileutils.MoveFile(c.pairs[i].src, c.pairs[i].dst)
+				err := shutil.MoveFile(c.pairs[i].src, c.pairs[i].dst)
 				if err != nil {
 					return err
 				}
@@ -199,7 +199,7 @@ func (c *fileActionCommand) undo() error {
 		return fmt.Errorf("there's a collision")
 	}
 	for i := range c.pairs {
-		if !pathExists(c.pairs[i].dst) {
+		if !shutil.PathExists(c.pairs[i].dst) {
 			return fmt.Errorf("%s doesn't exist", c.pairs[i].dst)
 		}
 		if c.pairs[i].src == c.pairs[i].dst {
@@ -212,8 +212,8 @@ func (c *fileActionCommand) undo() error {
 				return err
 			}
 		case cutFileAction, renameFileAction:
-			if fileutils.IsDir(c.pairs[i].dst) {
-				err := copyDir(c.pairs[i].dst, c.pairs[i].src)
+			if shutil.IsDir(c.pairs[i].dst) {
+				err := shutil.CopyDir(c.pairs[i].dst, c.pairs[i].src)
 				if err != nil {
 					return err
 				}
@@ -222,7 +222,7 @@ func (c *fileActionCommand) undo() error {
 					return err
 				}
 			} else {
-				err := fileutils.MoveFile(c.pairs[i].dst, c.pairs[i].src)
+				err := shutil.MoveFile(c.pairs[i].dst, c.pairs[i].src)
 				if err != nil {
 					return err
 				}
@@ -252,7 +252,7 @@ func newCreateCommand(name string, dir string) *createCommand {
 		isDir = true
 		runes = runes[:len(runes)-1]
 	}
-	path := uniquePath(nil, nil, filepath.Join(dir, string(runes)))
+	path := shutil.UniquePath(nil, nil, filepath.Join(dir, string(runes)))
 	return &createCommand{path, isDir, dir}
 }
 
@@ -263,7 +263,7 @@ func (c *createCommand) execute() error {
 			return err
 		}
 	} else {
-		err := fileutils.TouchFile(c.path)
+		err := shutil.TouchFile(c.path)
 		if err != nil {
 			return err
 		}

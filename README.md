@@ -169,3 +169,9 @@ Press `gg` to enter path mode.
 ```powershell
 .\build.ps1
 ```
+
+If that doesn't work, you may need to enable PowerShell scripts first:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
