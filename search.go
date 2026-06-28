@@ -381,15 +381,7 @@ func viewSearch(m *model) string {
 const searchBufferSize = 1000
 
 func (s *search) launch(dir string) {
-	if s.cancel != nil {
-		select {
-		case _, ok := <-s.cancel:
-			if ok {
-				close(s.cancel)
-			}
-		default:
-		}
-	}
+	s.stop()
 	s.working = true
 	s.cursor = 0
 	s.start = 0
@@ -403,6 +395,9 @@ func (s *search) launch(dir string) {
 }
 
 func (s *search) stop() {
+	if !s.working {
+		return
+	}
 	close(s.cancel)
 	s.working = false
 }
