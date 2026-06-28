@@ -343,12 +343,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				settings.cursor = 0
 				m.updateStart()
 				return m, nil
-			case "end":
-				tab := m.getTab()
-				settings := tab.getPageSettings()
+		case "end":
+			tab := m.getTab()
+			settings := tab.getPageSettings()
+			if tab.page.length() > 0 {
 				settings.cursor = tab.page.length() - 1
 				m.updateStart()
-				return m, nil
+			}
+			return m, nil
 			case "space":
 				tab := m.getTab()
 				if m.mode == visualMode {
