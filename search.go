@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"mc/widgets/textinput"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -703,7 +704,7 @@ func fileContainsText(path, text string) (bool, []searchLine, error) {
 		return false, nil, err
 	}
 	if binary {
-		return false, nil, err
+		return false, nil, nil
 	}
 
 	f, err := os.Open(path)
