@@ -742,14 +742,19 @@ func fileContainsText(path, text string, caseIgnore bool) (bool, []searchLine, e
 			lineStr = strings.ToLower(line)
 		}
 
-		idx := strings.Index(lineStr, searchText)
-		if idx != -1 {
+		offset := 0
+		for {
+			pos := strings.Index(lineStr[offset:], searchText)
+			if pos == -1 {
+				break
+			}
 			results = append(results, searchLine{
 				line:       line,
 				lineNumber: lineNumber,
-				start:      idx,
-				end:        idx + len(text),
+				start:      offset + pos,
+				end:        offset + pos + len(text),
 			})
+			offset += pos + 1
 		}
 	}
 
