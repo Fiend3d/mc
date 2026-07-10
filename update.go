@@ -808,6 +808,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "f1":
 				m.search.gitignore = !m.search.gitignore
 				return m, nil
+			case "f2":
+				m.search.caseIgnore = !m.search.caseIgnore
+				return m, nil
 			case "f3":
 				if m.search.isItem(m.search.cursor) {
 					return m.handleTool(msg.String())
