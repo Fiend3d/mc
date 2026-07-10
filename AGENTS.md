@@ -23,7 +23,7 @@ Pass directories as positional args to open them on launch.
 ## Setup Requirements
 
 - **OS**: Windows only (Win32 API, CF_HDROP clipboard, Netapi32)
-- **Go**: 1.26.1
+- **Go**: 1.26.4
 - **External deps**: `bat` + `less` (from Git), `hx` (helix), `code`
 - **Recommended**: Windows Terminal (for mouse support), JetBrainsMonoNL Nerd Font
 - **Config**: `$env:APPDATA\mc\config.toml` — theme, F-key tools
@@ -33,7 +33,7 @@ Run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` if PowerShell scripts 
 
 ## Architecture
 
-Single Go module (`module mc`), single `package main` plus `internal/widgets/` (spinner, textinput, cursor, key, runeutil). Uses Bubble Tea v2 (`charm.land/bubbletea/v2`).
+Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, textinput, cursor, key, runeutil) and `shutil/`. Uses Bubble Tea v2 (`charm.land/bubbletea/v2`).
 
 ### Key files
 
@@ -41,31 +41,40 @@ Single Go module (`module mc`), single `package main` plus `internal/widgets/` (
 |------|------|
 | `main.go` | Entrypoint, CLI flag parsing |
 | `model.go` | `model` struct (state), mode constants, initialization |
-| `update.go` | Message handling + event loop (`Update()`) — largest file (~1400 lines) |
+| `update.go` | Message handling + event loop (`Update()`) — largest file (~1470 lines) |
 | `view.go` | Rendering (`View()`) |
 | `handle.go` | Action handlers (quit, paste, rename, tools, clipboard copy) |
 | `commands.go` | Async command wrappers, directory reading, file ops |
 | `commandmanager.go` | Command pattern (undo/redo); delete is NOT undoable |
 | `item.go` | Item interface + 3 implementations: `filepathItem`, `driveItem`, `sharedItem` |
 | `search.go` | Full-text/content search with gitignore support |
+| `sort.go` | Sorting methods (modified time, alpha, extension, size, random) |
+| `tab.go` | Tab structure, navigation history, forward/back |
+| `mouse.go` | Mouse click tracking and double-click detection |
+| `bookmarks.go` | Bookmarks data structure and cursor management |
 | `theme.go` | 8 themes (dracula is default) |
 | `clipboard.go` | Windows CF_HDROP clipboard integration |
 | `drives.go` | Drive enumeration via Windows API |
 | `net.go` | Network share enumeration via Netapi32 |
 | `config.go` | TOML config, bookmarks, shell history |
 | `utils.go` | Path utilities, autocomplete, file ops, `uniquePath` naming |
+| `view_help.go` | Help view rendering with topics |
+| `view_bookmarks.go` | Bookmarks view rendering |
+| `view_tabs.go` | Tabs view rendering |
+| `view_utils.go` | View utility functions (colorizeDir, truncate) |
+| `shutil/shutil.go` | File system utility functions |
 
-### Modes (19 total)
+### Modes (22 total)
 
-Access via keybindings: normal, visual, jump, filter, sort, rename, create, copy, path, shell, search, go, theme, bookmarks, tabs, messages, help, hidden, confirm dialog.
+Access via keybindings: normal, hidden, visual, help, helpFilter, go, confirmDialog, confirmDialogVisual, jump, messages, tabs, filter, sort, rename, create, path, copy, copyVisual, bookmarks, search, shell, theme.
 
 ## Build Process
 
-No fork needed — all widget components live in `internal/widgets/`.
+No fork needed — all widget components live in `widgets`.
 
 ## Testing
 
-No test files exist.
+Only `shutil/shutil_test.go` exists (in the `shutil` package).
 
 ## Key Conventions
 
