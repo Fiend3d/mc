@@ -116,7 +116,7 @@ Entered by pressing `` ` `` (backtick). The message history can be viewed here.
 
 ### Search Mode
 
-Press `s` to enter search mode. Use `tab` to cycle through focus. By default, search respects `.gitignore`, but you can disable this by pressing `F1` while in search mode.
+Press `s` to enter search mode. Use `tab` to cycle through focus. By default, search respects `.gitignore`, but you can disable this by pressing `F1` while in search mode. Search is case-insensitive by default; toggle with `F2`.
 
 Press `F3` on a line to open it with `bat`; it will jump directly to that line. Press `n` to jump to the next match (or `N` to go backwards). Press `h` to hide all matched lines.
 
