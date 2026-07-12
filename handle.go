@@ -8,7 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"charm.land/bubbles/v2/textinput"
+	"mc/shutil"
+	"mc/widgets/textinput"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -167,8 +168,8 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 		return m, m.addMessage(msgError, fmt.Sprintf("failed to expand Windows env:%s", err))
 	}
 	dir = filepath.Clean(dir)
-	if !dirExists(dir) {
-		return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exists", dir))
+	if !shutil.DirExists(dir) {
+		return m, m.addMessage(msgError, fmt.Sprintf("directory \"%s\" doesn't exist", dir))
 	}
 
 	dir, err = realWindowsPath(dir)

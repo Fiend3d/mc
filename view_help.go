@@ -169,6 +169,7 @@ func viewHelp(m *model) string {
 
 	searchDocsData := [][]string{
 		{" F1", " - Toggle .gitignore filtering."},
+		{" F2", " - Toggle case sensitivity."},
 		{" F5", " - Start or restart search."},
 		{" F3", " - Open selected line with 'less' or F3 command from config."},
 		{" Esc", " - Exit Search mode or cancel searching."},

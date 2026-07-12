@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/go-pkgz/fileutils"
+	"mc/shutil"
 )
 
 type command interface {
@@ -28,37 +28,9 @@ func newCommandManager() *commandManager {
 	}
 }
 
-func (cm *commandManager) execute(cmd command) error {
-	err := cmd.execute()
+func (cm *commandManager) pushHistory(cmd command) {
 	cm.history = append(cm.history, cmd)
 	cm.redoStack = cm.redoStack[:0]
-	return err
-}
-
-func (cm *commandManager) undo() (command, error) {
-	if len(cm.history) == 0 {
-		return nil, nil
-	}
-
-	lastCmd := cm.history[len(cm.history)-1]
-	err := lastCmd.undo()
-
-	cm.history = cm.history[:len(cm.history)-1]
-	cm.redoStack = append(cm.redoStack, lastCmd)
-	return lastCmd, err
-}
-
-func (cm *commandManager) redo() (command, error) {
-	if len(cm.redoStack) == 0 {
-		return nil, nil
-	}
-
-	lastCmd := cm.redoStack[len(cm.redoStack)-1]
-	err := lastCmd.execute()
-
-	cm.redoStack = cm.redoStack[:len(cm.redoStack)-1]
-	cm.history = append(cm.history, lastCmd)
-	return lastCmd, err
 }
 
 func (cm *commandManager) canUndo() bool {
@@ -67,6 +39,32 @@ func (cm *commandManager) canUndo() bool {
 
 func (cm *commandManager) canRedo() bool {
 	return len(cm.redoStack) > 0
+}
+
+func (cm *commandManager) peekUndo() (command, error) {
+	if len(cm.history) == 0 {
+		return nil, fmt.Errorf("nothing to undo")
+	}
+	return cm.history[len(cm.history)-1], nil
+}
+
+func (cm *commandManager) commitUndo() {
+	lastCmd := cm.history[len(cm.history)-1]
+	cm.history = cm.history[:len(cm.history)-1]
+	cm.redoStack = append(cm.redoStack, lastCmd)
+}
+
+func (cm *commandManager) peekRedo() (command, error) {
+	if len(cm.redoStack) == 0 {
+		return nil, fmt.Errorf("nothing to redo")
+	}
+	return cm.redoStack[len(cm.redoStack)-1], nil
+}
+
+func (cm *commandManager) commitRedo() {
+	lastCmd := cm.redoStack[len(cm.redoStack)-1]
+	cm.redoStack = cm.redoStack[:len(cm.redoStack)-1]
+	cm.history = append(cm.history, lastCmd)
 }
 
 type deleteCommand struct {
@@ -128,12 +126,12 @@ func newFileActionCommand(action fileAction, paths []string, dst string, overrid
 		name := filepath.Base(paths[i])
 		dstPath := filepath.Join(dst, name)
 		if override {
-			if pathExists(dstPath) {
+			if shutil.PathExists(dstPath) {
 				collision = true
 			}
 			pairs = append(pairs, pathPair{paths[i], dstPath})
 		} else {
-			path := uniquePath(reserved, paths, dstPath)
+			path := shutil.UniquePath(reserved, paths, dstPath)
 			reserved = append(reserved, path)
 			pairs = append(pairs, pathPair{paths[i], path})
 		}
@@ -163,8 +161,8 @@ func (c *fileActionCommand) execute() error {
 		if c.pairs[i].src == c.pairs[i].dst {
 			continue
 		}
-		if fileutils.IsDir(c.pairs[i].src) {
-			err := copyDir(c.pairs[i].src, c.pairs[i].dst)
+		if shutil.IsDir(c.pairs[i].src) {
+			err := shutil.CopyDir(c.pairs[i].src, c.pairs[i].dst)
 			if err != nil {
 				return err
 			}
@@ -179,12 +177,12 @@ func (c *fileActionCommand) execute() error {
 		} else {
 			switch c.action {
 			case copyFileAction:
-				err := fileutils.CopyFile(c.pairs[i].src, c.pairs[i].dst)
+				err := shutil.CopyFile(c.pairs[i].src, c.pairs[i].dst)
 				if err != nil {
 					return err
 				}
 			case cutFileAction, renameFileAction:
-				err := fileutils.MoveFile(c.pairs[i].src, c.pairs[i].dst)
+				err := shutil.MoveFile(c.pairs[i].src, c.pairs[i].dst)
 				if err != nil {
 					return err
 				}
@@ -199,7 +197,7 @@ func (c *fileActionCommand) undo() error {
 		return fmt.Errorf("there's a collision")
 	}
 	for i := range c.pairs {
-		if !pathExists(c.pairs[i].dst) {
+		if !shutil.PathExists(c.pairs[i].dst) {
 			return fmt.Errorf("%s doesn't exist", c.pairs[i].dst)
 		}
 		if c.pairs[i].src == c.pairs[i].dst {
@@ -212,8 +210,8 @@ func (c *fileActionCommand) undo() error {
 				return err
 			}
 		case cutFileAction, renameFileAction:
-			if fileutils.IsDir(c.pairs[i].dst) {
-				err := copyDir(c.pairs[i].dst, c.pairs[i].src)
+			if shutil.IsDir(c.pairs[i].dst) {
+				err := shutil.CopyDir(c.pairs[i].dst, c.pairs[i].src)
 				if err != nil {
 					return err
 				}
@@ -222,7 +220,7 @@ func (c *fileActionCommand) undo() error {
 					return err
 				}
 			} else {
-				err := fileutils.MoveFile(c.pairs[i].dst, c.pairs[i].src)
+				err := shutil.MoveFile(c.pairs[i].dst, c.pairs[i].src)
 				if err != nil {
 					return err
 				}
@@ -252,7 +250,7 @@ func newCreateCommand(name string, dir string) *createCommand {
 		isDir = true
 		runes = runes[:len(runes)-1]
 	}
-	path := uniquePath(nil, nil, filepath.Join(dir, string(runes)))
+	path := shutil.UniquePath(nil, nil, filepath.Join(dir, string(runes)))
 	return &createCommand{path, isDir, dir}
 }
 
@@ -263,7 +261,7 @@ func (c *createCommand) execute() error {
 			return err
 		}
 	} else {
-		err := fileutils.TouchFile(c.path)
+		err := shutil.TouchFile(c.path)
 		if err != nil {
 			return err
 		}

@@ -1,17 +1,11 @@
 package main
 
 import (
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
-	"sort"
-	"strconv"
 	"strings"
 
-	"github.com/go-pkgz/fileutils"
 	"golang.org/x/sys/windows"
 )
 
@@ -63,24 +57,6 @@ func filepathDir(path string) string {
 	}
 	return dir
 
-}
-
-// DirExists checks if a path exists and is a directory
-func dirExists(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && info.IsDir()
-}
-
-// PathExists checks if a path exists (file or directory)
-func pathExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
-// IsFile checks if a path exists and is a file (not directory)
-func isFile(path string) bool {
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
 }
 
 func numberOfDigits(n int) int {
@@ -240,155 +216,4 @@ func realWindowsPath(p string) (string, error) {
 	}
 
 	return filepath.EvalSymlinks(abs)
-}
-
-// uniquePath returns the next available numbered path
-// Like Maya's naming: if test01, test02 exist, returns test03
-func uniquePath(reserved []string, exclude []string, path string) string {
-	dir := filepath.Dir(path)
-	base := filepath.Base(path)
-	ext := filepath.Ext(base)
-	name := strings.TrimSuffix(base, ext)
-
-	baseName, number, width, hasNumber := parseName(name)
-
-	if !hasNumber {
-		if !pathExists(path) && !slices.Contains(reserved, path) {
-			return path
-		}
-	}
-
-	existing := findExistingNumbers(reserved, exclude, dir, baseName, ext)
-
-	used := map[int]struct{}{}
-	for _, n := range existing {
-		used[n] = struct{}{}
-	}
-
-	next := number
-	if !hasNumber {
-		next = 1
-	}
-
-	for {
-		if _, ok := used[next]; !ok {
-			candidate := filepath.Join(dir,
-				fmt.Sprintf("%s%0*d%s", baseName, width, next, ext))
-
-			if !pathExists(candidate) && !slices.Contains(reserved, candidate) {
-				return candidate
-			}
-		}
-		next++
-	}
-}
-
-func parseName(name string) (baseName string, number int, width int, hasNumber bool) {
-	re := regexp.MustCompile(`^(.*?)(\d+)$`)
-	m := re.FindStringSubmatch(name)
-
-	if len(m) == 3 {
-		n, _ := strconv.Atoi(m[2])
-		return m[1], n, len(m[2]), true
-	}
-
-	return name, 0, 1, false
-}
-
-func findExistingNumbers(reserved []string, exclude []string, dir, baseName, ext string) []int {
-	var nums []int
-	pattern := regexp.MustCompile(`^` + regexp.QuoteMeta(baseName) + `(\d+)` + regexp.QuoteMeta(ext) + `$`)
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nums
-	}
-
-	for _, entry := range entries {
-		name := entry.Name()
-		path := filepath.Join(dir, name)
-		if slices.Contains(exclude, path) {
-			continue
-		}
-		matches := pattern.FindStringSubmatch(entry.Name())
-		if len(matches) == 2 {
-			num, _ := strconv.Atoi(matches[1])
-			if num > 0 {
-				nums = append(nums, num)
-			}
-		}
-	}
-
-	for _, path := range reserved {
-		name := filepath.Base(path)
-		matches := pattern.FindStringSubmatch(name)
-		if len(matches) == 2 {
-			num, _ := strconv.Atoi(matches[1])
-			if num > 0 {
-				nums = append(nums, num)
-			}
-		}
-	}
-
-	sort.Ints(nums)
-	return nums
-}
-
-func calcDirSize(path string) (uint64, error) {
-	var size uint64
-
-	err := filepath.WalkDir(path, func(_ string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return nil // skip unreadable entries
-		}
-
-		if entry.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-
-		if !entry.IsDir() {
-			info, err := entry.Info()
-			if err != nil {
-				return nil
-			}
-			size += uint64(info.Size())
-		}
-
-		return nil
-	})
-
-	return size, err
-}
-
-func isDirEmpty(path string) (bool, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return false, err
-	}
-	defer f.Close()
-
-	_, err = f.Readdirnames(1)
-	if err == io.EOF {
-		return true, nil // empty
-	}
-	return false, err // not empty or actual error
-}
-
-func copyDir(src, dst string) error {
-	empty, err := isDirEmpty(src)
-	if err != nil {
-		return err
-	}
-	if empty {
-		err := os.MkdirAll(dst, 0755)
-		if err != nil {
-			return err
-		}
-	} else {
-		err := fileutils.CopyDir(src, dst)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

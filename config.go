@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"mc/shutil"
 	"github.com/BurntSushi/toml"
 )
 
@@ -58,7 +59,7 @@ func loadConfig() (*Config, error) {
 
 	configPath := getConfigPath()
 
-	if !pathExists(configPath) {
+	if !shutil.PathExists(configPath) {
 		return cfg, nil
 	}
 
@@ -77,7 +78,7 @@ func loadConfig() (*Config, error) {
 
 func saveConfig(cfg *Config) error {
 	dir := getConfigDir()
-	if !dirExists(dir) {
+	if !shutil.DirExists(dir) {
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			return err
@@ -107,7 +108,7 @@ const noBookmarks = "--- NONE ---"
 
 func loadBookmarks() ([]string, error) {
 	path := getBookmarksPath()
-	if !pathExists(path) {
+	if !shutil.PathExists(path) {
 		return nil, nil
 	}
 	data, err := os.ReadFile(path)
@@ -122,7 +123,7 @@ func loadBookmarks() ([]string, error) {
 
 func saveBookmarks(bookmarks []string) error {
 	dir := getConfigDir()
-	if !dirExists(dir) {
+	if !shutil.DirExists(dir) {
 		err := os.MkdirAll(dir, 0755)
 		if err != nil {
 			return err
@@ -147,7 +148,7 @@ func getShellHistoryPath() string {
 
 func loadShellHistory() ([]string, error) {
 	path := getShellHistoryPath()
-	if !pathExists(path) {
+	if !shutil.PathExists(path) {
 		return nil, nil
 	}
 	data, err := os.ReadFile(path)
@@ -168,7 +169,7 @@ func saveShellHistory(history []string, cmd string) error {
 	}
 
 	dir := getConfigDir()
-	if !dirExists(dir) {
+	if !shutil.DirExists(dir) {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err
 		}

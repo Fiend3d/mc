@@ -13,7 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/bubbles/v2/textinput"
+	"mc/widgets/textinput"
+
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -36,7 +37,8 @@ type search struct {
 	filename textinput.Model
 	text     textinput.Model
 
-	gitignore bool
+	gitignore  bool
+	caseIgnore bool
 
 	working bool
 	result  chan searchItem
@@ -200,7 +202,7 @@ func newSearch(m *model) *search {
 	text := newTextinput(m.theme)
 	text.Placeholder = "text"
 	text.Blur()
-	return &search{filename: filename, text: text, gitignore: true, showLines: true}
+	return &search{filename: filename, text: text, gitignore: true, caseIgnore: true, showLines: true}
 }
 
 func renderSearchFocus(widget int, s *strings.Builder, m *model) {
@@ -341,6 +343,12 @@ func viewSearch(m *model) string {
 	}
 	s.WriteString(modeStyle.Background(m.theme.grayColor).Render(gitignoreText))
 
+	caseIgnoreText := "CASEIGNORE:ON "
+	if !m.search.caseIgnore {
+		caseIgnoreText = "CASEIGNORE:OFF "
+	}
+	s.WriteString(modeStyle.Background(m.theme.grayColor).Render(caseIgnoreText))
+
 	if m.search.working {
 		s.WriteString(base.Render(m.spinner.View()))
 	} else {
@@ -352,6 +360,8 @@ func viewSearch(m *model) string {
 	helpText += base.Foreground(m.theme.grayColor).Render(" - search ")
 	helpText += base.Render("F1")
 	helpText += base.Foreground(m.theme.grayColor).Render(" - toggle gitignore ")
+	helpText += base.Render("F2")
+	helpText += base.Foreground(m.theme.grayColor).Render(" - toggle case ignore ")
 	if m.search.focus == 2 {
 		helpText += base.Render("h")
 		helpText += base.Foreground(m.theme.grayColor).Render(" - hide lines ")
@@ -361,7 +371,7 @@ func viewSearch(m *model) string {
 	if searchLength == 0 {
 		rightText = " [empty] "
 	}
-	modeLength := len(modeText) + len(gitignoreText)
+	modeLength := len(modeText) + len(gitignoreText) + len(caseIgnoreText)
 	helpText = truncate(helpText, m.width-modeLength-2-len(rightText))
 	s.WriteString(base.Width(m.width - modeLength - 2 - len(rightText)).Render(helpText))
 	s.WriteString(base.Render(rightText))
@@ -381,15 +391,7 @@ func viewSearch(m *model) string {
 const searchBufferSize = 1000
 
 func (s *search) launch(dir string) {
-	if s.cancel != nil {
-		select {
-		case _, ok := <-s.cancel:
-			if ok {
-				close(s.cancel)
-			}
-		default:
-		}
-	}
+	s.stop()
 	s.working = true
 	s.cursor = 0
 	s.start = 0
@@ -399,10 +401,13 @@ func (s *search) launch(dir string) {
 	s.done = make(chan struct{})
 	pattern := s.filename.Value()
 	text := s.text.Value()
-	go doSearch(dir, pattern, text, s.gitignore, s.cancel, s.done, s.result)
+	go doSearch(dir, pattern, text, s.gitignore, s.caseIgnore, s.cancel, s.done, s.result)
 }
 
 func (s *search) stop() {
+	if !s.working {
+		return
+	}
 	close(s.cancel)
 	s.working = false
 }
@@ -627,6 +632,7 @@ func doSearch(
 	pattern string,
 	text string,
 	gitignore bool,
+	caseIgnore bool,
 	cancel <-chan struct{},
 	done chan<- struct{},
 	result chan<- searchItem,
@@ -664,7 +670,7 @@ outer:
 			if item.info.Size() > 5_242_880 { // 5M ought to be enough for anybody
 				continue
 			}
-			contains, fileLines, err := fileContainsText(item.path, text)
+			contains, fileLines, err := fileContainsText(item.path, text, caseIgnore)
 			if err != nil || !contains {
 				continue
 			}
@@ -702,13 +708,13 @@ func isBinaryFile(path string) (bool, error) {
 	return false, nil
 }
 
-func fileContainsText(path, text string) (bool, []searchLine, error) {
+func fileContainsText(path, text string, caseIgnore bool) (bool, []searchLine, error) {
 	binary, err := isBinaryFile(path)
 	if err != nil {
 		return false, nil, err
 	}
 	if binary {
-		return false, nil, err
+		return false, nil, nil
 	}
 
 	f, err := os.Open(path)
@@ -720,20 +726,35 @@ func fileContainsText(path, text string) (bool, []searchLine, error) {
 	var results []searchLine
 	scanner := bufio.NewScanner(f)
 
+	searchText := text
+	if caseIgnore {
+		searchText = strings.ToLower(text)
+	}
+
 	lineNumber := 0
 
 	for scanner.Scan() {
 		lineNumber++
 		line := scanner.Text()
 
-		idx := strings.Index(line, text)
-		if idx != -1 {
+		lineStr := line
+		if caseIgnore {
+			lineStr = strings.ToLower(line)
+		}
+
+		offset := 0
+		for {
+			pos := strings.Index(lineStr[offset:], searchText)
+			if pos == -1 {
+				break
+			}
 			results = append(results, searchLine{
 				line:       line,
 				lineNumber: lineNumber,
-				start:      idx,
-				end:        idx + len(text),
+				start:      offset + pos,
+				end:        offset + pos + len(text),
 			})
+			offset += pos + 1
 		}
 	}
 

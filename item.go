@@ -193,7 +193,6 @@ func (i *filepathItem) render(s *strings.Builder, style *lipgloss.Style, t *them
 	// size column
 	s.WriteString(style.Render(
 		lipgloss.PlaceHorizontal(sizeWidth, lipgloss.Center, i.sizeStr)))
-	s.WriteString(style.Render(i.sizeStr))
 }
 
 func (i *filepathItem) getExtra() string {

@@ -11,7 +11,8 @@ import (
 	"strings"
 	"unicode"
 
-	"charm.land/bubbles/v2/textinput"
+	"mc/shutil"
+	"mc/widgets/textinput"
 	tea "charm.land/bubbletea/v2"
 	"github.com/dustin/go-humanize"
 )
@@ -108,7 +109,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			reserved := make([]string, 0, len(lines))
 			for i := range pairs {
-				unique := uniquePath(reserved, msg.paths, pairs[i].dst)
+				unique := shutil.UniquePath(reserved, msg.paths, pairs[i].dst)
 				pairs[i].dst = unique
 				reserved = append(reserved, unique)
 			}
@@ -140,19 +141,57 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			return m, m.addMessage(
 				msgFail,
-				fmt.Sprintf("command \"%s\" failed: %s", msg.message, msg.err))
-		} else {
-			if msg.sel != nil {
-				tab := m.getTab()
-				if tab.dir == msg.dir {
-					settings := tab.pageSettings[msg.dir]
-					settings.sel = msg.sel
-				}
-			}
-			return m, tea.Batch(
-				m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.message)),
-				m.update(msg.dir))
+				fmt.Sprintf("command \"%s\" failed: %s", msg.cmd, msg.err))
 		}
+		m.cm.pushHistory(msg.cmd)
+		if msg.sel != nil {
+			tab := m.getTab()
+			if tab.dir == msg.dir {
+				settings := tab.pageSettings[msg.dir]
+				settings.sel = msg.sel
+			}
+		}
+		return m, tea.Batch(
+			m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.cmd)),
+			m.update(msg.dir))
+
+	case undoDoneMsg:
+		m.jobDone()
+		if msg.err != nil {
+			return m, m.addMessage(
+				msgFail,
+				fmt.Sprintf("undo \"%s\" failed: %s", msg.cmd, msg.err))
+		}
+		m.cm.commitUndo()
+		if msg.sel != nil {
+			tab := m.getTab()
+			if tab.dir == msg.dir {
+				settings := tab.pageSettings[msg.dir]
+				settings.sel = msg.sel
+			}
+		}
+		return m, tea.Batch(
+			m.addMessage(msgDone, fmt.Sprintf("undo: %s", msg.cmd)),
+			m.update(msg.dir))
+
+	case redoDoneMsg:
+		m.jobDone()
+		if msg.err != nil {
+			return m, m.addMessage(
+				msgFail,
+				fmt.Sprintf("redo \"%s\" failed: %s", msg.cmd, msg.err))
+		}
+		m.cm.commitRedo()
+		if msg.sel != nil {
+			tab := m.getTab()
+			if tab.dir == msg.dir {
+				settings := tab.pageSettings[msg.dir]
+				settings.sel = msg.sel
+			}
+		}
+		return m, tea.Batch(
+			m.addMessage(msgDone, fmt.Sprintf("redo: %s", msg.cmd)),
+			m.update(msg.dir))
 
 	case readDirMsg:
 		if msg.tab >= len(m.tabs) { // just in case
@@ -237,6 +276,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						clickedDir := filepathDir(clickedPath)
 
 						index := slices.Index(history, clickedDir)
+						if index < 0 || index+1 >= len(history) {
+							return m, nil
+						}
 						return m, m.changeDir(history[index+1])
 					}
 				} else if m.click.y < m.height-2 {
@@ -342,12 +384,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				settings.cursor = 0
 				m.updateStart()
 				return m, nil
-			case "end":
-				tab := m.getTab()
-				settings := tab.getPageSettings()
+		case "end":
+			tab := m.getTab()
+			settings := tab.getPageSettings()
+			if tab.page.length() > 0 {
 				settings.cursor = tab.page.length() - 1
 				m.updateStart()
-				return m, nil
+			}
+			return m, nil
 			case "space":
 				tab := m.getTab()
 				if m.mode == visualMode {
@@ -407,7 +451,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "c":
 				m.mode = normalMode
 				configDir := getConfigDir()
-				if !dirExists(configDir) {
+				if !shutil.DirExists(configDir) {
 					err := os.MkdirAll(configDir, 0755)
 					if err != nil {
 						return m, m.addMessage(msgError, err.Error())
@@ -417,14 +461,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "C":
 				m.mode = normalMode
 				configPath := getConfigPath()
-				configExists := pathExists(configPath)
+				configExists := shutil.PathExists(configPath)
 				err := saveConfig(m.cfg)
 				if err != nil {
 					return m, m.addMessage(msgError, err.Error())
 				}
 				var info string
 				if configExists {
-					info = fmt.Sprintf("config overriden: %s", configPath)
+					info = fmt.Sprintf("config overridden: %s", configPath)
 				} else {
 					info = fmt.Sprintf("config saved: %s", configPath)
 				}
@@ -661,20 +705,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if !m.cm.canUndo() {
 					return m, m.addMessage(msgWarning, "nothing to undo")
 				}
+				cmd, err := m.cm.peekUndo()
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
 				m.addJob()
 				return m, tea.Batch(
-					m.addMessage(msgInfo, "undo"),
+					m.addMessage(msgInfo, fmt.Sprintf("undo: %s", cmd)),
 					m.spinner.Tick,
-					m.undo())
+					m.runUndo(cmd))
 			case "U":
 				if !m.cm.canRedo() {
 					return m, m.addMessage(msgWarning, "nothing to redo")
 				}
+				cmd, err := m.cm.peekRedo()
+				if err != nil {
+					return m, m.addMessage(msgError, err.Error())
+				}
 				m.addJob()
 				return m, tea.Batch(
-					m.addMessage(msgInfo, "redo"),
+					m.addMessage(msgInfo, fmt.Sprintf("redo: %s", cmd)),
 					m.spinner.Tick,
-					m.redo())
+					m.runRedo(cmd))
 			case "p":
 				return m.handlePaste(false)
 			case "P":
@@ -755,6 +807,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "f1":
 				m.search.gitignore = !m.search.gitignore
+				return m, nil
+			case "f2":
+				m.search.caseIgnore = !m.search.caseIgnore
 				return m, nil
 			case "f3":
 				if m.search.isItem(m.search.cursor) {
@@ -1052,7 +1107,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					value := m.input.Value()
 					dir := filepath.Dir(m.renamePaths[0])
 					path := filepath.Join(dir, value)
-					finalPath := uniquePath(nil, nil, path)
+					finalPath := shutil.UniquePath(nil, nil, path)
 					pairs := []pathPair{{m.renamePaths[0], finalPath}}
 					cmd := &fileActionCommand{
 						action: renameFileAction,
