@@ -51,5 +51,9 @@ if ($dist) {
     if (Test-Path $deps) {
         Copy-Item $deps -Destination $distPath
     }
+    $koneko = "..\koneko\koneko.exe"
+    if (Test-Path $koneko) {
+        Copy-Item $koneko -Destination $distPath
+    }
     7z a "$distPath\mc_$version.zip" "$distPath\*"
 }
