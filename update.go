@@ -13,6 +13,7 @@ import (
 
 	"mc/shutil"
 	"mc/widgets/textinput"
+
 	tea "charm.land/bubbletea/v2"
 	"github.com/dustin/go-humanize"
 )
@@ -384,14 +385,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				settings.cursor = 0
 				m.updateStart()
 				return m, nil
-		case "end":
-			tab := m.getTab()
-			settings := tab.getPageSettings()
-			if tab.page.length() > 0 {
-				settings.cursor = tab.page.length() - 1
-				m.updateStart()
-			}
-			return m, nil
+			case "end":
+				tab := m.getTab()
+				settings := tab.getPageSettings()
+				if tab.page.length() > 0 {
+					settings.cursor = tab.page.length() - 1
+					m.updateStart()
+				}
+				return m, nil
 			case "space":
 				tab := m.getTab()
 				if m.mode == visualMode {
@@ -819,14 +820,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					item := m.search.items[i]
 					line := item.lines[j]
 					text := line.line[line.start:line.end]
-					cmd := exec.Command(
-						"bat",
-						"--color=always",
-						"-p",
-						"--pager",
-						fmt.Sprintf(`less -c -R -S +%dg/"%s"`, line.lineNumber, text),
-						item.path,
-					)
+					var cmd *exec.Cmd
+					switch m.cfg.F3.Command {
+					case "bat":
+						cmd = exec.Command(
+							"bat",
+							"--color=always",
+							"-p",
+							"--pager",
+							fmt.Sprintf(`less -c -R -S +%dg/"%s"`, line.lineNumber, text),
+							item.path,
+						)
+					case "koneko":
+						cmd = exec.Command(
+							"koneko",
+							fmt.Sprintf("-theme=%s", m.cfg.Theme),
+							fmt.Sprintf(
+								"-select=%d:%d-%d:%d",
+								line.lineNumber,
+								line.start+1,
+								line.lineNumber,
+								line.end+1),
+							item.path,
+						)
+					default:
+						cmd = exec.Command(m.cfg.F3.Command, item.path)
+					}
 					cmd.Dir = m.getTab().dir
 					return m, tea.ExecProcess(cmd, nil)
 				}

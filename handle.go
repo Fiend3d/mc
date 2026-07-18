@@ -10,6 +10,7 @@ import (
 
 	"mc/shutil"
 	"mc/widgets/textinput"
+
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -448,7 +449,12 @@ func (m *model) handleTool(key string) (tea.Model, tea.Cmd) {
 		if len(paths) == 0 {
 			return m, m.addMessage(msgWarning, "nothing is selected")
 		}
-		args := append(t.Args, paths...)
+		var args []string
+		if t.Command == "koneko" {
+			args = append(args, fmt.Sprintf("-theme=%s", m.cfg.Theme))
+		}
+		args = append(args, t.Args...)
+		args = append(args, paths...)
 		cmd = exec.Command(t.Command, args...)
 	case "dir":
 		args := append(t.Args, m.getTab().dir)

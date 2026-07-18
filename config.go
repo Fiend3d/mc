@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"mc/shutil"
 	"github.com/BurntSushi/toml"
+	"mc/shutil"
 )
 
 type ToolConfig struct {
@@ -50,11 +50,12 @@ func loadConfig() (*Config, error) {
 	cfg := &Config{
 		Theme: "dracula",
 		F2:    &ToolConfig{Command: "deps", Args: []string{}, Type: "path"},
-		F3:    &ToolConfig{Command: "bat", Args: []string{"--color=always", "-p", "--pager", "less -c -R -S"}, Type: "path"},
-		F4:    &ToolConfig{Command: "hx", Args: []string{}, Type: "path"},
-		F6:    &ToolConfig{Command: "explorer", Args: []string{}, Type: "dir"},
-		F7:    &ToolConfig{Command: "code", Args: []string{}, Type: "path"},
-		F8:    &ToolConfig{Command: "code", Args: []string{}, Type: "dir"},
+		// F3:    &ToolConfig{Command: "bat", Args: []string{"--color=always", "-p", "--pager", "less -c -R -S"}, Type: "path"},
+		F3: &ToolConfig{Command: "koneko", Args: []string{}, Type: "path"},
+		F4: &ToolConfig{Command: "hx", Args: []string{}, Type: "path"},
+		F6: &ToolConfig{Command: "explorer", Args: []string{}, Type: "dir"},
+		F7: &ToolConfig{Command: "code", Args: []string{}, Type: "path"},
+		F8: &ToolConfig{Command: "code", Args: []string{}, Type: "dir"},
 	}
 
 	configPath := getConfigPath()
