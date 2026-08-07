@@ -15,12 +15,6 @@ type errorMsg struct {
 	err error
 }
 
-func newErr(err error) tea.Cmd {
-	return func() tea.Msg {
-		return errorMsg{err}
-	}
-}
-
 type readDirMsg struct {
 	tab   int
 	items []item
@@ -41,7 +35,7 @@ func (m *model) update(dir string) tea.Cmd {
 			return func() tea.Msg {
 				items, err := readItems(dir)
 				if err != nil {
-					return newErr(err)
+					return errorMsg{err}
 				}
 				return readDirMsg{
 					tab:   tab,
@@ -76,7 +70,7 @@ func readItems(dir string) ([]item, error) {
 		return result, nil
 	}
 
-	clipboardFiles, op, _ := getClipboardFiles() // not sure about handling this error
+	clipboardFiles, op, _ := getClipboardFilesCached() // not sure about handling this error
 
 	if isUNCRoot(dir) {
 		paths, err := netView(dir)

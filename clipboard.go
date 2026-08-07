@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/gonutz/w32"
@@ -60,6 +61,53 @@ type dropFiles struct {
 	ptY    int32
 	fNC    uint32
 	fWide  uint32
+}
+
+var (
+	clipboardCacheMutex sync.Mutex
+	clipboardCachePaths []string
+	clipboardCacheOp    OpType
+	clipboardCacheTime  time.Time
+)
+
+const clipboardCacheTTL = 300 * time.Millisecond
+
+// invalidateClipboardCache must be called whenever we change the clipboard
+// ourselves, so the copy/cut markers show up on the next read.
+func invalidateClipboardCache() {
+	clipboardCacheMutex.Lock()
+	defer clipboardCacheMutex.Unlock()
+	clipboardCacheTime = time.Time{}
+	clipboardCachePaths = nil
+}
+
+// getClipboardFilesCached serves the copy/cut markers. Every directory read
+// asks for them - and a single refresh reads once per tab - so a short TTL
+// keeps us from opening the clipboard (which is a process-wide, exclusive
+// resource) over and over.
+func getClipboardFilesCached() ([]string, OpType, error) {
+	clipboardCacheMutex.Lock()
+	if !clipboardCacheTime.IsZero() &&
+		time.Since(clipboardCacheTime) < clipboardCacheTTL {
+		paths, op := clipboardCachePaths, clipboardCacheOp
+		clipboardCacheMutex.Unlock()
+		return paths, op, nil
+	}
+	clipboardCacheMutex.Unlock()
+
+	// Deliberately not holding the cache lock here: getClipboardFiles takes
+	// its own lock, and setClipboardFiles walks them in the other order.
+	paths, op, err := getClipboardFiles()
+	if err != nil {
+		return nil, op, err
+	}
+
+	clipboardCacheMutex.Lock()
+	clipboardCachePaths, clipboardCacheOp = paths, op
+	clipboardCacheTime = time.Now()
+	clipboardCacheMutex.Unlock()
+
+	return paths, op, nil
 }
 
 // setClipboardFiles copies file paths to clipboard with copy or cut operation.
@@ -146,6 +194,13 @@ func dragQueryFileCount(hDrop w32.HDROP) uint32 {
 	return uint32(ret)
 }
 
+// dragQueryFileSize gets the length, in characters, of the path at index,
+// not counting the terminating null.
+func dragQueryFileSize(hDrop w32.HDROP, index uint32) uint32 {
+	ret, _, _ := procDragQueryFile.Call(uintptr(hDrop), uintptr(index), 0, 0)
+	return uint32(ret)
+}
+
 // dragQueryFilePath gets the file path at index
 func dragQueryFilePath(hDrop w32.HDROP, index uint32, buf []uint16) uint32 {
 	ret, _, _ := procDragQueryFile.Call(uintptr(hDrop), uintptr(index), uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf)))
@@ -179,9 +234,14 @@ func getClipboardFiles() ([]string, OpType, error) {
 	}
 
 	var paths []string
-	buf := make([]uint16, 260) // MAX_PATH
 
 	for i := range count {
+		// Ask for the length first - paths can be longer than MAX_PATH.
+		size := dragQueryFileSize(hDrop, i)
+		if size == 0 {
+			continue
+		}
+		buf := make([]uint16, size+1) // room for the terminating null
 		n := dragQueryFilePath(hDrop, i, buf)
 		if n > 0 {
 			paths = append(paths, syscall.UTF16ToString(buf[:n]))

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -457,7 +458,7 @@ func (m *model) handleTool(key string) (tea.Model, tea.Cmd) {
 		args = append(args, paths...)
 		cmd = exec.Command(t.Command, args...)
 	case "dir":
-		args := append(t.Args, m.getTab().dir)
+		args := append(slices.Clone(t.Args), m.getTab().dir)
 		cmd = exec.Command(t.Command, args...)
 	case "none": // why?
 		cmd = exec.Command(t.Command, t.Args...)

@@ -180,10 +180,10 @@ func checkName(name string) bool {
 }
 
 func expandWindowsEnv(path string) (string, error) {
-	if strings.ContainsRune(path, '~') {
+	if strings.HasPrefix(path, "~") { // only a leading ~ is a home reference
 		home, err := os.UserHomeDir()
 		if err == nil {
-			path = strings.ReplaceAll(path, "~", home+"\\")
+			path = home + "\\" + strings.TrimPrefix(path[1:], "\\")
 		}
 	}
 	src, err := windows.UTF16PtrFromString(path)

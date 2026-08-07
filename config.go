@@ -119,7 +119,21 @@ func loadBookmarks() ([]string, error) {
 	if string(data) == noBookmarks {
 		return nil, nil
 	}
-	return strings.Split(string(data), "\n"), nil
+	return splitLines(string(data)), nil
+}
+
+// splitLines tolerates CRLF, a trailing newline and an empty file - all of
+// which "strings.Split" turns into bogus entries.
+func splitLines(data string) []string {
+	var result []string
+	for line := range strings.SplitSeq(data, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		result = append(result, line)
+	}
+	return result
 }
 
 func saveBookmarks(bookmarks []string) error {
@@ -156,7 +170,7 @@ func loadShellHistory() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return strings.Split(string(data), "\n"), nil
+	return splitLines(string(data)), nil
 }
 
 func saveShellHistory(history []string, cmd string) error {

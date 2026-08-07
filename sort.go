@@ -41,96 +41,67 @@ func (m *model) sort(method sortMethod, reverse bool) {
 	}
 	settings := m.getTab().getPageSettings()
 	selectedItem := items[settings.cursor]
+
+	// Reversing by negating the result would make less(i,j) and less(j,i) both
+	// true for equal keys, which isn't a strict weak ordering - swap the
+	// operands instead.
+	pair := func(i, j int) (item, item) {
+		if reverse {
+			return items[j], items[i]
+		}
+		return items[i], items[j]
+	}
+
 	switch method {
 	case alphabeticSort:
 		sort.Slice(items, func(i, j int) bool {
-			result := strings.ToLower(items[i].getName()) < strings.ToLower(items[j].getName())
-			if reverse {
-				result = !result
-			}
-			return result
+			a, b := pair(i, j)
+			return strings.ToLower(a.getName()) < strings.ToLower(b.getName())
 		})
 	case extensionSort:
 		sort.Slice(items, func(i, j int) bool {
-			result := true
-			iIsDir := items[i].isDirectory()
-			jIsDir := items[j].isDirectory()
-			if iIsDir && !jIsDir {
-				result = true
-			} else if !iIsDir && jIsDir {
-				result = false
-			} else {
-				if jIsDir {
-					a := items[i].getName()
-					b := items[j].getName()
-					result = strings.ToLower(a) < strings.ToLower(b)
-				} else {
-					iHasExt := hasExtension(items[i].getName())
-					jHasExt := hasExtension(items[j].getName())
-					if iHasExt && !jHasExt {
-						result = true
-					} else if !iHasExt && jHasExt {
-						result = false
-					} else if !iHasExt && !jHasExt {
-						a := items[i].getName()
-						b := items[j].getName()
-						result = strings.ToLower(a) < strings.ToLower(b)
-					} else {
-						a := filepath.Ext(items[i].getName())
-						b := filepath.Ext(items[j].getName())
-						if a == b {
-							a := items[i].getName()
-							b := items[j].getName()
-							result = strings.ToLower(a) < strings.ToLower(b)
-						} else {
-							result = strings.ToLower(a) < strings.ToLower(b)
-						}
-					}
+			a, b := pair(i, j)
+			aIsDir := a.isDirectory()
+			bIsDir := b.isDirectory()
+			if aIsDir != bIsDir {
+				return aIsDir // directories first
+			}
+			if aIsDir {
+				return strings.ToLower(a.getName()) < strings.ToLower(b.getName())
+			}
+			aHasExt := hasExtension(a.getName())
+			bHasExt := hasExtension(b.getName())
+			if aHasExt != bHasExt {
+				return aHasExt // files with an extension first
+			}
+			if aHasExt {
+				aExt := strings.ToLower(filepath.Ext(a.getName()))
+				bExt := strings.ToLower(filepath.Ext(b.getName()))
+				if aExt != bExt {
+					return aExt < bExt
 				}
 			}
-			if reverse {
-				result = !result
-			}
-			return result
+			return strings.ToLower(a.getName()) < strings.ToLower(b.getName())
 		})
 	case modifiedTimeSort:
 		sort.Slice(items, func(i, j int) bool {
-			a := items[i]
-			b := items[j]
-			result := a.getModTime().After(b.getModTime())
-			if reverse {
-				result = !result
-			}
-			return result
+			a, b := pair(i, j)
+			return a.getModTime().After(b.getModTime())
 		})
 	case normalSort:
 		sort.Slice(items, func(i, j int) bool {
-			result := true
-			a := items[i]
-			b := items[j]
-			iIsDir := a.isDirectory()
-			jIsDir := b.isDirectory()
-			if iIsDir && !jIsDir {
-				result = true
-			} else if !iIsDir && jIsDir {
-				result = false
-			} else {
-				result = strings.ToLower(a.getName()) < strings.ToLower(b.getName())
+			a, b := pair(i, j)
+			aIsDir := a.isDirectory()
+			bIsDir := b.isDirectory()
+			if aIsDir != bIsDir {
+				return aIsDir // directories first
 			}
-			if reverse {
-				result = !result
-			}
-			return result
+			return strings.ToLower(a.getName()) < strings.ToLower(b.getName())
 		})
 	case sizeSort:
 		sort.Slice(items, func(i, j int) bool {
-			a := items[i]
-			b := items[j]
-			result := a.getSize() > b.getSize()
-			if reverse {
-				result = !result
-			}
-			return result
+			a, b := pair(i, j)
+			return a.getSize() > b.getSize()
 		})
 	case randomSort:
 		r := rand.New(rand.NewSource(time.Now().UnixNano()))

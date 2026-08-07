@@ -376,6 +376,9 @@ func (i *driveItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, 
 }
 
 func (i *driveItem) getExtra() string {
+	if i.total == 0 {
+		return ""
+	}
 	percent := (float64(i.free) / float64(i.total)) * 100
 	return fmt.Sprintf("%.2f%% left", percent)
 }

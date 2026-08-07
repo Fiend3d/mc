@@ -40,15 +40,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tab := m.getTab()
 		if tab.dir == msg.dir {
 			items := tab.page.getItems()
+			sizes := make(map[string]uint64, len(msg.dirSizes))
 			for i := range msg.dirSizes {
-				for j := range items {
-					if msg.dirSizes[i].path == items[j].getFullPath() {
-						item, ok := items[j].(*filepathItem)
-						if ok {
-							item.size = msg.dirSizes[i].size
-							item.sizeStr = humanize.Bytes(msg.dirSizes[i].size)
-						}
-					}
+				sizes[msg.dirSizes[i].path] = msg.dirSizes[i].size
+			}
+			for j := range items {
+				size, ok := sizes[items[j].getFullPath()]
+				if !ok {
+					continue
+				}
+				if item, ok := items[j].(*filepathItem); ok {
+					item.size = size
+					item.sizeStr = humanize.Bytes(size)
 				}
 			}
 		}
@@ -94,26 +97,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case massRenameMsg:
+		lines := slices.Collect(readLines(msg.tempFile))
+		os.Remove(msg.tempFile)
 		if m.getTab().dir == msg.dir {
-			lines := slices.Collect(readLines(msg.tempFile))
 			if slices.Equal(msg.lines, lines) {
 				return m, m.addMessage(msgError, "nothing changed")
 			}
 			if len(lines) != len(msg.lines) {
 				return m, m.addMessage(msgError, "number of lines is wrong")
 			}
-			pairs := make([]pathPair, len(lines))
 			for i := range lines {
-				dir := filepath.Dir(msg.paths[i])
-				dst := filepath.Join(dir, lines[i])
-				pairs[i] = pathPair{msg.paths[i], dst}
+				if strings.TrimSpace(lines[i]) == "" {
+					return m, m.addMessage(msgError,
+						fmt.Sprintf("line %d is empty", i+1))
+				}
 			}
-			reserved := make([]string, 0, len(lines))
-			for i := range pairs {
-				unique := shutil.UniquePath(reserved, msg.paths, pairs[i].dst)
-				pairs[i].dst = unique
-				reserved = append(reserved, unique)
-			}
+			pairs := buildRenamePairs(msg.paths, lines)
 			cmd := &fileActionCommand{
 				action: renameFileAction,
 				dir:    m.getTab().dir,
@@ -144,7 +143,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				msgFail,
 				fmt.Sprintf("command \"%s\" failed: %s", msg.cmd, msg.err))
 		}
-		m.cm.pushHistory(msg.cmd)
+		if msg.cmd.undoable() {
+			m.cm.pushHistory(msg.cmd)
+		}
 		if msg.sel != nil {
 			tab := m.getTab()
 			if tab.dir == msg.dir {
@@ -634,8 +635,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.confirm(&deleteCommand{m.getTab().dir, paths})
 				return m, nil
-			// case "d":
-			// 	return m, newErr(errors.New("EPIC FAIL"))
 			case "r":
 				return m.handleRename()
 			case "j":
@@ -817,7 +816,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m.handleTool(msg.String())
 				} else {
 					i, j := m.search.mapIndex(m.search.cursor)
+					if i < 0 || i >= len(m.search.items) {
+						return m, nil
+					}
 					item := m.search.items[i]
+					if j < 0 || j >= len(item.lines) {
+						return m, nil
+					}
 					line := item.lines[j]
 					text := line.line[line.start:line.end]
 					var cmd *exec.Cmd
@@ -1123,11 +1128,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "enter":
 				m.mode = normalMode
 				if len(m.renamePaths) == 1 {
-					value := m.input.Value()
-					dir := filepath.Dir(m.renamePaths[0])
-					path := filepath.Join(dir, value)
-					finalPath := shutil.UniquePath(nil, nil, path)
-					pairs := []pathPair{{m.renamePaths[0], finalPath}}
+					value := strings.TrimSpace(m.input.Value())
+					if value == "" {
+						m.renamePaths = nil
+						return m, m.addMessage(msgError, "the name is empty")
+					}
+					src := m.renamePaths[0]
+					path := filepath.Join(filepath.Dir(src), value)
+					pairs := buildRenamePairs([]string{src}, []string{value})
+					finalPath := pairs[0].dst
 					cmd := &fileActionCommand{
 						action: renameFileAction,
 						dir:    m.getTab().dir,
@@ -1154,7 +1163,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter":
 				m.mode = normalMode
-				name := m.input.Value()
+				name := strings.TrimSpace(m.input.Value())
+				if name == "" || name == "\\" || name == "/" {
+					return m, m.addMessage(msgError, "the name is empty")
+				}
 				dir := m.getTab().dir
 				cmd := newCreateCommand(name, dir)
 				m.addJob()
@@ -1240,7 +1252,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.bm.start = 0
 				return m, nil
 			case "end":
-				m.bm.cursor = len(m.bm.dirs) - 1
+				m.bm.cursor = max(0, len(m.bm.dirs)-1)
 				m.bm.updateStart(m.height)
 				return m, nil
 			case "pgdown":
@@ -1256,6 +1268,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err != nil {
 						return m, m.addMessage(msgError, err.Error())
 					}
+				}
+				if len(m.bm.dirs) == 0 {
+					m.bm = nil
+					return m, nil
 				}
 				dir := m.bm.dirs[m.bm.cursor]
 				m.bm = nil

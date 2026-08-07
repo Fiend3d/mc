@@ -228,6 +228,9 @@ func (m *message) render(theme *theme, renderTime bool) string {
 func (m *model) getPaths() []string {
 	if m.mode == searchMode {
 		i, _ := m.search.mapIndex(m.search.cursor)
+		if i < 0 || i >= len(m.search.items) {
+			return nil
+		}
 		item := m.search.items[i]
 		return []string{item.path}
 	}
@@ -266,6 +269,7 @@ func (m *model) copyCut(cut bool) string {
 		setClipboardFiles(paths, OpCopy)
 		txt = "copied"
 	}
+	invalidateClipboardCache() // the refresh right after this must see it
 
 	return fmt.Sprintf("%d paths %s", len(paths), txt)
 }
@@ -307,13 +311,17 @@ func tick() tea.Cmd {
 
 func (m *model) fillPage(tab int, items []item) error {
 	// restore selection
-	for i := range m.tabs[tab].page.items {
+	old := m.tabs[tab].page.items
+	if len(old) > 0 {
+		selected := make(map[string]struct{}, len(old))
+		for i := range old {
+			if old[i].isSelected() {
+				selected[old[i].getFullPath()] = struct{}{}
+			}
+		}
 		for j := range items {
-			if m.tabs[tab].page.items[i].getFullPath() ==
-				items[j].getFullPath() {
-				if m.tabs[tab].page.items[i].isSelected() {
-					items[j].setSelected(true)
-				}
+			if _, ok := selected[items[j].getFullPath()]; ok {
+				items[j].setSelected(true)
 			}
 		}
 	}

@@ -748,11 +748,16 @@ func fileContainsText(path, text string, caseIgnore bool) (bool, []searchLine, e
 			if pos == -1 {
 				break
 			}
+			// Offsets are into lineStr, which may differ in length from line
+			// when lowercasing changes the byte count (e.g. "İ"), so clamp
+			// them before they reach the renderer.
+			start := min(offset+pos, len(line))
+			end := min(start+len(text), len(line))
 			results = append(results, searchLine{
 				line:       line,
 				lineNumber: lineNumber,
-				start:      offset + pos,
-				end:        offset + pos + len(text),
+				start:      start,
+				end:        end,
 			})
 			offset += pos + 1
 		}

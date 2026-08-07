@@ -50,7 +50,17 @@ func main() {
 		log.Fatalf("failed to launch the program: %s", err)
 	}
 
-	finalModel := m.(*model)
+	// Update() has a value receiver, but the handlers with pointer receivers
+	// return *model, so either can end up in the interface.
+	var finalModel *model
+	switch v := m.(type) {
+	case *model:
+		finalModel = v
+	case model:
+		finalModel = &v
+	default:
+		log.Fatalf("unexpected model type: %T", m)
+	}
 
 	if output {
 		if finalModel.result != "" {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"mc/shutil"
 )
@@ -11,6 +12,7 @@ import (
 type command interface {
 	execute() error
 	undo() error
+	undoable() bool // false commands never reach the history
 	String() string
 	getDir() string
 	sel() *string // select is a keyword
@@ -94,6 +96,10 @@ func (c *deleteCommand) undo() error {
 	return fmt.Errorf("can't be undone")
 }
 
+func (c *deleteCommand) undoable() bool {
+	return false
+}
+
 func (c *deleteCommand) sel() *string {
 	return nil
 }
@@ -110,6 +116,28 @@ const (
 	cutFileAction
 	renameFileAction
 )
+
+// buildRenamePairs maps every new name onto a destination path.
+//
+// Names that weren't edited are left exactly as they are: such a path already
+// exists - as itself - so putting it through UniquePath would turn "a.txt"
+// into "a1.txt" and rename a file the user never touched. Windows paths are
+// case-insensitive, so a case-only edit is compared the same way, which lets
+// "foo.txt" -> "Foo.txt" through as a real rename instead of "Foo1.txt".
+func buildRenamePairs(paths []string, names []string) []pathPair {
+	pairs := make([]pathPair, 0, len(names))
+	reserved := make([]string, 0, len(names))
+	for i := range names {
+		src := paths[i]
+		dst := filepath.Join(filepath.Dir(src), names[i])
+		if !strings.EqualFold(dst, src) {
+			dst = shutil.UniquePath(reserved, paths, dst)
+		}
+		reserved = append(reserved, dst)
+		pairs = append(pairs, pathPair{src, dst})
+	}
+	return pairs
+}
 
 type fileActionCommand struct {
 	action    fileAction
@@ -230,6 +258,10 @@ func (c *fileActionCommand) undo() error {
 	return nil
 }
 
+func (c *fileActionCommand) undoable() bool {
+	return true
+}
+
 func (c *fileActionCommand) sel() *string {
 	if len(c.pairs) > 0 {
 		return &c.pairs[0].dst
@@ -246,7 +278,8 @@ type createCommand struct {
 func newCreateCommand(name string, dir string) *createCommand {
 	isDir := false
 	runes := []rune(name)
-	if runes[len(runes)-1] == '\\' || runes[len(runes)-1] == '/' {
+	if len(runes) > 0 &&
+		(runes[len(runes)-1] == '\\' || runes[len(runes)-1] == '/') {
 		isDir = true
 		runes = runes[:len(runes)-1]
 	}
@@ -271,6 +304,10 @@ func (c *createCommand) execute() error {
 
 func (c *createCommand) undo() error {
 	return os.RemoveAll(c.path)
+}
+
+func (c *createCommand) undoable() bool {
+	return true
 }
 
 func (c *createCommand) getDir() string {
