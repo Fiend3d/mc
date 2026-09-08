@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"charm.land/lipgloss/v2"
 	"github.com/dustin/go-humanize"
 )
 
@@ -21,7 +20,6 @@ type item interface {
 	isSelected() bool
 	setSelected(bool)
 	getAction() itemAction
-	render(s *strings.Builder, style *lipgloss.Style, t *theme, width int)
 	getExtra() string
 }
 
@@ -137,64 +135,6 @@ func (i *filepathItem) getAction() itemAction {
 	return i.action
 }
 
-func (i *filepathItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
-	const (
-		sizeWidth = 8
-		timeWidth = 16
-		colGap    = 1
-	)
-
-	// name block
-	var nameBlock strings.Builder
-
-	nameWidth := max(
-		width-sizeWidth-timeWidth-colGap*2+1, 1)
-
-	if i.isDir {
-		nameBlock.WriteString(
-			style.Foreground(t.accentColor4).Render(i.name),
-		)
-		nameBlock.WriteString(style.Bold(true).Render("/"))
-	} else {
-		if strings.HasSuffix(strings.ToLower(i.name), ".exe") {
-			nameBlock.WriteString(
-				style.Foreground(t.greenColor).Render(i.name),
-			)
-		} else {
-			nameBlock.WriteString(
-				style.Foreground(t.whiteColor).Render(i.name),
-			)
-		}
-	}
-
-	if i.isSymlink {
-		nameBlock.WriteString(
-			style.Foreground(t.accentColor2).Render(" -> "))
-		nameBlock.WriteString(
-			style.Foreground(t.accentColor3).Render(i.symlink))
-	}
-
-	name := nameBlock.String()
-
-	name = truncate(name, nameWidth)
-
-	s.WriteString(name)
-	nameLen := lipgloss.Width(name)
-	if nameLen < nameWidth {
-		s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
-	}
-
-	// time column
-	timeStyle := style.Foreground(t.grayColor)
-	s.WriteString(timeStyle.Width(timeWidth).Render(i.modTimeStr))
-
-	s.WriteString(style.Render(" "))
-
-	// size column
-	s.WriteString(style.Render(
-		lipgloss.PlaceHorizontal(sizeWidth, lipgloss.Center, i.sizeStr)))
-}
-
 func (i *filepathItem) getExtra() string {
 	return i.mode
 }
@@ -254,31 +194,6 @@ func (i *sharedItem) getAction() itemAction {
 	return i.action
 }
 
-func (i *sharedItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
-	info := " [shared] "
-	infoSize := len(info)
-
-	var nameBlock strings.Builder
-	nameWidth := max(width-infoSize, 1)
-
-	nameBlock.WriteString(
-		style.Foreground(t.accentColor4).Render(i.name),
-	)
-	nameBlock.WriteString(style.Bold(true).Render("/"))
-
-	name := nameBlock.String()
-
-	name = truncate(name, nameWidth)
-
-	s.WriteString(name)
-	nameLen := lipgloss.Width(name)
-	if nameLen < nameWidth {
-		s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
-	}
-
-	s.WriteString(style.Foreground(t.grayColor).Render(info))
-}
-
 func (i *sharedItem) getExtra() string {
 	return ""
 }
@@ -335,44 +250,6 @@ func (i *driveItem) setSelected(selected bool) {
 
 func (i *driveItem) getAction() itemAction {
 	return itemActionNone
-}
-
-func (i *driveItem) render(s *strings.Builder, style *lipgloss.Style, t *theme, width int) {
-	var infoBlock strings.Builder
-	sizeWidth := 8
-	infoBlock.WriteString(style.Foreground(t.grayColor).Render(fmt.Sprintf("%s ", i.driveType)))
-	infoBlock.WriteString(style.Align(lipgloss.Right).Width(sizeWidth).Render(humanize.Bytes(i.free)))
-	infoBlock.WriteString(style.Render(" free of "))
-	infoBlock.WriteString(style.
-		Align(lipgloss.Left).
-		Foreground(t.accentColor5).
-		Bold(true).
-		Width(sizeWidth).
-		Render(humanize.Bytes(i.total)))
-	infoBlock.WriteString(style.Render(" "))
-
-	info := infoBlock.String()
-	infoSize := lipgloss.Width(info)
-
-	var nameBlock strings.Builder
-	nameWidth := max(width-infoSize, 1)
-
-	nameBlock.WriteString(
-		style.Foreground(t.accentColor4).Render(i.letter),
-	)
-	nameBlock.WriteString(style.Bold(true).Render("/"))
-	nameBlock.WriteString(style.Foreground(t.accentColor2).Render(fmt.Sprintf(" %s", i.label)))
-	name := nameBlock.String()
-
-	name = truncate(name, nameWidth)
-
-	s.WriteString(name)
-	nameLen := lipgloss.Width(name)
-	if nameLen < nameWidth {
-		s.WriteString(style.Width(nameWidth - nameLen).Render(" "))
-	}
-
-	s.WriteString(style.Foreground(t.grayColor).Render(info))
 }
 
 func (i *driveItem) getExtra() string {

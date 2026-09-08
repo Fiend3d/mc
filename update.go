@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -14,11 +13,30 @@ import (
 	"mc/shutil"
 	"mc/widgets/textinput"
 
-	tea "charm.land/bubbletea/v2"
 	"github.com/dustin/go-humanize"
+	"mc/internal/event"
 )
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
+	switch input := msg.(type) {
+	case event.KeyMsg:
+		m.clearHover()
+		if !rangeKey(input.String()) {
+			m.finishRangeSelection()
+		}
+	case event.MouseClickMsg:
+		m.clearHover()
+		if !input.Shift && !input.Ctrl {
+			m.finishRangeSelection()
+		}
+	case event.MouseWheelMsg:
+		m.finishRangeSelection()
+	case event.BlurMsg, event.WindowSizeMsg:
+		m.clearHover()
+	}
+	if handled, cmd := m.updateV2(msg); handled {
+		return m, cmd
+	}
 	switch msg := msg.(type) {
 
 	case errorMsg:
@@ -37,8 +55,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case calcDirSizeMsg:
 		m.jobDone()
-		tab := m.getTab()
-		if tab.dir == msg.dir {
+		tab := msg.target
+		if tab != nil && tab.page == msg.page {
 			items := tab.page.getItems()
 			sizes := make(map[string]uint64, len(msg.dirSizes))
 			for i := range msg.dirSizes {
@@ -123,172 +141,180 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case selectItemMsg:
-		if m.currentTab == msg.tab {
-			tab := m.getTab()
-			items := tab.page.getItems()
-			settings := tab.getPageSettings()
-			for i := range items {
-				if items[i].getFullPath() == msg.path {
-					settings.cursor = i
-					m.updateStart()
-					return m, nil
+		tab := msg.target
+		if tab.page != msg.page {
+			return m, nil
+		}
+		tab.page.selectionRange = nil
+		settings := tab.getPageSettings()
+		for i, it := range tab.page.getItems() {
+			if it.getFullPath() == msg.path {
+				settings.cursor = i
+				break
+			}
+		}
+		revealCursor(settings, max(1, m.screenHeight-5))
+		return m, nil
+
+	case readDirMsg:
+		tab := msg.target
+		tab.pendingReads = max(0, tab.pendingReads-1)
+		found := false
+		for _, p := range m.panes {
+			for _, t := range p.tabs {
+				if t == tab {
+					found = true
 				}
 			}
 		}
-
-	case commandDoneMsg:
-		m.jobDone()
-		if msg.err != nil {
-			return m, m.addMessage(
-				msgFail,
-				fmt.Sprintf("command \"%s\" failed: %s", msg.cmd, msg.err))
-		}
-		if msg.cmd.undoable() {
-			m.cm.pushHistory(msg.cmd)
-		}
-		if msg.sel != nil {
-			tab := m.getTab()
-			if tab.dir == msg.dir {
-				settings := tab.pageSettings[msg.dir]
-				settings.sel = msg.sel
-			}
-		}
-		return m, tea.Batch(
-			m.addMessage(msgDone, fmt.Sprintf("command: %s", msg.cmd)),
-			m.update(msg.dir))
-
-	case undoDoneMsg:
-		m.jobDone()
-		if msg.err != nil {
-			return m, m.addMessage(
-				msgFail,
-				fmt.Sprintf("undo \"%s\" failed: %s", msg.cmd, msg.err))
-		}
-		m.cm.commitUndo()
-		if msg.sel != nil {
-			tab := m.getTab()
-			if tab.dir == msg.dir {
-				settings := tab.pageSettings[msg.dir]
-				settings.sel = msg.sel
-			}
-		}
-		return m, tea.Batch(
-			m.addMessage(msgDone, fmt.Sprintf("undo: %s", msg.cmd)),
-			m.update(msg.dir))
-
-	case redoDoneMsg:
-		m.jobDone()
-		if msg.err != nil {
-			return m, m.addMessage(
-				msgFail,
-				fmt.Sprintf("redo \"%s\" failed: %s", msg.cmd, msg.err))
-		}
-		m.cm.commitRedo()
-		if msg.sel != nil {
-			tab := m.getTab()
-			if tab.dir == msg.dir {
-				settings := tab.pageSettings[msg.dir]
-				settings.sel = msg.sel
-			}
-		}
-		return m, tea.Batch(
-			m.addMessage(msgDone, fmt.Sprintf("redo: %s", msg.cmd)),
-			m.update(msg.dir))
-
-	case readDirMsg:
-		if msg.tab >= len(m.tabs) { // just in case
+		if !found || tab.dir != msg.dir || tab.page != msg.page || tab.readGeneration != msg.generation {
 			return m, nil
 		}
-		tab := m.tabs[msg.tab]
-		if tab.dir != msg.dir {
+		if msg.err != nil {
+			if msg.automatic && tab.lastReadError == msg.err.Error() {
+				return m, nil
+			}
+			tab.lastReadError = msg.err.Error()
+			return m, m.addMessage(msgError, msg.err.Error())
+		}
+		tab.lastReadError = ""
+		if msg.automatic && unchangedListing(tab.page.items, msg.items) {
 			return m, nil
 		}
-		err := m.fillPage(msg.tab, msg.items)
-		if err != nil {
-			return m, m.addMessage(msgError, err.Error())
-		}
+		m.clearHover()
 		settings := tab.getPageSettings()
+		cursor, start := settings.cursor, settings.start
+		cursorPath, topPath := "", ""
+		previous := tab.page.getItems()
+		if cursor >= 0 && cursor < len(previous) {
+			cursorPath = previous[cursor].getFullPath()
+		}
+		if start >= 0 && start < len(previous) {
+			topPath = previous[start].getFullPath()
+		}
+		selected := map[string]bool{}
+		calculatedSizes := map[string]struct {
+			size uint64
+			text string
+		}{}
+		for _, it := range tab.page.items {
+			if it.isSelected() {
+				selected[it.getFullPath()] = true
+			}
+			if old, ok := it.(*filepathItem); ok && old.isDir && old.sizeStr != "" {
+				calculatedSizes[old.getFullPath()] = struct {
+					size uint64
+					text string
+				}{size: old.size, text: old.sizeStr}
+			}
+		}
+		for _, it := range msg.items {
+			it.setSelected(selected[it.getFullPath()])
+			if current, ok := it.(*filepathItem); ok && current.isDir {
+				if saved, ok := calculatedSizes[current.getFullPath()]; ok {
+					current.size, current.sizeStr = saved.size, saved.text
+				}
+			}
+		}
+		tab.page.items = msg.items
+		tab.filter()
+		if tab.sorted {
+			tab.sortItems(tab.sortMethod, tab.sortReverse)
+		}
+		settings.cursor, settings.start = cursor, start
+		for i, it := range tab.page.getItems() {
+			if samePath(it.getFullPath(), cursorPath) {
+				settings.cursor = i
+			}
+			if samePath(it.getFullPath(), topPath) {
+				settings.start = i
+			}
+		}
 		settings.update(tab.page.length())
 		if settings.sel != nil {
-			items := tab.page.getItems()
-			for i := range items {
-				if items[i].getFullPath() == *settings.sel {
+			for i, it := range tab.page.getItems() {
+				if it.getFullPath() == *settings.sel {
 					settings.cursor = i
 					break
 				}
 			}
 			settings.sel = nil
+			revealCursor(settings, max(1, m.screenHeight-5))
 		}
 		return m, nil
 
-	case tea.WindowSizeMsg:
+	case event.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
 
-	case tea.MouseWheelMsg:
+	case event.MouseHoverMsg:
+		if msg.Search {
+			m.hoverSearchIndex = msg.Index
+			m.hoverPane, m.hoverIndex = -1, -1
+			m.hoverTabPane, m.hoverTabIndex, m.hoverPathPane, m.hoverPathX = -1, -1, -1, -1
+		} else if msg.Tab {
+			m.hoverTabPane, m.hoverTabIndex = msg.Pane, msg.Index
+			m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
+			m.hoverPathPane, m.hoverPathX = -1, -1
+		} else if msg.Path {
+			m.hoverPathPane, m.hoverPathX = msg.Pane, msg.X
+			m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
+			m.hoverTabPane, m.hoverTabIndex = -1, -1
+		} else {
+			m.hoverPane, m.hoverIndex = msg.Pane, msg.Index
+			m.hoverSearchIndex = -1
+			m.hoverTabPane, m.hoverTabIndex, m.hoverPathPane, m.hoverPathX = -1, -1, -1, -1
+		}
+		return m, nil
+
+	case event.MouseTabMsg:
+		m.clearHover()
+		m.click = mouseClick{}
+		m.finishRangeSelection()
+		if msg.Pane >= 0 && msg.Pane < len(m.panes) && msg.Index >= 0 && msg.Index < len(m.panes[msg.Pane].tabs) {
+			m.activePane = msg.Pane
+			m.pane = m.panes[msg.Pane]
+			m.currentTab = msg.Index
+			m.mode = normalMode
+		}
+		return m, nil
+
+	case event.MouseWheelMsg:
+		m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
+		m.hoverTabPane, m.hoverTabIndex, m.hoverPathPane, m.hoverPathX = -1, -1, -1, -1
 		data := msg.Mouse()
 		switch data.Button {
-		case tea.MouseWheelUp:
+		case event.MouseWheelUp:
 			return m.handleWheel(-3)
-		case tea.MouseWheelDown:
+		case event.MouseWheelDown:
 			return m.handleWheel(3)
 		}
 
-	case tea.MouseClickMsg:
+	case event.MouseClickMsg:
 		data := msg.Mouse()
 		switch data.Button {
-		case tea.MouseLeft:
+		case event.MouseLeft:
 			m.click = newClick(data.X, data.Y, &m.click)
 			switch m.mode {
-			case normalMode, visualMode, jumpMode:
+			case normalMode, jumpMode:
 				if m.click.y == 0 {
-					if m.mode == visualMode {
-						return m, nil
-					}
-					if m.multipleTabs() && m.click.x > m.width-len(m.getTabInfo()) {
-						m.mode = tabsMode
-						return m, nil
-					}
+					m.finishRangeSelection()
 					dir := m.getTab().dir
-					diskExp := regexp.MustCompile(`^([a-zA-Z]+:\\)`)
-					matches := diskExp.FindStringSubmatch(dir)
-					start := 0
-					if len(matches) > 1 {
-						start = len(matches[1])
-						if m.click.x < start {
-							return m, m.changeDir(matches[1])
-						}
-					}
-					runes := []rune(dir)
-					if m.click.x < len(runes) && m.click.x >= start {
-						var history []string
-						current := dir
-						for {
-							history = append(history, current)
-							parent := filepathDir(current)
-							if parent == current {
-								break
-							}
-							current = parent
-						}
-						slices.Reverse(history)
-
-						clickedPath := string(runes[:m.click.x+1])
-						clickedDir := filepathDir(clickedPath)
-
-						index := slices.Index(history, clickedDir)
-						if index < 0 || index+1 >= len(history) {
-							return m, nil
-						}
-						return m, m.changeDir(history[index+1])
+					if target := breadcrumbAtX(dir, m.click.x, m.width); target != "" {
+						return m, m.changeDir(target)
 					}
 				} else if m.click.y < m.height-2 {
 					tab := m.getTab()
 					settings := tab.getPageSettings()
-					if m.click.y-1 < len(tab.page.getItems())-settings.start {
+					if m.click.y >= 1 && m.click.y-1 < len(tab.page.getItems())-settings.start {
+						if data.Shift || data.Ctrl {
+							m.selectRangeTo(m.click.y - 1 + settings.start)
+							m.click = mouseClick{}
+							return m, nil
+						}
 						settings.cursor = m.click.y - 1 + settings.start
-						if m.click.doubleClick && m.mode != visualMode {
+						if m.click.doubleClick {
 							return m.right(false)
 						}
 					}
@@ -346,10 +372,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-	case tea.KeyMsg:
+	case event.KeyMsg:
 		switch m.mode {
-		case normalMode, jumpMode, visualMode:
+		case normalMode, jumpMode:
 			switch msg.String() {
+			case "shift+up", "shift+down", "shift+home", "shift+end":
+				end := m.getTab().getPageSettings().cursor
+				switch msg.String() {
+				case "shift+up":
+					end--
+				case "shift+down":
+					end++
+				case "shift+home":
+					end = 0
+				case "shift+end":
+					end = m.getPage().length() - 1
+				}
+				m.selectRangeTo(end)
+				return m, nil
 			case "ctrl+a":
 				items := m.getPage().getItems()
 				for i := range items {
@@ -394,21 +434,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.updateStart()
 				}
 				return m, nil
-			case "space":
+			case "space", "insert":
 				tab := m.getTab()
-				if m.mode == visualMode {
-					start, end := m.getStartEnd()
-					for i := start; i <= end; i++ {
-						item := tab.page.getItems()[i]
-						item.setSelected(!item.isSelected())
-					}
-					m.mode = normalMode
-				} else {
-					settings := tab.getPageSettings()
-					selectedItem := tab.page.getItems()[settings.cursor]
-					selectedItem.setSelected(!selectedItem.isSelected())
+				settings := tab.getPageSettings()
+				items := tab.page.getItems()
+				if len(items) > 0 {
+					items[settings.cursor].setSelected(!items[settings.cursor].isSelected())
 					m.moveCursor(1)
 				}
+
 				return m, nil
 			}
 		}
@@ -478,7 +512,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				dir := m.getTab().dir
 				cmd := m.addMessage(msgInfo, info)
 				if dir == getConfigDir() {
-					return m, tea.Batch(cmd, m.update(dir))
+					return m, event.Batch(cmd, m.update(dir))
 				} else {
 					return m, cmd
 				}
@@ -503,7 +537,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.addMessage(msgError, "please select at least one directory")
 				}
 				m.addJob()
-				return m, tea.Batch(calculateSize(m.getTab().dir, paths), m.spinner.Tick)
+				return m, event.Batch(calculateSize(m.getTab(), paths), m.spinner.Tick)
 			}
 
 		case helpMode:
@@ -545,7 +579,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-		case confirmDialogMode, confirmDialogVisualMode:
+		case confirmDialogMode:
 			return m.handleConfirm(msg)
 
 		case normalMode:
@@ -589,7 +623,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				tabCopy := newTab(dir, &page{})
 				m.tabs = append(m.tabs, tabCopy)
 				m.currentTab = len(m.tabs) - 1
-				return m, tea.Batch(
+				return m, event.Batch(
 					m.addMessage(msgInfo, "tab copied"),
 					m.readDir(m.currentTab, dir),
 				)
@@ -661,13 +695,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				dir := tab.next()
 				return m, m.readDir(m.currentTab, dir)
-			case "tab":
+			case "shift+tab":
 				m.mode = jumpMode
-				return m, nil
-			case "v":
-				settings := m.getTab().getPageSettings()
-				m.visual = settings.cursor
-				m.mode = visualMode
 				return m, nil
 			case "f":
 				m.mode = filterMode
@@ -692,15 +721,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logStart = 0
 				return m, nil
 			case "f5":
-				return m, tea.Batch(
+				return m, event.Batch(
 					m.addMessage(msgInfo, fmt.Sprintf("tab %d updated", m.currentTab+1)),
 					m.update(m.getTab().dir))
 			case "y":
 				msg := m.copyCut(false)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+				return m, event.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 			case "x":
 				msg := m.copyCut(true)
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
+				return m, event.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
 			case "u":
 				if !m.cm.canUndo() {
 					return m, m.addMessage(msgWarning, "nothing to undo")
@@ -710,7 +739,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.addMessage(msgError, err.Error())
 				}
 				m.addJob()
-				return m, tea.Batch(
+				return m, event.Batch(
 					m.addMessage(msgInfo, fmt.Sprintf("undo: %s", cmd)),
 					m.spinner.Tick,
 					m.runUndo(cmd))
@@ -723,7 +752,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, m.addMessage(msgError, err.Error())
 				}
 				m.addJob()
-				return m, tea.Batch(
+				return m, event.Batch(
 					m.addMessage(msgInfo, fmt.Sprintf("redo: %s", cmd)),
 					m.spinner.Tick,
 					m.runRedo(cmd))
@@ -761,14 +790,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				cmd := m.addMessage(msgInfo, fmt.Sprintf(`"%s" bookmarked`, dir))
 				if dir == getConfigDir() {
-					return m, tea.Batch(cmd, m.update(dir))
+					return m, event.Batch(cmd, m.update(dir))
 				} else {
 					return m, cmd
 				}
 
 			case "s":
 				if m.search == nil {
-					m.search = newSearch(&m)
+					m.search = newSearch(m)
 				}
 				m.mode = searchMode
 				return m, m.search.blink()
@@ -782,7 +811,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.shellHistory = shellHistory
 				m.shellHistoryCurrent = -1
 				m.resetInput(fmt.Sprintf("%s (#sl - pipe selected)", SHELL))
-				fillAutocomplete(&m)
+				fillAutocomplete(m)
 				return m, textinput.Blink
 			}
 
@@ -852,7 +881,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmd = exec.Command(m.cfg.F3.Command, item.path)
 					}
 					cmd.Dir = m.getTab().dir
-					return m, tea.ExecProcess(cmd, nil)
+					return m, event.ExecProcess(cmd, nil)
 				}
 			case "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
 				if m.search.isItem(m.search.cursor) {
@@ -941,7 +970,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.shellHistoryCurrent++
 				m.shellHistoryCurrent = min(len(m.shellHistory)-1, m.shellHistoryCurrent)
 				m.input.SetValue(m.shellHistory[m.shellHistoryCurrent])
-				fillAutocomplete(&m)
+				fillAutocomplete(m)
 				return m, nil
 			case "ctrl+f":
 				if len(m.shellHistory) == 0 {
@@ -954,7 +983,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.input.SetValue(m.shellHistory[m.shellHistoryCurrent])
 				}
-				fillAutocomplete(&m)
+				fillAutocomplete(m)
 				return m, nil
 			case "enter":
 				m.mode = normalMode
@@ -1020,36 +1049,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.updateStart()
 					}
 				}
-				return m, nil
-			}
-
-		case visualMode:
-			switch msg.String() {
-			case "esc":
-				m.mode = normalMode
-				return m, nil
-			case "v":
-				m.mode = normalMode
-				return m, nil
-			case "y":
-				msg := m.copyCut(false)
-				m.mode = normalMode
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-			case "x":
-				msg := m.copyCut(true)
-				m.mode = normalMode
-				return m, tea.Batch(m.addMessage(msgInfo, msg), m.update(m.getTab().dir))
-			case "r":
-				return m.handleRename()
-			case "d":
-				paths := m.getPaths()
-				if len(paths) == 0 {
-					return m, m.addMessage(msgWarning, "nothing selected")
-				}
-				m.confirm(&deleteCommand{m.getTab().dir, paths})
-				return m, nil
-			case "c":
-				m.mode = copyVisualMode
 				return m, nil
 			}
 
@@ -1144,7 +1143,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					if finalPath != path {
 						m.addJob()
-						return m, tea.Batch(m.addCommand(cmd),
+						return m, event.Batch(m.addCommand(cmd),
 							m.addMessage(msgWarning, fmt.Sprintf("%s already exists", path)))
 
 					} else {
@@ -1173,7 +1172,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.addCommand(cmd)
 			}
 
-		case copyMode, copyVisualMode:
+		case copyMode:
 			switch msg.String() {
 			case "esc":
 				m.mode = normalMode
@@ -1455,7 +1454,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	var cmds []tea.Cmd
+	var cmds []event.Cmd
 
 	searching := false
 	if m.search != nil {
@@ -1463,17 +1462,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.hasJobs() || searching {
-		var cmd tea.Cmd
+		var cmd event.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 
 	switch m.mode {
 	case filterMode, helpFilterMode, renameMode, createMode, shellMode:
-		var cmd tea.Cmd
+		var cmd event.Cmd
 		m.input, cmd = m.input.Update(msg)
 		switch msg.(type) {
-		case tea.KeyMsg:
+		case event.KeyMsg:
 			switch m.mode {
 			case helpFilterMode:
 				m.help = 0
@@ -1482,27 +1481,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.setFilter()
 				m.getTab().filter()
 			case shellMode:
-				fillAutocomplete(&m)
+				fillAutocomplete(m)
 			}
 		}
 		cmds = append(cmds, cmd)
 	case pathMode:
-		var cmd tea.Cmd
+		var cmd event.Cmd
 		m.pathInput, cmd = m.pathInput.Update(msg)
-		fillAutocomplete(&m)
+		fillAutocomplete(m)
 		cmds = append(cmds, cmd)
 	case searchMode:
 		switch m.search.focus {
 		case 0:
-			var cmd tea.Cmd
+			var cmd event.Cmd
 			m.search.filename, cmd = m.search.filename.Update(msg)
 			cmds = append(cmds, cmd)
 		case 1:
-			var cmd tea.Cmd
+			var cmd event.Cmd
 			m.search.text, cmd = m.search.text.Update(msg)
 			cmds = append(cmds, cmd)
 		}
 	}
 
-	return m, tea.Batch(cmds...)
+	return m, event.Batch(cmds...)
 }

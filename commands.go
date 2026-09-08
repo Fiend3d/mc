@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
+	"mc/internal/event"
 	"mc/shutil"
-	tea "charm.land/bubbletea/v2"
 )
 
 type errorMsg struct {
@@ -16,45 +16,42 @@ type errorMsg struct {
 }
 
 type readDirMsg struct {
-	tab   int
-	items []item
-	dir   string
+	target     *tab
+	generation uint64
+	page       *page
+	items      []item
+	dir        string
+	err        error
+	automatic  bool
 }
 
-func (m *model) update(dir string) tea.Cmd {
-	var cmds []tea.Cmd
-
-	for i := range m.tabs {
-		tab := m.tabs[i]
-		if tab.dir != dir {
-			continue
-		}
-
-		// Create command for each page
-		cmd := func(dir string, tab int) tea.Cmd {
-			return func() tea.Msg {
-				items, err := readItems(dir)
-				if err != nil {
-					return errorMsg{err}
-				}
-				return readDirMsg{
-					tab:   tab,
-					dir:   dir,
-					items: items,
-				}
+func (m *model) update(dir string) event.Cmd {
+	var cmds []event.Cmd
+	for _, p := range m.panes {
+		for _, t := range p.tabs {
+			if t.dir == dir {
+				cmds = append(cmds, m.readTab(t))
 			}
-		}(tab.dir, i)
-
-		cmds = append(cmds, cmd)
+		}
 	}
+	return event.Batch(cmds...)
+}
+func (m *model) readTab(t *tab) event.Cmd {
+	return m.readTabMode(t, false)
+}
 
-	if len(cmds) == 0 {
+func (m *model) readTabMode(t *tab, automatic bool) event.Cmd {
+	if automatic && t.pendingReads > 0 {
 		return nil
 	}
-	if len(cmds) == 1 { // is it faster, lol?
-		return cmds[0]
+	t.pendingReads++
+	t.readGeneration++
+	generation := t.readGeneration
+	dir, page := t.dir, t.page
+	return func() event.Msg {
+		items, err := readItems(dir)
+		return readDirMsg{target: t, generation: generation, page: page, items: items, dir: dir, err: err, automatic: automatic}
 	}
-	return tea.Batch(cmds...)
 }
 
 func readItems(dir string) ([]item, error) {
@@ -126,7 +123,7 @@ func readItems(dir string) ([]item, error) {
 	return items, nil
 }
 
-func (m *model) changeDir(dir string) tea.Cmd {
+func (m *model) changeDir(dir string) event.Cmd {
 	tab := m.getTab()
 	m.mode = normalMode
 	if !tab.set(dir) {
@@ -135,58 +132,11 @@ func (m *model) changeDir(dir string) tea.Cmd {
 	return m.readDir(m.currentTab, dir)
 }
 
-func (m *model) readDir(tab int, dir string) tea.Cmd {
-	return func() tea.Msg {
-		items, err := readItems(dir)
-		if err != nil {
-			return errorMsg{err}
-		}
+func (m *model) readDir(index int, dir string) event.Cmd { return m.readTab(m.tabs[index]) }
 
-		return readDirMsg{tab: tab, items: items, dir: dir}
-	}
-}
-
-type commandDoneMsg struct {
-	cmd command
-	dir string
-	sel *string
-	err error
-}
-
-type undoDoneMsg struct {
-	cmd command
-	dir string
-	sel *string
-	err error
-}
-
-type redoDoneMsg struct {
-	cmd command
-	dir string
-	sel *string
-	err error
-}
-
-func (m model) execute(cmd command) tea.Cmd {
-	return func() tea.Msg {
-		err := cmd.execute()
-		return commandDoneMsg{cmd, cmd.getDir(), cmd.sel(), err}
-	}
-}
-
-func (m model) runUndo(cmd command) tea.Cmd {
-	return func() tea.Msg {
-		err := cmd.undo()
-		return undoDoneMsg{cmd, cmd.getDir(), cmd.sel(), err}
-	}
-}
-
-func (m model) runRedo(cmd command) tea.Cmd {
-	return func() tea.Msg {
-		err := cmd.execute()
-		return redoDoneMsg{cmd, cmd.getDir(), cmd.sel(), err}
-	}
-}
+func (m *model) execute(cmd command) event.Cmd { return m.enqueue(cmd, "execute") }
+func (m *model) runUndo(cmd command) event.Cmd { return m.enqueue(cmd, "undo") }
+func (m *model) runRedo(cmd command) event.Cmd { return m.enqueue(cmd, "redo") }
 
 type dirSize struct {
 	path string
@@ -194,14 +144,16 @@ type dirSize struct {
 }
 
 type calcDirSizeMsg struct {
-	dir      string
+	target   *tab
+	page     *page
 	dirSizes []dirSize
 	total    uint64
 }
 
-func calculateSize(dir string, paths []string) tea.Cmd {
-	return func() tea.Msg {
-		result := calcDirSizeMsg{dir: dir, dirSizes: make([]dirSize, 0, len(paths))}
+func calculateSize(target *tab, paths []string) event.Cmd {
+	page := target.page
+	return func() event.Msg {
+		result := calcDirSizeMsg{target: target, page: page, dirSizes: make([]dirSize, 0, len(paths))}
 		for i := range paths {
 			size, err := shutil.CalcDirSize(paths[i])
 			if err == nil {
@@ -217,8 +169,8 @@ type processDoneMsg struct {
 	dir string
 }
 
-func runCmd(cmd *exec.Cmd, dir string) tea.Cmd {
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+func runCmd(cmd *exec.Cmd, dir string) event.Cmd {
+	return event.ExecProcess(cmd, func(err error) event.Msg {
 		return processDoneMsg{dir: dir}
 	})
 }

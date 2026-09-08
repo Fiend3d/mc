@@ -2,13 +2,16 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
+	"mc/internal/event"
 	"mc/widgets/spinner"
 	"mc/widgets/textinput"
-	tea "charm.land/bubbletea/v2"
 )
 
 type mode int
@@ -16,12 +19,10 @@ type mode int
 const (
 	normalMode mode = iota
 	hiddenMode
-	visualMode
 	helpMode
 	helpFilterMode
 	goMode
 	confirmDialogMode
-	confirmDialogVisualMode
 	jumpMode
 	messagesMode
 	tabsMode
@@ -31,25 +32,45 @@ const (
 	createMode
 	pathMode
 	copyMode
-	copyVisualMode
 	bookmarksMode
 	searchMode
 	shellMode
 	themeMode
+	transferMode
 )
 
-type model struct {
-	cfg *Config
-
-	err        error
+type pane struct {
 	tabs       []*tab
 	currentTab int
 	closedTabs []string
-	mode       mode
-	visual     int
-	width      int
-	height     int
-	click      mouseClick
+}
+
+type model struct {
+	*pane
+	panes                     [2]*pane
+	activePane                int
+	screenWidth, screenHeight int
+	taskList                  []*task
+	taskWorkers               *sync.WaitGroup
+	taskCursor                int
+	taskView                  bool
+	taskEvents                chan event.Msg
+	transferPaths             []string
+	transferMove              bool
+	quitting                  bool
+	quitResult                bool
+
+	cfg *Config
+
+	err                         error
+	mode                        mode
+	width                       int
+	height                      int
+	click                       mouseClick
+	hoverPane, hoverIndex       int
+	hoverSearchIndex            int
+	hoverTabPane, hoverTabIndex int
+	hoverPathPane, hoverPathX   int
 
 	help       int
 	helpFilter string
@@ -111,13 +132,6 @@ func (m *model) resetInput(placeholder string) {
 	m.input.Focus()
 }
 
-func (m *model) getStartEnd() (int, int) {
-	settings := m.getTab().getPageSettings()
-	start := min(settings.cursor, m.visual)
-	end := max(settings.cursor, m.visual)
-	return start, end
-}
-
 func (m *model) setFilter() {
 	patterns := strings.FieldsFunc(m.input.Value(), func(r rune) bool {
 		return r == ',' || r == ';'
@@ -147,14 +161,23 @@ func (p *page) isTemp() bool {
 
 func (m *model) updateStart() {
 	settings := m.getTab().getPageSettings()
+	revealCursor(settings, max(1, m.height-3))
+}
+
+func revealCursor(settings *pageSettings, rows int) {
 	if settings.cursor < settings.start {
 		settings.start = settings.cursor
 		return
 	}
-	actualHeight := m.height - 4
+	actualHeight := rows - 1
 	if settings.cursor > settings.start+actualHeight {
 		settings.start = settings.cursor - actualHeight
 	}
+}
+
+func (m *model) clearHover() {
+	m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
+	m.hoverTabPane, m.hoverTabIndex, m.hoverPathPane, m.hoverPathX = -1, -1, -1, -1
 }
 
 func (m *model) updateTabsStart() {
@@ -239,22 +262,14 @@ func (m *model) getPaths() []string {
 		return nil
 	}
 	var paths []string
-	switch m.mode {
-	case visualMode, copyVisualMode:
-		start, end := m.getStartEnd()
-		for i := start; i <= end; i++ {
-			paths = append(paths, items[i].getFullPath())
+	settings := m.getTab().getPageSettings()
+	for _, it := range items {
+		if it.isSelected() {
+			paths = append(paths, it.getFullPath())
 		}
-	default:
-		settings := m.getTab().getPageSettings()
-		for i := range items {
-			if items[i].isSelected() {
-				paths = append(paths, items[i].getFullPath())
-			}
-		}
-		if len(paths) == 0 {
-			paths = append(paths, items[settings.cursor].getFullPath())
-		}
+	}
+	if len(paths) == 0 && settings.cursor < len(items) {
+		paths = append(paths, items[settings.cursor].getFullPath())
 	}
 	return paths
 }
@@ -275,11 +290,7 @@ func (m *model) copyCut(cut bool) string {
 }
 
 func (m *model) confirm(cmd command) {
-	if m.mode == visualMode {
-		m.mode = confirmDialogVisualMode
-	} else {
-		m.mode = confirmDialogMode
-	}
+	m.mode = confirmDialogMode
 	m.yes = false
 	m.cmd = cmd
 }
@@ -293,8 +304,8 @@ const (
 	msgFail
 )
 
-func (m *model) addCommand(cmd command) tea.Cmd {
-	return tea.Batch(
+func (m *model) addCommand(cmd command) event.Cmd {
+	return event.Batch(
 		m.addMessage(msgInfo, fmt.Sprintf("command: %s", cmd)),
 		m.spinner.Tick,
 		m.execute(cmd),
@@ -303,52 +314,31 @@ func (m *model) addCommand(cmd command) tea.Cmd {
 
 type tickMsg struct{}
 
-func tick() tea.Cmd {
-	return tea.Tick(time.Second, func(time.Time) tea.Msg {
+func tick() event.Cmd {
+	return event.Tick(time.Second, func(time.Time) event.Msg {
 		return tickMsg{}
 	})
 }
 
-func (m *model) fillPage(tab int, items []item) error {
-	// restore selection
-	old := m.tabs[tab].page.items
-	if len(old) > 0 {
-		selected := make(map[string]struct{}, len(old))
-		for i := range old {
-			if old[i].isSelected() {
-				selected[old[i].getFullPath()] = struct{}{}
-			}
-		}
-		for j := range items {
-			if _, ok := selected[items[j].getFullPath()]; ok {
-				items[j].setSelected(true)
-			}
-		}
-	}
-	m.tabs[tab].page.items = items
-	m.tabs[tab].filter()
-	return nil
-}
-
-func (m *model) addMessage(msgType msgType, msg string) tea.Cmd {
+func (m *model) addMessage(msgType msgType, msg string) event.Cmd {
 	message := newMessage(msgType, msg)
 	m.log = append(m.log, message)
 	m.ticks += 6
 	return tick()
 }
 
-func (m *model) left() (tea.Model, tea.Cmd) {
+func (m *model) left() (event.Model, event.Cmd) {
 	tab := m.getTab()
 	dir := tab.dir
 	parent := filepathDir(tab.dir)
 	tab.set(parent)
-	return m, tea.Sequence(
+	return m, event.Sequence(
 		m.readDir(m.currentTab, parent),
-		selectItem(m.currentTab, dir),
+		selectItem(m.getTab(), dir),
 	)
 }
 
-func (m *model) right(addNewTab bool) (tea.Model, tea.Cmd) {
+func (m *model) right(addNewTab bool) (event.Model, event.Cmd) {
 	tab := m.getTab()
 	settings := tab.getPageSettings()
 	items := tab.page.getItems()
@@ -370,7 +360,7 @@ func (m *model) right(addNewTab bool) (tea.Model, tea.Cmd) {
 		tabCopy := newTab(dir, &page{})
 		m.tabs = append(m.tabs, tabCopy)
 		m.currentTab = len(m.tabs) - 1
-		return m, tea.Batch(
+		return m, event.Batch(
 			m.addMessage(msgInfo, fmt.Sprintf("%s opened in a new tab", dir)),
 			m.readDir(m.currentTab, dir),
 		)
@@ -399,7 +389,7 @@ func (m *model) getPage() *page { // probably redundant
 
 func setTextinputStyle(input *textinput.Model, t *theme) {
 	styles := input.Styles()
-	styles.Cursor.Shape = tea.CursorBar
+	styles.Cursor.Shape = event.CursorBar
 	styles.Focused.Text = t.emptyStyle
 	styles.Focused.Placeholder = t.emptyStyle.Foreground(t.grayColor)
 	styles.Focused.Suggestion = t.emptyStyle.Foreground(t.grayColor)
@@ -435,8 +425,24 @@ func initialModel(dirs []string) model {
 		fmt.Printf("warning: failed to load config: %s\n\n", err.Error())
 	}
 
-	tabs := make([]*tab, len(dirs))
+	if len(dirs) == 0 {
+		wd, _ := os.Getwd()
+		dirs = []string{wd}
+	}
 	for i, dir := range dirs {
+		if dir != "" {
+			if abs, err := filepath.Abs(dir); err == nil {
+				dirs[i] = abs
+			}
+		}
+	}
+	leftDirs := append([]string{dirs[0]}, dirs[min(2, len(dirs)):]...)
+	rightDir := dirs[0]
+	if len(dirs) > 1 {
+		rightDir = dirs[1]
+	}
+	tabs := make([]*tab, len(leftDirs))
+	for i, dir := range leftDirs {
 		tabs[i] = newTab(dir, &page{})
 	}
 
@@ -446,15 +452,18 @@ func initialModel(dirs []string) model {
 	s := spinner.New()
 	setSpinnerStyle(&s, theme)
 
+	left := &pane{tabs: tabs}
+	right := &pane{tabs: []*tab{newTab(rightDir, &page{})}}
 	return model{
-		cfg:        cfg,
-		tabs:       tabs,
-		currentTab: 0,
-		mode:       normalMode,
-		theme:      theme,
-		input:      input,
-		pathInput:  pathInput,
-		spinner:    s,
-		cm:         newCommandManager(),
+		pane: left, panes: [2]*pane{left, right}, taskEvents: make(chan event.Msg, 128), taskWorkers: &sync.WaitGroup{},
+		hoverPane: -1, hoverIndex: -1, hoverSearchIndex: -1,
+		hoverTabPane: -1, hoverTabIndex: -1, hoverPathPane: -1, hoverPathX: -1,
+		cfg:       cfg,
+		mode:      normalMode,
+		theme:     theme,
+		input:     input,
+		pathInput: pathInput,
+		spinner:   s,
+		cm:        newCommandManager(),
 	}
 }

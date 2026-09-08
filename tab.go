@@ -6,10 +6,16 @@ import (
 )
 
 type tab struct {
-	dir          string
-	page         *page
-	pageSettings map[string]*pageSettings
-	filterText   []string
+	readGeneration uint64
+	pendingReads   int
+	lastReadError  string
+	sortMethod     sortMethod
+	sortReverse    bool
+	sorted         bool
+	dir            string
+	page           *page
+	pageSettings   map[string]*pageSettings
+	filterText     []string
 
 	history        []string
 	historyCurrent int
@@ -71,8 +77,9 @@ func (t *tab) hasNext() bool {
 }
 
 type page struct {
-	items     []item
-	tempItems []item
+	selectionRange *rangeSelection
+	items          []item
+	tempItems      []item
 }
 
 type pageSettings struct {
@@ -97,6 +104,7 @@ func (s *pageSettings) update(length int) {
 }
 
 func (t *tab) filter() {
+	t.page.selectionRange = nil
 	if t.filterText == nil {
 		return
 	}

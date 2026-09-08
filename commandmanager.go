@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -140,15 +141,20 @@ func buildRenamePairs(paths []string, names []string) []pathPair {
 }
 
 type fileActionCommand struct {
-	action    fileAction
-	dir       string
-	pairs     []pathPair
-	collision bool
+	action            fileAction
+	dir               string
+	pairs             []pathPair
+	collision         bool
+	overwrite         bool
+	overwriteExisting map[string]bool
+	journal           []shutil.Record
+	redoJournal       []shutil.Record
 }
 
 func newFileActionCommand(action fileAction, paths []string, dst string, override bool) *fileActionCommand {
 	var pairs []pathPair
 	collision := false
+	existing := map[string]bool{}
 	var reserved []string
 	for i := range paths {
 		name := filepath.Base(paths[i])
@@ -156,6 +162,7 @@ func newFileActionCommand(action fileAction, paths []string, dst string, overrid
 		if override {
 			if shutil.PathExists(dstPath) {
 				collision = true
+				existing[dstPath] = true
 			}
 			pairs = append(pairs, pathPair{paths[i], dstPath})
 		} else {
@@ -165,17 +172,17 @@ func newFileActionCommand(action fileAction, paths []string, dst string, overrid
 		}
 	}
 
-	return &fileActionCommand{action, dst, pairs, collision}
+	return &fileActionCommand{action: action, dir: dst, pairs: pairs, collision: collision, overwrite: override, overwriteExisting: existing}
 }
 
 func (c *fileActionCommand) String() string {
 	switch c.action {
 	case copyFileAction:
-		return fmt.Sprintf("copy paths:%d", len(c.pairs))
+		return fmt.Sprintf("copy %d items", len(c.pairs))
 	case cutFileAction:
-		return fmt.Sprintf("cut paths:%d", len(c.pairs))
+		return fmt.Sprintf("move %d items", len(c.pairs))
 	case renameFileAction:
-		return fmt.Sprintf("rename paths:%d", len(c.pairs))
+		return fmt.Sprintf("rename %d items", len(c.pairs))
 	}
 	return "unknown command"
 }
@@ -184,82 +191,13 @@ func (c *fileActionCommand) getDir() string {
 	return c.dir
 }
 
-func (c *fileActionCommand) execute() error {
-	for i := range c.pairs {
-		if c.pairs[i].src == c.pairs[i].dst {
-			continue
-		}
-		if shutil.IsDir(c.pairs[i].src) {
-			err := shutil.CopyDir(c.pairs[i].src, c.pairs[i].dst)
-			if err != nil {
-				return err
-			}
-
-			switch c.action {
-			case cutFileAction, renameFileAction:
-				err := os.RemoveAll(c.pairs[i].src)
-				if err != nil {
-					return err
-				}
-			}
-		} else {
-			switch c.action {
-			case copyFileAction:
-				err := shutil.CopyFile(c.pairs[i].src, c.pairs[i].dst)
-				if err != nil {
-					return err
-				}
-			case cutFileAction, renameFileAction:
-				err := shutil.MoveFile(c.pairs[i].src, c.pairs[i].dst)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
-}
-
+func (c *fileActionCommand) execute() error { return c.executeTask(context.Background(), nil) }
 func (c *fileActionCommand) undo() error {
-	if c.collision {
-		return fmt.Errorf("there's a collision")
-	}
-	for i := range c.pairs {
-		if !shutil.PathExists(c.pairs[i].dst) {
-			return fmt.Errorf("%s doesn't exist", c.pairs[i].dst)
-		}
-		if c.pairs[i].src == c.pairs[i].dst {
-			continue
-		}
-		switch c.action {
-		case copyFileAction:
-			err := os.RemoveAll(c.pairs[i].dst)
-			if err != nil {
-				return err
-			}
-		case cutFileAction, renameFileAction:
-			if shutil.IsDir(c.pairs[i].dst) {
-				err := shutil.CopyDir(c.pairs[i].dst, c.pairs[i].src)
-				if err != nil {
-					return err
-				}
-				err = os.RemoveAll(c.pairs[i].dst)
-				if err != nil {
-					return err
-				}
-			} else {
-				err := shutil.MoveFile(c.pairs[i].dst, c.pairs[i].src)
-				if err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
+	return shutil.UndoJournal(context.Background(), &c.journal, &c.redoJournal, nil)
 }
 
 func (c *fileActionCommand) undoable() bool {
-	return true
+	return !c.collision
 }
 
 func (c *fileActionCommand) sel() *string {
@@ -270,9 +208,10 @@ func (c *fileActionCommand) sel() *string {
 }
 
 type createCommand struct {
-	path  string
-	isDir bool
-	dir   string
+	snapshot map[string]shutil.Stamp
+	path     string
+	isDir    bool
+	dir      string
 }
 
 func newCreateCommand(name string, dir string) *createCommand {
@@ -284,26 +223,37 @@ func newCreateCommand(name string, dir string) *createCommand {
 		runes = runes[:len(runes)-1]
 	}
 	path := shutil.UniquePath(nil, nil, filepath.Join(dir, string(runes)))
-	return &createCommand{path, isDir, dir}
+	return &createCommand{path: path, isDir: isDir, dir: dir}
 }
 
 func (c *createCommand) execute() error {
+	if shutil.PathExists(c.path) {
+		return fmt.Errorf("path already exists: %s", c.path)
+	}
+	if err := shutil.CheckDestination(c.path); err != nil {
+		return err
+	}
+	var err error
 	if c.isDir {
-		err := os.MkdirAll(c.path, 0755)
-		if err != nil {
-			return err
-		}
+		err = os.MkdirAll(c.path, 0755)
 	} else {
-		err := shutil.TouchFile(c.path)
-		if err != nil {
-			return err
+		var f *os.File
+		f, err = os.OpenFile(c.path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err == nil {
+			err = f.Close()
 		}
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	c.snapshot, err = shutil.Snapshot(c.path)
+	return err
 }
-
 func (c *createCommand) undo() error {
-	return os.RemoveAll(c.path)
+	if err := shutil.Unchanged(c.path, c.snapshot); err != nil {
+		return err
+	}
+	return os.Remove(c.path)
 }
 
 func (c *createCommand) undoable() bool {

@@ -1,59 +1,72 @@
-$icon = $false
-$dist = $false
+$ErrorActionPreference = "Stop"
+Push-Location $PSScriptRoot
+try {
+    $icon = $false
+    $dist = $false
 
-foreach ($arg in $args) {
-    if ($arg -eq "icon") {
-        $icon = $true
+    foreach ($arg in $args) {
+        if ($arg -eq "icon") {
+            $icon = $true
+        }
+        if ($arg -eq "dist") {
+            $dist = $true
+        }
     }
-    if ($arg -eq "dist") {
-        $dist = $true
+
+    $commit    = git rev-parse --short HEAD
+    $buildTime = Get-Date -Format "dd.MM.yyyy HH:mm"
+    $version   = (Get-Content -LiteralPath (Join-Path $PSScriptRoot "VERSION") -Raw).Trim()
+    $dirty     = git status --porcelain
+
+    if (-not $version) { $version = "dev" }
+    if ($dirty) { $version += "-dirty" }
+
+    $ldflags = @(
+        "-X 'main.Version=$version'"
+        "-X 'main.GitCommit=$commit'"
+        "-X 'main.BuildTime=$buildTime'"
+    ) -join " "
+
+    if ($icon) {
+        # go install github.com/akavel/rsrc@latest
+        rsrc -ico .\assets\icon.ico
     }
-}
 
-$commit    = git rev-parse --short HEAD
-$buildTime = Get-Date -Format "dd.MM.yyyy HH:mm"
-$version   = git describe --tags --abbrev=0
-$dirty     = git status --porcelain
-
-if (-not $version) { $version = "dev" }
-if ($dirty) { $version += "-dirty" }
-
-$ldflags = @(
-    "-X 'main.Version=$version'"
-    "-X 'main.GitCommit=$commit'"
-    "-X 'main.BuildTime=$buildTime'"
-) -join " "
-
-if ($icon) {
-    # go install github.com/akavel/rsrc@latest
-    rsrc -ico .\assets\icon.ico
-}
-
-$output = "mc.exe"
-if (Test-Path $output) { 
-    # Go doesn't rebuild if no source changes, which could leave outdated version flags
-    # Force clean build to ensure accurate version and dirty state
-    Remove-Item $output
-}
-
-go build -ldflags $ldflags -o $output
-
-if ($dist) {
-    $distPath = ".\dist"
-    if (Test-Path $distPath) {
-        Remove-Item $distPath -Recurse
+    $output = "mc.exe"
+    if (Test-Path $output) {
+        # Go doesn't rebuild if no source changes, which could leave outdated version flags
+        # Force clean build to ensure accurate version and dirty state
+        Remove-Item $output
     }
-    New-Item -Path $distPath -ItemType Directory
-    Copy-Item .\mc.exe -Destination $distPath
-    Get-ChildItem -Path ".\scripts" -Include "*.bat", "*.ps1" -Recurse | 
-        Copy-Item -Destination $distPath
-    $deps = "..\deps\deps.exe"
-    if (Test-Path $deps) {
-        Copy-Item $deps -Destination $distPath
+
+    go build -ldflags $ldflags -o $output
+    if ($LASTEXITCODE -ne 0) { throw "Go build failed" }
+
+    if ($dist) {
+        $distPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "dist"))
+        New-Item -Path $distPath -ItemType Directory -Force | Out-Null
+        $stagePath = Join-Path $distPath (".package-" + [guid]::NewGuid().ToString("N"))
+        New-Item -Path $stagePath -ItemType Directory | Out-Null
+        try {
+            Copy-Item -LiteralPath $output -Destination $stagePath
+            Get-ChildItem -Path ".\scripts" -Include "*.bat", "*.ps1" -Recurse |
+                Copy-Item -Destination $stagePath
+            foreach ($dependency in @("..\deps\deps.exe", "..\koneko\koneko.exe")) {
+                if (Test-Path -LiteralPath $dependency) {
+                    Copy-Item -LiteralPath $dependency -Destination $stagePath
+                }
+            }
+            $archivePath = Join-Path $distPath "mc_$version.zip"
+            Get-ChildItem -LiteralPath $stagePath | Compress-Archive -DestinationPath $archivePath -Force
+            Write-Host "Created $archivePath"
+        } finally {
+            $resolvedStage = [System.IO.Path]::GetFullPath($stagePath)
+            if ([System.IO.Path]::GetDirectoryName($resolvedStage) -ne $distPath -or
+                -not [System.IO.Path]::GetFileName($resolvedStage).StartsWith(".package-")) {
+                throw "Unexpected package staging path"
+            }
+            Remove-Item -LiteralPath $resolvedStage -Recurse
+        }
     }
-    $koneko = "..\koneko\koneko.exe"
-    if (Test-Path $koneko) {
-        Copy-Item $koneko -Destination $distPath 
-    }
-    7z a "$distPath\mc_$version.zip" "$distPath\*"
-}
+
+} finally { Pop-Location }

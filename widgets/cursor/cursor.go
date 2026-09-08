@@ -5,8 +5,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"mc/internal/event"
+	"mc/internal/paint"
 )
 
 const defaultBlinkSpeed = time.Millisecond * 530
@@ -48,8 +48,8 @@ func (c Mode) String() string {
 }
 
 type Model struct {
-	Style      lipgloss.Style
-	TextStyle  lipgloss.Style
+	Style      paint.Style
+	TextStyle  paint.Style
 	BlinkSpeed time.Duration
 	IsBlinked  bool
 	char       string
@@ -72,7 +72,7 @@ func New() Model {
 	}
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg event.Msg) (Model, event.Cmd) {
 	switch msg := msg.(type) {
 	case initialBlinkMsg:
 		if m.mode != CursorBlink || !m.focus {
@@ -81,10 +81,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		cmd := m.Blink()
 		return m, cmd
 
-	case tea.FocusMsg:
+	case event.FocusMsg:
 		return m, m.Focus()
 
-	case tea.BlurMsg:
+	case event.BlurMsg:
 		m.Blur()
 		return m, nil
 
@@ -95,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		if msg.id != m.id || msg.tag != m.blinkTag {
 			return m, nil
 		}
-		var cmd tea.Cmd
+		var cmd event.Cmd
 		if m.mode == CursorBlink {
 			m.IsBlinked = !m.IsBlinked
 			cmd = m.Blink()
@@ -112,7 +112,7 @@ func (m Model) Mode() Mode {
 	return m.mode
 }
 
-func (m *Model) SetMode(mode Mode) tea.Cmd {
+func (m *Model) SetMode(mode Mode) event.Cmd {
 	if mode < CursorBlink || mode > CursorHide {
 		return nil
 	}
@@ -124,7 +124,7 @@ func (m *Model) SetMode(mode Mode) tea.Cmd {
 	return nil
 }
 
-func (m *Model) Blink() tea.Cmd {
+func (m *Model) Blink() event.Cmd {
 	if m.mode != CursorBlink {
 		return nil
 	}
@@ -139,7 +139,7 @@ func (m *Model) Blink() tea.Cmd {
 	m.blinkTag++
 	blinkMsg := BlinkMsg{id: m.id, tag: m.blinkTag}
 
-	return func() tea.Msg {
+	return func() event.Msg {
 		defer cancel()
 		<-ctx.Done()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -149,11 +149,11 @@ func (m *Model) Blink() tea.Cmd {
 	}
 }
 
-func Blink() tea.Msg {
+func Blink() event.Msg {
 	return initialBlinkMsg{}
 }
 
-func (m *Model) Focus() tea.Cmd {
+func (m *Model) Focus() event.Cmd {
 	m.focus = true
 	m.IsBlinked = m.mode == CursorHide
 

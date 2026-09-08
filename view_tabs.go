@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/lipgloss/v2"
+	"mc/internal/paint"
 )
 
 func viewTabs(m *model) string {
@@ -57,10 +57,10 @@ func viewTabs(m *model) string {
 		if current {
 			tag += style.Foreground(m.theme.grayColor).Render(" [current] ")
 		}
-		tagLength := lipgloss.Width(tag)
+		tagLength := paint.Width(tag)
 		text = truncate(text, m.width-prefixWidth-tagLength)
 
-		textLength := lipgloss.Width(text)
+		textLength := paint.Width(text)
 		var coloredText string
 		if current {
 			coloredText = colorizeDir(text, *style, style.Foreground(m.theme.accentColor5), textLength)

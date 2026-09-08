@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/lipgloss/v2"
+	"mc/internal/paint"
 )
 
 func viewBookmarks(m *model) string {
@@ -50,7 +50,7 @@ func viewBookmarks(m *model) string {
 		text := m.bm.dirs[index]
 		text = truncate(text, m.width-prefixWidth)
 
-		textLength := lipgloss.Width(text)
+		textLength := paint.Width(text)
 		coloredText := colorizeDir(text, *style, style.Foreground(m.theme.accentColor4), textLength)
 		s.WriteString(style.Width(m.width - prefixWidth).Render(coloredText))
 		s.WriteRune('\n')

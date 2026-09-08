@@ -5,20 +5,14 @@ import (
 	"fmt"
 	"log"
 	"os"
-
-	tea "charm.land/bubbletea/v2"
 )
 
 var (
 	// Set by build flags
-	Version   = "dev"
+	Version   = "2.0.0-dev"
 	GitCommit = ""
 	BuildTime = ""
 )
-
-func (m model) Init() tea.Cmd {
-	return m.readDir(0, m.tabs[0].dir)
-}
 
 func main() {
 	var showVersion bool
@@ -43,23 +37,9 @@ func main() {
 		dirs = []string{wd}
 	}
 
-	p := tea.NewProgram(initialModel(dirs))
-
-	m, err := p.Run()
-	if err != nil {
-		log.Fatalf("failed to launch the program: %s", err)
-	}
-
-	// Update() has a value receiver, but the handlers with pointer receivers
-	// return *model, so either can end up in the interface.
-	var finalModel *model
-	switch v := m.(type) {
-	case *model:
-		finalModel = v
-	case model:
-		finalModel = &v
-	default:
-		log.Fatalf("unexpected model type: %T", m)
+	finalModel := initialModel(dirs)
+	if err := run(&finalModel); err != nil {
+		log.Fatalf("mc: %s", err)
 	}
 
 	if output {

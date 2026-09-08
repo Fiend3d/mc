@@ -23,7 +23,7 @@ Pass directories as positional args to open them on launch.
 ## Setup Requirements
 
 - **OS**: Windows only (Win32 API, CF_HDROP clipboard, Netapi32)
-- **Go**: 1.26.4
+- **Go**: 1.27.0
 - **External deps**: `bat` + `less` (from Git), `hx` (helix), `code`
 - **Recommended**: Windows Terminal (for mouse support), JetBrainsMonoNL Nerd Font
 - **Config**: `$env:APPDATA\mc\config.toml` — theme, F-key tools
@@ -33,7 +33,7 @@ Run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` if PowerShell scripts 
 
 ## Architecture
 
-Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, textinput, cursor, key, runeutil) and `shutil/`. Uses Bubble Tea v2 (`charm.land/bubbletea/v2`).
+Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, textinput, cursor, key, runeutil) and `shutil/`. Uses catatui (`github.com/Fiend3d/catatui`), with the sibling checkout via a local go.mod replacement.
 
 ### Key files
 
@@ -42,7 +42,10 @@ Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, 
 | `main.go` | Entrypoint, CLI flag parsing |
 | `model.go` | `model` struct (state), mode constants, initialization |
 | `update.go` | Message handling + event loop (`Update()`) — largest file (~1470 lines) |
-| `view.go` | Rendering (`View()`) |
+| `view_native.go` | Native catatui pane, dialog and task rendering |
+| `runtime.go` | catatui terminal ownership, input and effect scheduling |
+| `tasks.go` | Sequential cancellable tasks, progress, undo/redo |
+| `shutil/transfer.go` | Atomic copy, safe move and operation journals |
 | `handle.go` | Action handlers (quit, paste, rename, tools, clipboard copy) |
 | `commands.go` | Async command wrappers, directory reading, file ops |
 | `commandmanager.go` | Command pattern (undo/redo); delete is NOT undoable |
@@ -64,9 +67,9 @@ Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, 
 | `view_utils.go` | View utility functions (colorizeDir, truncate) |
 | `shutil/shutil.go` | File system utility functions |
 
-### Modes (22 total)
+### Modes
 
-Access via keybindings: normal, hidden, visual, help, helpFilter, go, confirmDialog, confirmDialogVisual, jump, messages, tabs, filter, sort, rename, create, path, copy, copyVisual, bookmarks, search, shell, theme.
+Access via keybindings: normal, hidden, help, helpFilter, go, confirmDialog, jump, messages, tabs, filter, sort, rename, create, path, copy, bookmarks, search, shell, theme, transfer. Tasks and quit confirmation are global overlays.
 
 ## Build Process
 
@@ -74,13 +77,16 @@ No fork needed — all widget components live in `widgets`.
 
 ## Testing
 
-Only `shutil/shutil_test.go` exists (in the `shutil` package).
+Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests cover panes, tasks, file operations, native rendering, Unicode editing, and ConPTY input/process handoff. `review_test.go` covers refresh bursts and errors, real filesystem notifications, cursor/viewport preservation, overlay mouse isolation, and Unicode breadcrumb hit testing.
 
 ## Key Conventions
 
 - `SHELL = "powershell"` (hardcoded in `config.go`)
 - `#sl` macro in shell mode expands to selected file paths
 - File filter uses comma/semicolon-separated patterns (case-insensitive `Contains`)
-- Delete is permanent + undoable only for file actions (copy/move/rename), NOT for delete
+- Delete and overwrites are not undoable; other completed file work is journaled, including partial operations.
+- Tab switches panes; Shift+Tab enters Jump; Y/X transfer to the opposite pane; Ctrl+T opens tasks.
+- Pane/tab state is independent. Async reads carry the target tab, page and generation.
+- Only the UI loop mutates model state; workers send immutable progress/completion events.
 - Themes set via `g -> T`, saved via `g -> C`
 - Binary files in search are detected by null-byte scan (first 8KB); 5MB size limit for text search

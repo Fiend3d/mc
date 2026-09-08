@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"mc/internal/paint"
 )
 
 type helpTopic struct {
@@ -28,7 +28,7 @@ func addTopic(docs []string, topic *helpTopic, m *model) []string {
 	base := &m.theme.baseStyle
 	highlight := base.Bold(true).Foreground(m.theme.accentColor3)
 	str := highlight.Render(topic.header)
-	docs = addParagraph(docs, m, str, lipgloss.Left, true)
+	docs = addParagraph(docs, m, str, paint.Left, true)
 	docs = append(docs, base.Width(m.width).Render())
 	for i := range topic.docs {
 		docs = append(docs, topic.docs[i])
@@ -36,7 +36,7 @@ func addTopic(docs []string, topic *helpTopic, m *model) []string {
 	return docs
 }
 
-func addParagraph(docs []string, m *model, text string, position lipgloss.Position, keep bool) []string {
+func addParagraph(docs []string, m *model, text string, position paint.Position, keep bool) []string {
 	if !keep && len(m.helpFilter) > 0 {
 		if !strings.Contains(
 			strings.ToUpper(text),
@@ -62,7 +62,7 @@ func makeDocs(docs []string, m *model, prefix string, text string) []string {
 	base := &m.theme.baseStyle
 	highlight := base.Bold(true).Foreground(m.theme.accentColor5)
 	str := highlight.Render(prefix) + base.Render(text)
-	docs = addParagraph(docs, m, str, lipgloss.Left, false)
+	docs = addParagraph(docs, m, str, paint.Left, false)
 	return docs
 }
 
@@ -85,7 +85,7 @@ func viewHelp(m *model) string {
 		docs,
 		m,
 		base.Foreground(m.theme.accentColor2).Bold(true).Render("Modal Commander")+base.Render(header),
-		lipgloss.Center,
+		paint.Center,
 		true,
 	)
 
@@ -95,11 +95,14 @@ func viewHelp(m *model) string {
 		{" g", " - Enter Go mode."},
 		{" Ctrl+h", " - Hide/Unhide TUI."},
 		{" t", " - Duplicate the current tab."},
-		{" Ctrl+t, Ctrl+n", " - Open selected directory in a new tab."},
+		{" Ctrl+n", " - Open selected directory in a new tab."},
 		{" ]", " - Next tab."},
 		{" [", " - Previous tab."},
 		{" 1-0", " - Select tabs 1 to 10 (0 is tab 10)."},
-		{" space", " - Select."},
+		{" Space / Insert", " - Toggle selection and advance."},
+		{" Shift+Up/Down", " - Extend or shrink a selection range."},
+		{" Shift+Home/End", " - Select a range to the first / last item."},
+		{" Ctrl+click", " - Select a range to the clicked item (Shift+click may select terminal text)."},
 		{" Ctrl+a", " - Select all."},
 		{" Ctrl+d", " - Deselect all."},
 		{" Ctrl+r", " - Toggle selection (invert all)."},
@@ -119,8 +122,10 @@ func viewHelp(m *model) string {
 		{" h, left", " - Enter the parent directory."},
 		{" Ctrl+b", " - Go back in history."},
 		{" Ctrl+f", " - Go forward in history."},
-		{" tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut."},
-		{" v", " - Enter Visual mode."},
+		{" Shift+Tab", " - Enter Jump mode. Jump mode allows jumping to items using their first letter as a shortcut."},
+		{" Tab", " - Switch the focused pane."},
+		{" Y / X", " - Copy / move to the opposite pane, with an editable destination."},
+		{" Ctrl+t", " - Background tasks; c cancels the highlighted task."},
 		{" f", " - Enter Filter mode. Filter mode filters the items in the current tab."},
 		{" c", " - Enter Copy mode to copy paths and names of selected items to the clipboard."},
 		{" B", " - Bookmark the directory."},
@@ -134,7 +139,7 @@ func viewHelp(m *model) string {
 		{" F2", " - Dependency walker (deps by default, configurable)."},
 		{" F3", " - Viewer tool (koneko by default, configurable)."},
 		{" F4", " - Editor (Helix by default, configurable)."},
-		{" F5", " - Refresh current tab."},
+		{" F5", " - Refresh immediately (directories also update automatically)."},
 		{" F6", " - File explorer (configurable)."},
 		{" F7", " - VS Code paths (configurable)."},
 		{" F8", " - VS Code directory (configurable)."},

@@ -12,23 +12,24 @@ import (
 	"mc/shutil"
 	"mc/widgets/textinput"
 
-	tea "charm.land/bubbletea/v2"
+	"mc/internal/event"
 )
 
-func (m *model) handleQuit(result bool) (tea.Model, tea.Cmd) {
-	if m.hasJobs() && !m.confirmQuit {
-		m.confirmQuit = true
-		return m, m.addMessage(msgError, "unfinished jobs - press again to confirm")
+func (m *model) handleQuit(result bool) (event.Model, event.Cmd) {
+	if m.hasJobs() {
+		m.quitting = true
+		m.quitResult = result
+		return m, nil
 	}
 	if result {
 		m.result = m.getTab().dir
 	}
-	return m, tea.Quit
+	return m, event.Quit
 }
 
-func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *model) handleConfirm(msg event.Msg) (event.Model, event.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case event.KeyMsg:
 		switch msg.String() {
 		case "esc", "n":
 			m.mode = normalMode
@@ -55,7 +56,7 @@ func (m *model) handleConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) handlePaste(override bool) (tea.Model, tea.Cmd) {
+func (m *model) handlePaste(override bool) (event.Model, event.Cmd) {
 	paths, op, err := getClipboardFiles()
 	if err != nil {
 		return m, m.addMessage(msgWarning, "nothing to paste")
@@ -82,13 +83,13 @@ type massRenameMsg struct {
 	paths    []string
 }
 
-func massRename(dir, tempFile string, lines, paths []string) tea.Cmd {
-	return func() tea.Msg {
+func massRename(dir, tempFile string, lines, paths []string) event.Cmd {
+	return func() event.Msg {
 		return massRenameMsg{dir, tempFile, lines, paths}
 	}
 }
 
-func (m *model) handleRename() (tea.Model, tea.Cmd) {
+func (m *model) handleRename() (event.Model, event.Cmd) {
 	items := m.getPage().getItems()
 	if len(items) > 0 {
 		item := items[0]
@@ -129,8 +130,8 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 					tempFile.Name(),
 				)
 				cmd.Dir = m.getTab().dir
-				return m, tea.Sequence(
-					tea.ExecProcess(cmd, nil),
+				return m, event.Sequence(
+					event.ExecProcess(cmd, nil),
 					massRename(m.getTab().dir, tempFile.Name(), strings.Split(origin, "\n"), paths),
 				)
 			}
@@ -141,7 +142,7 @@ func (m *model) handleRename() (tea.Model, tea.Cmd) {
 	return m, m.addMessage(msgError, "nothing to rename")
 }
 
-func (m *model) handleRestoreTab() (tea.Model, tea.Cmd) {
+func (m *model) handleRestoreTab() (event.Model, event.Cmd) {
 	if len(m.closedTabs) == 0 {
 		return m, m.addMessage(msgWarning, "nothing to restore")
 	}
@@ -152,7 +153,7 @@ func (m *model) handleRestoreTab() (tea.Model, tea.Cmd) {
 	return m, m.readDir(m.currentTab, dir)
 }
 
-func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
+func (m *model) handleNewPath(addTab bool) (event.Model, event.Cmd) {
 	dir := m.pathInput.Value()
 	dir = strings.TrimSpace(dir)
 	if isUNCRoot(dir) || dir == "" {
@@ -186,9 +187,9 @@ func (m *model) handleNewPath(addTab bool) (tea.Model, tea.Cmd) {
 	return m, m.changeDir(dir)
 }
 
-func (m *model) handleWheel(steps int) (tea.Model, tea.Cmd) {
+func (m *model) handleWheel(steps int) (event.Model, event.Cmd) {
 	switch m.mode {
-	case normalMode, visualMode, jumpMode:
+	case normalMode, jumpMode:
 		tab := m.getTab()
 		if m.height-3 <= tab.page.length() {
 			settings := tab.getPageSettings()
@@ -247,16 +248,12 @@ const (
 	clipboardCopyFilenameArray
 )
 
-func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Model, tea.Cmd) {
+func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (event.Model, event.Cmd) {
 	switchMode := func() {
-		if m.mode == copyVisualMode {
-			m.mode = visualMode
-		} else {
-			m.mode = normalMode
-		}
+		m.mode = normalMode
 	}
 
-	result := func(paths []string) (tea.Model, tea.Cmd) {
+	result := func(paths []string) (event.Model, event.Cmd) {
 		if len(paths) == 1 {
 			return m, m.addMessage(msgInfo, fmt.Sprintf(`"%s" copied`, paths[0]))
 		} else {
@@ -415,7 +412,7 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (tea.Mod
 	return m, m.addMessage(msgError, "lol?")
 }
 
-func (m *model) handleTool(key string) (tea.Model, tea.Cmd) {
+func (m *model) handleTool(key string) (event.Model, event.Cmd) {
 	var t *ToolConfig
 	switch key {
 	case "f2":

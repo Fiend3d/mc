@@ -1,0 +1,412 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/Fiend3d/catatui"
+	"github.com/Fiend3d/catatui/term"
+	"github.com/fsnotify/fsnotify"
+	"mc/internal/event"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"time"
+)
+
+type delivered struct {
+	msg event.Msg
+	ack chan struct{}
+}
+
+func run(m *model) (err error) {
+	defer term.RecoverAndRestore()
+	var terminal *catatui.Terminal
+	var restore func()
+	var reader *term.EventReader
+	start := func() error {
+		var e error
+		opts := []term.Option{term.WithBracketedPaste(), term.WithFocusReporting()}
+		if m.mode == hiddenMode {
+			opts = append(opts, term.WithoutAlternateScreen())
+		} else {
+			opts = append(opts, term.WithMouse())
+		}
+		terminal, restore, e = term.Init(opts...)
+		if e != nil {
+			return e
+		}
+		reader = term.NewEventReader(os.Stdin, os.Stdout)
+		return nil
+	}
+	stop := func() {
+		if reader != nil {
+			reader.Close()
+		}
+		if restore != nil {
+			restore()
+		}
+	}
+	if err = start(); err != nil {
+		return err
+	}
+	defer stop()
+	ctx, cancel := context.WithCancel(context.Background())
+	var workers sync.WaitGroup
+	defer func() {
+		cancel()
+		for _, t := range m.taskList {
+			if t.cancel != nil {
+				t.cancel()
+			}
+		}
+		if m.search != nil {
+			m.search.stop()
+		}
+		workers.Wait()
+		done := make(chan struct{})
+		go func() { m.taskWorkers.Wait(); close(done) }()
+		for {
+			select {
+			case <-done:
+				return
+			case <-m.taskEvents:
+			}
+		}
+	}()
+	inbox := make(chan delivered, 128)
+	var execute func(event.Cmd)
+	execute = func(cmd event.Cmd) {
+		if cmd == nil {
+			return
+		}
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			var effect func(event.Msg)
+			effect = func(msg event.Msg) {
+				switch v := msg.(type) {
+				case nil:
+					return
+				case event.BatchMsg:
+					for _, c := range v {
+						execute(c)
+					}
+				case event.SequenceMsg:
+					for _, c := range v {
+						if ctx.Err() != nil {
+							return
+						}
+						if c != nil {
+							effect(c())
+						}
+					}
+				case event.Delay:
+					timer := time.NewTimer(v.Duration)
+					defer timer.Stop()
+					select {
+					case now := <-timer.C:
+						effect(v.Next(now))
+					case <-ctx.Done():
+					}
+				default:
+					ack := make(chan struct{})
+					select {
+					case inbox <- delivered{msg, ack}:
+					case <-ctx.Done():
+						return
+					}
+					select {
+					case <-ack:
+					case <-ctx.Done():
+					}
+				}
+			}
+			effect(cmd())
+		}()
+	}
+	for _, p := range m.panes {
+		for _, t := range p.tabs {
+			execute(m.readTab(t))
+		}
+	}
+	watcher, watchErr := fsnotify.NewWatcher()
+	if watchErr == nil {
+		defer watcher.Close()
+	}
+	watched := make(map[string]bool)
+	pendingRefresh := make(refreshQueue)
+	lastFallback := time.Now()
+	reconcileWatches := func(retry bool) {
+		if watcher == nil {
+			return
+		}
+		wanted := make(map[string]bool)
+		for _, p := range m.panes {
+			for _, t := range p.tabs {
+				if t.dir != "" {
+					wanted[filepath.Clean(t.dir)] = true
+				}
+			}
+		}
+		for dir := range watched {
+			if !wanted[dir] {
+				_ = watcher.Remove(dir)
+				delete(watched, dir)
+				delete(pendingRefresh, dir)
+			}
+		}
+		registered := make(map[string]bool)
+		for _, dir := range watcher.WatchList() {
+			registered[dir] = true
+		}
+		for dir := range wanted {
+			if watched[dir] && !registered[dir] {
+				watched[dir] = false
+			}
+			if working, ok := watched[dir]; !ok || (!working && retry) {
+				watched[dir] = watcher.Add(dir) == nil
+			}
+		}
+	}
+	reconcileWatches(true)
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	dirty := true
+	for {
+		if dirty && m.mode != hiddenMode {
+			if err = terminal.Draw(func(f *catatui.Frame) {
+				m.screenWidth = int(f.Area().Width)
+				m.screenHeight = int(f.Area().Height)
+				m.draw(f)
+			}); err != nil {
+				return err
+			}
+			dirty = false
+		}
+		var msg event.Msg
+		var ack chan struct{}
+		select {
+		case d := <-inbox:
+			msg, ack = d.msg, d.ack
+		case msg = <-m.taskEvents:
+		case e, ok := <-reader.Events():
+			if !ok {
+				return reader.Err()
+			}
+			msg = m.inputEvent(e)
+		case change := <-watcherEvents(watcher):
+			pendingRefresh.changed(change, watched, time.Now())
+			continue
+		case <-watcherErrors(watcher):
+			for dir := range watched {
+				pendingRefresh[dir] = time.Now()
+			}
+			continue
+		case <-ticker.C:
+			now := time.Now()
+			retry := now.Sub(lastFallback) >= 2*time.Second
+			reconcileWatches(retry)
+			if retry {
+				lastFallback = now
+				for _, p := range m.panes {
+					for _, t := range p.tabs {
+						// Also catches missed notifications and clipboard changes.
+						if _, pending := pendingRefresh[t.dir]; !pending {
+							pendingRefresh[t.dir] = now
+						}
+					}
+				}
+			}
+			for _, cmd := range pendingRefresh.drain(m, now) {
+				execute(cmd)
+			}
+			if m.tasksPending() {
+				dirty = true
+			}
+			continue
+		}
+
+		switch v := msg.(type) {
+		case event.QuitMsg:
+			if ack != nil {
+				close(ack)
+			}
+			return nil
+		case event.ProcessMsg:
+			stop()
+			v.Command.Stdin = os.Stdin
+			v.Command.Stdout = os.Stdout
+			v.Command.Stderr = os.Stderr
+			processErr := v.Command.Run()
+			if err = start(); err != nil {
+				if ack != nil {
+					close(ack)
+				}
+				return err
+			}
+			if v.Next != nil {
+				_, cmd := m.Update(v.Next(processErr))
+				execute(cmd)
+			}
+			if processErr != nil {
+				execute(m.addMessage(msgError, processErr.Error()))
+			}
+		default:
+			if msg != nil {
+				wasHidden := m.mode == hiddenMode
+				m.dimensions()
+				_, cmd := m.Update(msg)
+				execute(cmd)
+				if wasHidden != (m.mode == hiddenMode) {
+					stop()
+					if err = start(); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		if ack != nil {
+			close(ack)
+		}
+		dirty = true
+	}
+}
+
+func watcherEvents(w *fsnotify.Watcher) <-chan fsnotify.Event {
+	if w == nil {
+		return nil
+	}
+	return w.Events
+}
+
+func watcherErrors(w *fsnotify.Watcher) <-chan error {
+	if w == nil {
+		return nil
+	}
+	return w.Errors
+}
+
+func samePath(a, b string) bool { return strings.EqualFold(filepath.Clean(a), filepath.Clean(b)) }
+
+func (m *model) inputEvent(e term.Event) event.Msg {
+	switch e.Kind {
+	case term.EventResize:
+		m.screenWidth, m.screenHeight = int(e.Size.Width), int(e.Size.Height)
+		m.dimensions()
+		return event.WindowSizeMsg{Width: m.width, Height: m.height}
+	case term.EventPaste:
+		return event.PasteMsg{Content: e.Text}
+	case term.EventFocus:
+		if e.Focused {
+			return event.FocusMsg{}
+		}
+		return event.BlurMsg{}
+	case term.EventKey:
+		names := map[term.KeyCode]string{term.KeyEnter: "enter", term.KeyEscape: "esc", term.KeyBackspace: "backspace", term.KeyTab: "tab", term.KeyBackTab: "shift+tab", term.KeyDelete: "delete", term.KeyInsert: "insert", term.KeyLeft: "left", term.KeyRight: "right", term.KeyUp: "up", term.KeyDown: "down", term.KeyHome: "home", term.KeyEnd: "end", term.KeyPageUp: "pgup", term.KeyPageDown: "pgdown"}
+		name := names[e.Key]
+		text := ""
+		if e.Key == term.KeyRune {
+			name = string(e.Rune)
+			if e.Mods&(term.ModCtrl|term.ModAlt) == 0 {
+				text = name
+			}
+			if e.Rune == ' ' {
+				name = "space"
+			}
+		}
+		if e.Key >= term.KeyF1 && e.Key <= term.KeyF12 {
+			name = fmt.Sprintf("f%d", e.Key-term.KeyF1+1)
+		}
+		if e.Mods.Contains(term.ModShift) && e.Key != term.KeyRune && e.Key != term.KeyBackTab {
+			name = "shift+" + name
+		}
+		if e.Mods.Contains(term.ModCtrl) {
+			name = "ctrl+" + strings.ToLower(name)
+		}
+		if e.Mods.Contains(term.ModAlt) {
+			name = "alt+" + name
+		}
+		return event.KeyMsg{Name: name, Text: text}
+	case term.EventMouse:
+		// Overlays own input before any pane focus or tab mutation occurs.
+		if m.taskView || m.quitting || (e.MouseKind == term.MouseDown && e.Button != term.MouseButtonLeft) {
+			return nil
+		}
+		x, y := int(e.X), int(e.Y)
+		if m.mode == searchMode && e.MouseKind == term.MouseMove {
+			index := y - 3 + m.search.start
+			if y >= 3 && y < m.height-2 && index >= 0 && index < m.search.length() {
+				return event.MouseHoverMsg{Index: index, Search: true}
+			}
+			return event.MouseHoverMsg{Pane: -1, Index: -1, Search: true}
+		}
+		if m.mode == normalMode || m.mode == jumpMode {
+			left := (m.screenWidth - 1) / 2
+			pane := 0
+			if x > left {
+				pane = 1
+				x -= left + 1
+			}
+			if x == left && pane == 0 {
+				if e.MouseKind == term.MouseMove {
+					return event.MouseHoverMsg{Pane: -1, Index: -1}
+				}
+				return nil
+			}
+			if e.MouseKind == term.MouseDown || e.MouseKind == term.MouseScrollDown || e.MouseKind == term.MouseScrollUp {
+				if pane != m.activePane {
+					m.finishRangeSelection()
+					m.click = mouseClick{}
+				}
+				m.activePane = pane
+				m.pane = m.panes[pane]
+			}
+			// The native pane has a separate tab row above its path.
+			if y == 0 {
+				if e.MouseKind == term.MouseDown {
+					m.finishRangeSelection()
+					if index := paneTabAtX(m.panes[pane], x); index >= 0 {
+						return event.MouseTabMsg{Pane: pane, Index: index}
+					}
+				}
+				if e.MouseKind == term.MouseMove {
+					return event.MouseHoverMsg{Pane: pane, Index: paneTabAtX(m.panes[pane], x), Tab: true}
+				}
+				return nil
+			}
+			y--
+			if e.MouseKind == term.MouseMove {
+				if y == 0 {
+					if m.panes[pane].tabs[m.panes[pane].currentTab].dir != "" {
+						return event.MouseHoverMsg{Pane: pane, Index: -1, Path: true, X: x}
+					}
+					return event.MouseHoverMsg{Pane: -1, Index: -1}
+				}
+				t := m.panes[pane].tabs[m.panes[pane].currentTab]
+				settings := t.getPageSettings()
+				index := y - 1 + settings.start
+				if y >= 1 && y < m.height-2 && index >= 0 && index < len(t.page.getItems()) {
+					return event.MouseHoverMsg{Pane: pane, Index: index}
+				}
+				return event.MouseHoverMsg{Pane: -1, Index: -1}
+			}
+		}
+		if m.taskView || m.quitting {
+			return nil
+		}
+		switch e.MouseKind {
+		case term.MouseMove:
+			return event.MouseHoverMsg{Pane: -1, Index: -1}
+		case term.MouseDown:
+			if e.Button == term.MouseButtonLeft {
+				return event.MouseClickMsg{X: x, Y: y, Button: event.MouseLeft, Shift: e.Mods.Contains(term.ModShift), Ctrl: e.Mods.Contains(term.ModCtrl)}
+			}
+		case term.MouseScrollUp:
+			return event.MouseWheelMsg{X: x, Y: y, Button: event.MouseWheelUp}
+		case term.MouseScrollDown:
+			return event.MouseWheelMsg{X: x, Y: y, Button: event.MouseWheelDown}
+		}
+	}
+	return nil
+}

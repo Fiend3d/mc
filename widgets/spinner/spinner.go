@@ -4,8 +4,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"mc/internal/event"
+	"mc/internal/paint"
 )
 
 var lastID int64
@@ -80,7 +80,7 @@ var (
 
 type Model struct {
 	Spinner Spinner
-	Style   lipgloss.Style
+	Style   paint.Style
 	frame   int
 	id      int
 	tag     int
@@ -109,7 +109,7 @@ type TickMsg struct {
 	ID   int
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg event.Msg) (Model, event.Cmd) {
 	switch msg := msg.(type) {
 	case TickMsg:
 		if msg.ID > 0 && msg.ID != m.id {
@@ -136,7 +136,7 @@ func (m Model) View() string {
 	return m.Style.Render(m.Spinner.Frames[m.frame])
 }
 
-func (m Model) Tick() tea.Msg {
+func (m Model) Tick() event.Msg {
 	return TickMsg{
 		Time: time.Now(),
 		ID:   m.id,
@@ -144,8 +144,8 @@ func (m Model) Tick() tea.Msg {
 	}
 }
 
-func (m Model) tick(id, tag int) tea.Cmd {
-	return tea.Tick(m.Spinner.FPS, func(t time.Time) tea.Msg {
+func (m Model) tick(id, tag int) event.Cmd {
+	return event.Tick(m.Spinner.FPS, func(t time.Time) event.Msg {
 		return TickMsg{
 			Time: t,
 			ID:   id,
@@ -162,7 +162,7 @@ func WithSpinner(spinner Spinner) Option {
 	}
 }
 
-func WithStyle(style lipgloss.Style) Option {
+func WithStyle(style paint.Style) Option {
 	return func(m *Model) {
 		m.Style = style
 	}

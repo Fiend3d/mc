@@ -15,8 +15,8 @@ import (
 
 	"mc/widgets/textinput"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"mc/internal/event"
+	"mc/internal/paint"
 )
 
 type searchLine struct {
@@ -51,10 +51,10 @@ type search struct {
 	items     []searchItem
 }
 
-func (m *model) launchSearch() (tea.Model, tea.Cmd) {
+func (m *model) launchSearch() (event.Model, event.Cmd) {
 	dir := m.getTab().dir
 	m.search.launch(dir)
-	return m, tea.Batch(
+	return m, event.Batch(
 		m.spinner.Tick,
 		searchTick(),
 		m.addMessage(msgInfo, fmt.Sprintf("searching: %s", dir)),
@@ -62,17 +62,19 @@ func (m *model) launchSearch() (tea.Model, tea.Cmd) {
 }
 
 type selectItemMsg struct {
-	tab  int
-	path string
+	target *tab
+	page   *page
+	path   string
 }
 
-func selectItem(tab int, path string) tea.Cmd {
-	return func() tea.Msg {
-		return selectItemMsg{tab, path}
+func selectItem(tab *tab, path string) event.Cmd {
+	page := tab.page
+	return func() event.Msg {
+		return selectItemMsg{tab, page, path}
 	}
 }
 
-func (m *model) searchRight() (tea.Model, tea.Cmd) {
+func (m *model) searchRight() (event.Model, event.Cmd) {
 	if len(m.search.items) == 0 {
 		return m, nil
 	}
@@ -80,7 +82,7 @@ func (m *model) searchRight() (tea.Model, tea.Cmd) {
 	index, _ := m.search.mapIndex(m.search.cursor)
 	item := m.search.items[index]
 	dir := filepath.Dir(item.path)
-	return m, tea.Sequence(m.changeDir(dir), selectItem(m.currentTab, item.path))
+	return m, event.Sequence(m.changeDir(dir), selectItem(m.getTab(), item.path))
 }
 
 func (s *search) length() int {
@@ -141,7 +143,7 @@ func (s *search) mapIndex(index int) (int, int) {
 	return -1, -1
 }
 
-func (s *search) blink() tea.Cmd {
+func (s *search) blink() event.Cmd {
 	switch s.focus {
 	case 0, 1:
 		return textinput.Blink
@@ -250,6 +252,9 @@ func viewSearch(m *model) string {
 		cursorWidth := 3
 
 		cursor := "   "
+		if index == m.hoverSearchIndex {
+			style = &m.theme.selectionStyle
+		}
 
 		if index == m.search.cursor {
 			style = &m.theme.cursorStyle
@@ -378,7 +383,7 @@ func viewSearch(m *model) string {
 	s.WriteRune('\n')
 	if m.ticks > 0 {
 		logMsg := m.log[len(m.log)-1].render(m.theme, false)
-		if lipgloss.Width(logMsg) > m.width {
+		if paint.Width(logMsg) > m.width {
 			logMsg = truncate(logMsg, m.width)
 		}
 		s.WriteString(empty.Width(m.width).Render(logMsg))
@@ -772,8 +777,8 @@ func fileContainsText(path, text string, caseIgnore bool) (bool, []searchLine, e
 
 type searchTickMsg struct{}
 
-func searchTick() tea.Cmd {
-	return tea.Tick(time.Millisecond*100, func(time.Time) tea.Msg {
+func searchTick() event.Cmd {
+	return event.Tick(time.Millisecond*100, func(time.Time) event.Msg {
 		return searchTickMsg{}
 	})
 }

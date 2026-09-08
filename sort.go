@@ -34,12 +34,16 @@ func hasExtension(path string) bool {
 	return true
 }
 
-func (m *model) sort(method sortMethod, reverse bool) {
-	items := m.getPage().getItems()
+func (m *model) sort(method sortMethod, reverse bool) { m.getTab().sortItems(method, reverse) }
+func (t *tab) sortItems(method sortMethod, reverse bool) {
+	t.page.selectionRange = nil
+	t.sorted, t.sortMethod, t.sortReverse = true, method, reverse
+	items := t.page.getItems()
 	if len(items) == 0 {
 		return
 	}
-	settings := m.getTab().getPageSettings()
+	settings := t.getPageSettings()
+	settings.update(len(items))
 	selectedItem := items[settings.cursor]
 
 	// Reversing by negating the result would make less(i,j) and less(j,i) both
@@ -100,7 +104,14 @@ func (m *model) sort(method sortMethod, reverse bool) {
 		})
 	case sizeSort:
 		sort.Slice(items, func(i, j int) bool {
-			a, b := pair(i, j)
+			a, b := items[i], items[j]
+			aUnknown, bUnknown := hasUnknownDirectorySize(a), hasUnknownDirectorySize(b)
+			if aUnknown != bUnknown {
+				return aUnknown
+			}
+			if reverse {
+				return a.getSize() < b.getSize()
+			}
 			return a.getSize() > b.getSize()
 		})
 	case randomSort:
@@ -115,4 +126,15 @@ func (m *model) sort(method sortMethod, reverse bool) {
 			break
 		}
 	}
+}
+
+func hasUnknownDirectorySize(it item) bool {
+	if !it.isDirectory() {
+		return false
+	}
+	if file, ok := it.(*filepathItem); ok {
+		return file.sizeStr == ""
+	}
+	_, isDrive := it.(*driveItem)
+	return !isDrive
 }

@@ -6,14 +6,13 @@ import (
 	"strings"
 	"unicode"
 
-	"charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"github.com/Fiend3d/catatui"
+	"github.com/atotto/clipboard"
+	"mc/internal/event"
+	"mc/internal/paint"
 	"mc/widgets/cursor"
 	"mc/widgets/key"
 	"mc/widgets/runeutil"
-	"github.com/atotto/clipboard"
-	rw "github.com/mattn/go-runewidth"
-	"github.com/rivo/uniseg"
 )
 
 type (
@@ -154,6 +153,7 @@ func (m Model) Width() int {
 
 func (m *Model) SetWidth(w int) {
 	m.width = w
+	m.handleOverflow()
 }
 
 func (m *Model) SetValue(s string) {
@@ -187,7 +187,13 @@ func (m Model) Position() int {
 }
 
 func (m *Model) SetCursor(pos int) {
-	m.pos = clamp(pos, 0, len(m.value))
+	pos = clamp(pos, 0, len(m.value))
+	left, right := bounds(m.value, pos)
+	if pos > m.pos {
+		m.pos = right
+	} else {
+		m.pos = left
+	}
 	m.handleOverflow()
 }
 
@@ -203,7 +209,7 @@ func (m Model) Focused() bool {
 	return m.focus
 }
 
-func (m *Model) Focus() tea.Cmd {
+func (m *Model) Focus() event.Cmd {
 	m.focus = true
 	return m.virtualCursor.Focus()
 }
@@ -272,45 +278,43 @@ func (m *Model) insertRunesFromUserInput(v []rune) {
 	m.setValueInternal(value, inputErr)
 }
 
+// bounds returns grapheme boundaries surrounding a rune offset.
+func bounds(value []rune, pos int) (int, int) {
+	offset := 0
+	for g := range catatui.SegmentGraphemes(string(value)) {
+		end := offset + len([]rune(g.Symbol))
+		if pos == offset {
+			return offset, offset
+		}
+		if pos < end {
+			return offset, end
+		}
+		offset = end
+	}
+	return len(value), len(value)
+}
+func previous(value []rune, pos int) int { left, _ := bounds(value, max(0, pos-1)); return left }
+func next(value []rune, pos int) int     { _, right := bounds(value, min(len(value), pos+1)); return right }
 func (m *Model) handleOverflow() {
-	if m.Width() <= 0 || uniseg.StringWidth(string(m.value)) <= m.Width() {
+	m.pos = clamp(m.pos, 0, len(m.value))
+	m.offset = clamp(m.offset, 0, m.pos)
+	m.offset, _ = bounds(m.value, m.offset)
+	if m.Width() <= 0 {
 		m.offset = 0
 		m.offsetRight = len(m.value)
 		return
 	}
-
-	m.offsetRight = min(m.offsetRight, len(m.value))
-
-	if m.pos < m.offset {
-		m.offset = m.pos
-
-		w := 0
-		i := 0
-		runes := m.value[m.offset:]
-
-		for i < len(runes) && w <= m.Width() {
-			w += rw.RuneWidth(runes[i])
-			if w <= m.Width()+1 {
-				i++
-			}
+	for catatui.StringWidth(string(m.value[m.offset:m.pos])) >= m.Width() && m.offset < m.pos {
+		m.offset = next(m.value, m.offset)
+	}
+	m.offsetRight = m.offset
+	w := 0
+	for g := range catatui.SegmentGraphemes(string(m.value[m.offset:])) {
+		if w+int(g.Width) > m.Width() {
+			break
 		}
-
-		m.offsetRight = m.offset + i
-	} else if m.pos >= m.offsetRight {
-		m.offsetRight = m.pos
-
-		w := 0
-		runes := m.value[:m.offsetRight]
-		i := len(runes) - 1
-
-		for i > 0 && w < m.Width() {
-			w += rw.RuneWidth(runes[i])
-			if w <= m.Width() {
-				i--
-			}
-		}
-
-		m.offset = m.offsetRight - (len(runes) - 1 - i)
+		w += int(g.Width)
+		m.offsetRight += len([]rune(g.Symbol))
 	}
 }
 
@@ -467,7 +471,7 @@ func (m *Model) wordForward() {
 func (m Model) echoTransform(v string) string {
 	switch m.EchoMode {
 	case EchoPassword:
-		return strings.Repeat(string(m.EchoCharacter), uniseg.StringWidth(v))
+		return strings.Repeat(string(m.EchoCharacter), catatui.StringWidth(v))
 	case EchoNone:
 		return ""
 	case EchoNormal:
@@ -477,12 +481,12 @@ func (m Model) echoTransform(v string) string {
 	}
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg event.Msg) (Model, event.Cmd) {
 	if !m.focus {
 		return m, nil
 	}
 
-	keyMsg, ok := msg.(tea.KeyPressMsg)
+	keyMsg, ok := msg.(event.KeyPressMsg)
 	if ok && key.Matches(keyMsg, m.KeyMap.AcceptSuggestion) {
 		if m.canAcceptSuggestion() {
 			m.value = append(m.value, m.matchedSuggestions[m.currentSuggestionIndex][len(m.value):]...)
@@ -493,18 +497,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	oldPos := m.pos
 
 	switch msg := msg.(type) {
-	case tea.KeyPressMsg:
+	case event.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.KeyMap.DeleteWordBackward):
 			m.deleteWordBackward()
 		case key.Matches(msg, m.KeyMap.DeleteCharacterBackward):
 			m.Err = nil
 			if len(m.value) > 0 {
-				m.value = append(m.value[:max(0, m.pos-1)], m.value[m.pos:]...)
+				prev := previous(m.value, m.pos)
+				m.value = append(m.value[:prev], m.value[m.pos:]...)
+				m.pos = prev
 				m.Err = m.validate(m.value)
-				if m.pos > 0 {
-					m.SetCursor(m.pos - 1)
-				}
 			}
 		case key.Matches(msg, m.KeyMap.WordBackward):
 			m.wordBackward()
@@ -522,7 +525,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.CursorStart()
 		case key.Matches(msg, m.KeyMap.DeleteCharacterForward):
 			if len(m.value) > 0 && m.pos < len(m.value) {
-				m.value = slices.Delete(m.value, m.pos, m.pos+1)
+				m.value = slices.Delete(m.value, m.pos, next(m.value, m.pos))
 				m.Err = m.validate(m.value)
 			}
 		case key.Matches(msg, m.KeyMap.LineEnd):
@@ -545,7 +548,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		m.updateSuggestions()
 
-	case tea.PasteMsg:
+	case event.PasteMsg:
 		m.insertRunesFromUserInput([]rune(msg.Content))
 
 	case pasteMsg:
@@ -555,8 +558,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.Err = msg
 	}
 
-	var cmds []tea.Cmd
-	var cmd tea.Cmd
+	var cmds []event.Cmd
+	var cmd event.Cmd
 
 	if m.useVirtualCursor {
 		m.virtualCursor, cmd = m.virtualCursor.Update(msg)
@@ -569,7 +572,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	}
 
 	m.handleOverflow()
-	return m, tea.Batch(cmds...)
+	return m, event.Batch(cmds...)
 }
 
 func (m Model) View() string {
@@ -586,11 +589,12 @@ func (m Model) View() string {
 	v := styleText(m.echoTransform(string(value[:pos])))
 
 	if pos < len(value) {
-		char := m.echoTransform(string(value[pos]))
+		end := next(value, pos)
+		char := m.echoTransform(string(value[pos:end]))
 		m.virtualCursor.TextStyle = styles.Text
 		m.virtualCursor.SetChar(char)
 		v += m.virtualCursor.View()
-		v += styleText(m.echoTransform(string(value[pos+1:])))
+		v += styleText(m.echoTransform(string(value[end:])))
 		v += m.completionView(0)
 	} else {
 		if m.focus && m.canAcceptSuggestion() {
@@ -612,7 +616,7 @@ func (m Model) View() string {
 		}
 	}
 
-	valWidth := uniseg.StringWidth(string(value))
+	valWidth := catatui.StringWidth(string(value))
 	if m.Width() > 0 && valWidth <= m.Width() {
 		padding := max(0, m.Width()-valWidth)
 		if valWidth+padding <= m.Width() && pos < len(value) {
@@ -647,7 +651,7 @@ func (m Model) placeholderView() string {
 	}
 
 	if m.Width() > 0 {
-		minWidth := lipgloss.Width(m.Placeholder)
+		minWidth := paint.Width(m.Placeholder)
 		availWidth := m.Width() - minWidth + 1
 
 		if availWidth < 0 {
@@ -663,11 +667,11 @@ func (m Model) placeholderView() string {
 	return styles.Prompt.Render(m.Prompt) + v
 }
 
-func Blink() tea.Msg {
+func Blink() event.Msg {
 	return cursor.Blink()
 }
 
-func Paste() tea.Msg {
+func Paste() event.Msg {
 	str, err := clipboard.ReadAll()
 	if err != nil {
 		return pasteErrMsg{err}
@@ -773,12 +777,12 @@ func (m Model) validate(v []rune) error {
 	return nil
 }
 
-func (m Model) Cursor() *tea.Cursor {
+func (m Model) Cursor() *event.Cursor {
 	if m.useVirtualCursor || !m.Focused() {
 		return nil
 	}
 
-	w := lipgloss.Width
+	w := paint.Width
 
 	promptWidth := w(m.promptView())
 	xOffset := m.Position() +
@@ -788,7 +792,7 @@ func (m Model) Cursor() *tea.Cursor {
 	}
 
 	style := m.styles.Cursor
-	c := tea.NewCursor(xOffset, 0)
+	c := event.NewCursor(xOffset, 0)
 	c.Blink = style.Blink
 	c.Color = style.Color
 	c.Shape = style.Shape
@@ -801,7 +805,7 @@ func (m *Model) updateVirtualCursorStyle() {
 		return
 	}
 
-	m.virtualCursor.Style = lipgloss.NewStyle().Foreground(m.styles.Cursor.Color)
+	m.virtualCursor.Style = paint.NewStyle().Foreground(m.styles.Cursor.Color)
 
 	if m.styles.Cursor.Blink {
 		if m.styles.Cursor.BlinkSpeed > 0 {

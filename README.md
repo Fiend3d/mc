@@ -1,20 +1,33 @@
 # Modal Commander
 
-Modal Commander (mc) is a TUI file manager for Windows (though it might be ported to other platforms in the future). It's heavily inspired by Yazi, Helix, and Total Commander. 
+Modal Commander (mc) is a TUI file manager for Windows (though it might be ported to other platforms in the future). It's heavily inspired by Yazi, Helix, and Total Commander.
 
-## Version 1.1
+## Version 2.0
 
-Themes have been added.
+mc now uses [catatui](https://github.com/Fiend3d/catatui), with two independent panes and background file tasks. Each pane has its own tabs, history, selection, filter and sorting. Existing themes and F-key tool configuration are retained.
 
-![RECLibboard](assets/demo/themes.gif)
+- `Tab` switches panes. Click a pane to focus it; click a pane tab to switch directly.
+- `Space` / `Insert` toggles an item and advances; select-all, invert and clear remain available. Visual mode has been removed.
+- `Shift+Up/Down` extends or shrinks a range; `Shift+Home/End` extends to the first or last item; `Ctrl+click` extends to the clicked item. Earlier selections are preserved. Ordinary navigation starts a new range anchor. `Shift+click` also works in terminals that forward it, but Windows Terminal reserves it for terminal text selection.
+- `Y` copies and `X` moves selected items to the opposite pane. Enter confirms the editable destination. Existing `y/x/p/P` clipboard operations are unchanged.
+- `Ctrl+T` opens tasks; `c` cancels the highlighted task and Escape returns to browsing. File operations run sequentially while browsing remains available. Progress shows bytes and file counts, with scanning shown before totals are known.
+- `Shift+Tab` enters Jump mode. `Ctrl+N` still opens a directory in a new tab.
 
-The theme can be set in Go mode (`g` -> `T`). The config can be saved by pressing `g` -> `C`. Alternatively, the theme can be set by editing `$env:APPDATA\mc\config.toml`:
+Normal transfers choose unique names on collisions; `P` explicitly requests overwrite and confirms collisions. Cancellation retains completed files and removes unfinished temporary copies. Completed reversible work can be undone, including partial tasks. Delete is permanent; overwrites are not undoable. Undo/redo refuses conflicting or changed paths. Reparse points are reported as unsupported for transfers/deletion.
 
-```toml
-theme = "tokyonight"
-```
+No arguments opens the working directory in both panes. One directory opens it in both; two initialize left/right; extra directories become left-pane tabs. The focused pane supplies the directory returned by the PowerShell wrapper. Pane locations and task history are not persisted between sessions.
 
-## Demo
+Set a theme with `g` -> `T`, save with `g` -> `C`, or edit `$env:APPDATA\mc\config.toml`.
+
+### Building v2
+
+Go 1.27 and Windows are required. The development module uses `replace github.com/Fiend3d/catatui => ../catatui`; keep the catatui checkout beside mc, including its input-reader shutdown fix. Run `.\build.ps1` or `.\build.ps1 dist`. The generated executable and zip are standalone; the sibling source checkout is only a build dependency.
+
+Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests include native catatui rendering, queued transfers, cancellation, partial undo/redo, Unicode editing, and an actual Windows pseudoconsole process handoff. Before publishing a source release, publish the catatui changes and replace the development replacement with that revision.
+
+![mc v2 with two panes and a background transfer](assets/demo/v2.png)
+
+## v1 screenshots
 
 ![RECLibboard](assets/demo/demo01.png)
 ![RECLibboard](assets/demo/demo02.png)
@@ -28,11 +41,11 @@ theme = "tokyonight"
 
 ## How to install
 
-Currently, `mc` uses [bat](https://github.com/sharkdp/bat) for viewing files, and [helix](https://github.com/helix-editor/helix) for editing. `bat` requires `less` to work and I strongly recommend using the one that comes with `git`. 
+F3 uses the configured viewer (`koneko` by default), and F4 uses [Helix](https://helix-editor.com/). You can configure `bat` with the `less` pager as an alternative viewer in config.toml.
 
-I also recommend using [Windows Terminal](https://github.com/microsoft/terminal) because it's the only terminal emulator, that I found, that makes the mouse work properly on Windows 10. It also looks kinda good if you install https://www.nerdfonts.com/font-downloads specifically `JetBrainsMonoNL Nerd Font`. 
+I also recommend using [Windows Terminal](https://github.com/microsoft/terminal) because it's the only terminal emulator, that I found, that makes the mouse work properly on Windows 10. It also looks kinda good if you install https://www.nerdfonts.com/font-downloads specifically `JetBrainsMonoNL Nerd Font`.
 
-Here is how you can configure your powershell to `cd` to the directory when you exit: https://github.com/Fiend3d/mc/tree/master/scripts you can also find there `t.bat` that makes launching Windows Terminal a lot easier, because by default it doesn't open the current directory and typing just `t` is convenient. 
+Here is how you can configure your powershell to `cd` to the directory when you exit: https://github.com/Fiend3d/mc/tree/master/scripts you can also find there `t.bat` that makes launching Windows Terminal a lot easier, because by default it doesn't open the current directory and typing just `t` is convenient.
 
 ## How to use
 
@@ -45,6 +58,9 @@ The main mode of the program, from which most other modes can be accessed.
 **q** - Quit, returning the current directory.<br/>
 **Q** - Quit without returning anything.<br/>
 **space** - Select.<br/>
+**Shift+Up / Shift+Down** - Extend or shrink the selection range.<br/>
+**Shift+Home / Shift+End** - Extend the selection range to the first or last item.<br/>
+**Ctrl+click** - Extend the selection range to the clicked item.<br/>
 **Ctrl+a** - Select all.<br/>
 **Ctrl+d** - Deselect all.<br/>
 **Ctrl+r** - Toggle selection (invert all).<br/>
@@ -59,28 +75,24 @@ The main mode of the program, from which most other modes can be accessed.
 **t** - Copy current tab.<br/>
 **Ctrl+w** - Close current tab.<br/>
 **T** - Restore closed tab.<br/>
-**Ctrl+t, Ctrl+n** - Open selected directory in a new tab.<br/>
+**Ctrl+n** - Open selected directory in a new tab.<br/>
 **]** - Next tab.<br/>
 **[** - Previous tab.<br/>
 **1-0** - Select tabs 1 to 10 (0 is tab 10).<br/>
 **Ctrl+b**  - Go back in history.<br/>
 **Ctrl+f** - Go forward in history.<br/>
-**F5** - Update.<br/>
+Directories update automatically from filesystem notifications, with periodic checks for missed changes and clipboard updates. Refresh keeps the focused file and scroll position when those items still exist. **F5** forces an immediate update.<br/>
 <br/>
 **B** - Bookmark the directory.<br/>
 **b** - Browse bookmarks.<br/>
 
 ### Jump Mode
 
-Can be entered by pressing `tab` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item. 
-
-### Visual Mode
-
-Can be entered by pressing `v`. It's for range selecting. 
+Can be entered by pressing `Shift+Tab` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item.
 
 ### Filter Mode
 
-Entered by pressing `f` in the normal mode. Current tab can be filtered. 
+Entered by pressing `f` in the normal mode. Current tab can be filtered.
 
 ### Copy Mode
 
@@ -124,7 +136,7 @@ Press `F3` on a line to open it with `bat`; it will jump directly to that line. 
 
 ### Shell Mode
 
-Press `:` to enter shell mode. You can hide and show TUI by pressing `Ctrl+h` to see the result of a command. `#sl` - is a macro that is converted to a list of selected items for a command. 
+Press `:` to enter shell mode. You can hide and show TUI by pressing `Ctrl+h` to see the result of a command. `#sl` - is a macro that is converted to a list of selected items for a command.
 
 **Ctrl+b** - Back in history.<br/>
 **Ctrl+f** - Forward in history.<br/>

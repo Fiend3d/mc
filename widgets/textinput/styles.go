@@ -4,29 +4,29 @@ import (
 	"image/color"
 	"time"
 
-	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
+	"mc/internal/event"
+	"mc/internal/paint"
 )
 
 func DefaultStyles(isDark bool) Styles {
-	lightDark := lipgloss.LightDark(isDark)
+	lightDark := paint.LightDark(isDark)
 
 	var s Styles
 	s.Focused = StyleState{
-		Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		Suggestion:  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		Prompt:      lipgloss.NewStyle().Foreground(lipgloss.Color("7")),
-		Text:        lipgloss.NewStyle(),
+		Placeholder: paint.NewStyle().Foreground(paint.Color("240")),
+		Suggestion:  paint.NewStyle().Foreground(paint.Color("240")),
+		Prompt:      paint.NewStyle().Foreground(paint.Color("7")),
+		Text:        paint.NewStyle(),
 	}
 	s.Blurred = StyleState{
-		Placeholder: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		Suggestion:  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		Prompt:      lipgloss.NewStyle().Foreground(lipgloss.Color("7")),
-		Text:        lipgloss.NewStyle().Foreground(lightDark(lipgloss.Color("245"), lipgloss.Color("7"))),
+		Placeholder: paint.NewStyle().Foreground(paint.Color("240")),
+		Suggestion:  paint.NewStyle().Foreground(paint.Color("240")),
+		Prompt:      paint.NewStyle().Foreground(paint.Color("7")),
+		Text:        paint.NewStyle().Foreground(lightDark(paint.Color("245"), paint.Color("7"))),
 	}
 	s.Cursor = CursorStyle{
-		Color: lipgloss.Color("7"),
-		Shape: tea.CursorBlock,
+		Color: paint.Color("7"),
+		Shape: event.CursorBlock,
 		Blink: true,
 	}
 	return s
@@ -47,15 +47,15 @@ type Styles struct {
 }
 
 type StyleState struct {
-	Text        lipgloss.Style
-	Placeholder lipgloss.Style
-	Suggestion  lipgloss.Style
-	Prompt      lipgloss.Style
+	Text        paint.Style
+	Placeholder paint.Style
+	Suggestion  paint.Style
+	Prompt      paint.Style
 }
 
 type CursorStyle struct {
 	Color      color.Color
-	Shape      tea.CursorShape
+	Shape      event.CursorShape
 	Blink      bool
 	BlinkSpeed time.Duration
 }
