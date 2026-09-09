@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"image/color"
+
 	"github.com/Fiend3d/catatui"
 	"github.com/Fiend3d/catatui/widgets"
 	"github.com/dustin/go-humanize"
@@ -21,18 +23,25 @@ func (m *model) draw(f *catatui.Frame) {
 	}
 	left := (int(area.Width) - 1) / 2
 	m.dimensions()
+	contentHeight := area.Height
+	if m.taskStripVisible() {
+		contentHeight--
+	}
+	content := catatui.NewRect(0, 0, area.Width, contentHeight)
 	m.input.SetWidth(max(1, m.width-4))
 	m.pathInput.SetWidth(max(1, m.width-4))
 	if m.taskView {
-		m.drawTasks(f, area)
-		m.drawTaskStrip(f, catatui.NewRect(0, area.Height-1, area.Width, 1))
+		m.drawTasks(f, content)
+		if m.taskStripVisible() {
+			m.drawTaskStrip(f, catatui.NewRect(0, area.Height-1, area.Width, 1))
+		}
 		return
 	}
 	switch m.mode {
 	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode:
 		savedWidth, savedHeight := m.width, m.height
 		m.width = int(area.Width)
-		m.height = int(area.Height) - 1
+		m.height = int(content.Height)
 		var text string
 		switch m.mode {
 		case helpMode, helpFilterMode:
@@ -46,7 +55,7 @@ func (m *model) draw(f *catatui.Frame) {
 		case searchMode:
 			text = viewSearch(m)
 		}
-		textAt(f, catatui.NewRect(0, 0, area.Width, area.Height-1), text)
+		textAt(f, content, text)
 		m.width, m.height = savedWidth, savedHeight
 	default:
 		for i, p := range m.panes {
@@ -55,25 +64,34 @@ func (m *model) draw(f *catatui.Frame) {
 				x = left + 1
 				w = int(area.Width) - x
 			}
-			m.drawPane(f, catatui.NewRect(uint16(x), 0, uint16(w), area.Height-1), p, i, i == m.activePane)
+			m.drawPane(f, catatui.NewRect(uint16(x), 0, uint16(w), content.Height), p, i, i == m.activePane)
 		}
-		for y := uint16(0); y < area.Height-1; y++ {
+		for y := uint16(0); y < content.Height; y++ {
 			f.Buffer().SetString(uint16(left), y, "│", m.theme.emptyStyle.Foreground(m.theme.grayColor).Native())
 		}
 		m.drawMode(f, area)
 	}
-	m.drawTaskStrip(f, catatui.NewRect(0, area.Height-1, area.Width, 1))
+	if m.taskStripVisible() {
+		m.drawTaskStrip(f, catatui.NewRect(0, area.Height-1, area.Width, 1))
+	}
 	if m.quitting {
 		m.dialog(f, area, "Unfinished tasks", "Cancel tasks and quit?\n\ny / Enter: cancel and quit    n / Esc: keep working")
 	}
 }
+
+var modeLabels = map[mode]string{jumpMode: "JUMP", filterMode: "FILTER", renameMode: "RENAME", createMode: "CREATE", pathMode: "PATH", shellMode: "SHELL", transferMode: "TRANSFER"}
+
 func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex int, active bool) {
-	t := p.tabs[p.currentTab]
 	style := m.theme.emptyStyle
 	accent := m.theme.grayColor
 	if active {
 		accent = m.theme.accentColor3
 	}
+	if !p.hasTabs() {
+		m.drawEmptyPane(f, a, style, accent, active)
+		return
+	}
+	t := p.tabs[p.currentTab]
 	labels := paneTabLabels(p)
 	var tabLine strings.Builder
 	baseTabStyle := style.Foreground(accent).Bold(active)
@@ -190,8 +208,7 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 	}
 	status := fmt.Sprintf("%d items · %d selected %s", len(items), selected, humanize.Bytes(size))
 	if active && m.mode != normalMode {
-		labels := map[mode]string{jumpMode: "JUMP", filterMode: "FILTER", renameMode: "RENAME", createMode: "CREATE", pathMode: "PATH", shellMode: "SHELL", transferMode: "TRANSFER"}
-		if label := labels[m.mode]; label != "" {
+		if label := modeLabels[m.mode]; label != "" {
 			status = label + " · " + status
 		}
 	}
@@ -215,6 +232,45 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 	}
 	textAt(f, catatui.NewRect(a.X, a.Height-1, a.Width, 1), footer)
 }
+
+// drawEmptyPane paints a pane that holds no tabs. It keeps the pane's half of
+// the screen so the split never moves, and says how to fill it back up.
+func (m *model) drawEmptyPane(f *catatui.Frame, a catatui.Rect, style paint.Style, accent color.Color, active bool) {
+	for row := uint16(0); row < a.Height; row++ {
+		textAt(f, catatui.NewRect(a.X, a.Y+row, a.Width, 1), style.Width(int(a.Width)).Render(""))
+	}
+	hints := []string{"no tabs", "", "T restores the last closed tab", "gg opens a path", "Tab switches panes"}
+	top := a.Y + a.Height/2 - uint16(len(hints)/2)
+	for i, hint := range hints {
+		row := top + uint16(i)
+		if row >= a.Y+a.Height-2 {
+			break
+		}
+		hintStyle := style.Foreground(m.theme.grayColor)
+		if i == 0 {
+			hintStyle = style.Bold(true).Foreground(accent)
+		}
+		textAt(f, catatui.NewRect(a.X, row, a.Width, 1),
+			hintStyle.Width(int(a.Width)).Align(paint.Center).Render(truncate(hint, int(a.Width))))
+	}
+	// Path mode is the way out of an empty pane, so it has to be visible here
+	// too, on the row a populated pane uses for its path bar.
+	if active && m.mode == pathMode {
+		textAt(f, catatui.NewRect(a.X, a.Y+1, a.Width, 1), m.pathInput.View())
+	}
+	if active && m.mode != normalMode {
+		if label := modeLabels[m.mode]; label != "" {
+			textAt(f, catatui.NewRect(a.X, a.Height-2, a.Width, 1),
+				style.Foreground(accent).Width(int(a.Width)).Render(label))
+		}
+	}
+	footer := ""
+	if active && m.ticks > 0 && len(m.log) > 0 {
+		footer = m.log[len(m.log)-1].render(m.theme, false)
+	}
+	textAt(f, catatui.NewRect(a.X, a.Height-1, a.Width, 1), footer)
+}
+
 func filepathBase(path string) string {
 	path = strings.TrimRight(path, "\\/")
 	if i := strings.LastIndexAny(path, "\\/"); i >= 0 {
@@ -353,7 +409,7 @@ func (m *model) drawTasks(f *catatui.Frame, a catatui.Rect) {
 		if t.err != nil {
 			detail = t.err.Error()
 		}
-		textAt(f, catatui.NewRect(0, a.Height-2, a.Width, 1), detail)
+		textAt(f, catatui.NewRect(0, a.Height-1, a.Width, 1), detail)
 	}
 }
 
@@ -362,10 +418,14 @@ func (m *model) dimensions() {
 	if m.activePane == 1 {
 		m.width = max(1, m.screenWidth-m.width-1)
 	}
-	m.height = max(4, m.screenHeight-2)
+	reservedRows := 0
+	if m.taskStripVisible() {
+		reservedRows = 1
+	}
+	m.height = max(4, m.screenHeight-1-reservedRows)
 	switch m.mode {
 	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode:
 		m.width = max(1, m.screenWidth)
-		m.height = max(4, m.screenHeight-1)
+		m.height = max(4, m.screenHeight-reservedRows)
 	}
 }

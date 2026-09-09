@@ -7,15 +7,17 @@ Modal Commander (mc) is a TUI file manager for Windows (though it might be porte
 mc now uses [catatui](https://github.com/Fiend3d/catatui), with two independent panes and background file tasks. Each pane has its own tabs, history, selection, filter and sorting. Existing themes and F-key tool configuration are retained.
 
 - `Tab` switches panes. Click a pane to focus it; click a pane tab to switch directly.
+- `Ctrl+Left` / `Ctrl+Right` move the current tab to that pane and follow it; `Shift+Left` / `Shift+Right` copy it there and keep the focus.
+- A pane may hold no tabs at all: `Ctrl+W` closes the last one and a move can empty the source. The empty pane keeps its half of the screen; `T` restores the last closed tab, `gg` opens a path, `b` picks a bookmark, and `Shift+Left`/`Shift+Right` copies one in from the other side. Keys that need a current directory do nothing there. Quitting from an empty pane returns no directory.
 - `Space` / `Insert` toggles an item and advances; select-all, invert and clear remain available. Visual mode has been removed.
 - `Shift+Up/Down` extends or shrinks a range; `Shift+Home/End` extends to the first or last item; `Ctrl+click` extends to the clicked item. Earlier selections are preserved. Ordinary navigation starts a new range anchor. `Shift+click` also works in terminals that forward it, but Windows Terminal reserves it for terminal text selection.
 - `Y` copies and `X` moves selected items to the opposite pane. Enter confirms the editable destination. Existing `y/x/p/P` clipboard operations are unchanged.
-- `Ctrl+T` opens tasks; `c` cancels the highlighted task and Escape returns to browsing. File operations run sequentially while browsing remains available. Progress shows bytes and file counts, with scanning shown before totals are known.
+- `w` opens tasks; `c` cancels the highlighted task and Escape returns to browsing. File operations run sequentially while browsing remains available. Progress shows bytes and file counts, with scanning shown before totals are known.
 - `Shift+Tab` enters Jump mode. `Ctrl+N` still opens a directory in a new tab.
 
 Normal transfers choose unique names on collisions; `P` explicitly requests overwrite and confirms collisions. Cancellation retains completed files and removes unfinished temporary copies. Completed reversible work can be undone, including partial tasks. Delete is permanent; overwrites are not undoable. Undo/redo refuses conflicting or changed paths. Reparse points are reported as unsupported for transfers/deletion.
 
-No arguments opens the working directory in both panes. One directory opens it in both; two initialize left/right; extra directories become left-pane tabs. The focused pane supplies the directory returned by the PowerShell wrapper. Pane locations and task history are not persisted between sessions.
+No arguments opens the working directory in the left pane and leaves the right one empty; a single directory argument does the same. Two directories initialize left/right; extra directories become left-pane tabs. The focused pane supplies the directory returned by the PowerShell wrapper. Pane locations and task history are not persisted between sessions.
 
 Set a theme with `g` -> `T`, save with `g` -> `C`, or edit `$env:APPDATA\mc\config.toml`.
 

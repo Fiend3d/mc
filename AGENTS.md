@@ -85,8 +85,9 @@ Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests cover pane
 - `#sl` macro in shell mode expands to selected file paths
 - File filter uses comma/semicolon-separated patterns (case-insensitive `Contains`)
 - Delete and overwrites are not undoable; other completed file work is journaled, including partial operations.
-- Tab switches panes; Shift+Tab enters Jump; Y/X transfer to the opposite pane; Ctrl+T opens tasks.
+- Tab switches panes; Ctrl+Left/Right move the current tab across panes and Shift+Left/Right copy it; Shift+Tab enters Jump; Y/X transfer to the opposite pane; w opens tasks.
 - Pane/tab state is independent. Async reads carry the target tab, page and generation.
+- A pane may hold zero tabs. `pane.hasTabs()` guards it; the key gate in `Update` (`emptyPaneBlocked`) swallows tab-dependent keys so handlers can keep calling `getTab()`. Use `currentDir()`/`paneDir()` where only a path is needed. An empty pane parks `currentTab` at 0, never -1.
 - Only the UI loop mutates model state; workers send immutable progress/completion events.
 - Themes set via `g -> T`, saved via `g -> C`
 - Binary files in search are detected by null-byte scan (first 8KB); 5MB size limit for text search

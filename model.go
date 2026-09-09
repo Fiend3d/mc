@@ -437,10 +437,6 @@ func initialModel(dirs []string) model {
 		}
 	}
 	leftDirs := append([]string{dirs[0]}, dirs[min(2, len(dirs)):]...)
-	rightDir := dirs[0]
-	if len(dirs) > 1 {
-		rightDir = dirs[1]
-	}
 	tabs := make([]*tab, len(leftDirs))
 	for i, dir := range leftDirs {
 		tabs[i] = newTab(dir, &page{})
@@ -452,8 +448,13 @@ func initialModel(dirs []string) model {
 	s := spinner.New()
 	setSpinnerStyle(&s, theme)
 
+	// A single directory opens on the left only; the right pane starts empty
+	// rather than showing the same thing twice.
 	left := &pane{tabs: tabs}
-	right := &pane{tabs: []*tab{newTab(rightDir, &page{})}}
+	right := &pane{}
+	if len(dirs) > 1 {
+		right.tabs = []*tab{newTab(dirs[1], &page{})}
+	}
 	return model{
 		pane: left, panes: [2]*pane{left, right}, taskEvents: make(chan event.Msg, 128), taskWorkers: &sync.WaitGroup{},
 		hoverPane: -1, hoverIndex: -1, hoverSearchIndex: -1,

@@ -75,20 +75,41 @@ func numberOfDigits(n int) int {
 	return count
 }
 
+// drivesInput parks pathInputDir while the drive list is the suggestion set.
+// It cannot collide with a real directory, so probing every drive letter
+// happens once per visit rather than on each keystroke.
+const drivesInput = "\x00drives"
+
 func fillAutocomplete(m *model) {
 	switch m.mode {
 	case pathMode:
 		path := m.pathInput.Value()
-		if m.getTab().dir == "" {
-			m.pathInput.ShowSuggestions = false // TODO: autocomplete drives maybe
-			return
-		}
 		if isUNC(path) { // because network is slow T_T
 			m.pathInput.ShowSuggestions = false
 			return
 		}
 		if strings.HasSuffix(path, ":") {
 			path = path + "\\"
+		}
+		// This PC and empty panes have no directory to list: their children are
+		// the drives, so complete those until a separator is typed.
+		if m.currentDir() == "" && !strings.ContainsAny(path, `\/`) {
+			if m.pathInputDir == drivesInput {
+				return
+			}
+			m.pathInputDir = drivesInput
+			drives, err := getDrives()
+			if err != nil {
+				m.pathInput.ShowSuggestions = false
+				return
+			}
+			suggestions := make([]string, 0, len(drives))
+			for _, d := range drives {
+				suggestions = append(suggestions, newDriveItem(d).getFullPath())
+			}
+			m.pathInput.ShowSuggestions = true
+			m.pathInput.SetSuggestions(suggestions)
+			return
 		}
 		dir := filepath.Dir(path)
 		if dir == m.pathInputDir {

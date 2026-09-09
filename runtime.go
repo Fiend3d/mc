@@ -376,6 +376,12 @@ func (m *model) inputEvent(e term.Event) event.Msg {
 				return nil
 			}
 			y--
+			if !m.panes[pane].hasTabs() {
+				if e.MouseKind == term.MouseMove {
+					return event.MouseHoverMsg{Pane: -1, Index: -1}
+				}
+				return nil
+			}
 			if e.MouseKind == term.MouseMove {
 				if y == 0 {
 					if m.panes[pane].tabs[m.panes[pane].currentTab].dir != "" {

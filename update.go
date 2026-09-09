@@ -17,6 +17,58 @@ import (
 	"mc/internal/event"
 )
 
+// emptyPaneKey lists the keys that still mean something in a pane with no
+// tabs: switching or refilling the pane, and the global overlays. Everything
+// else needs a current tab, so the gate in Update swallows it.
+func emptyPaneKey(key string) bool {
+	switch key {
+	case "tab", "ctrl+left", "ctrl+right", "shift+left", "shift+right":
+		return true
+	case "T", "b", "g":
+		return true // refill routes: restore, bookmarks, Go mode
+	case "q", "Q", "w", "f1", "`", "ctrl+h":
+		return true
+	case "u", "U":
+		return true
+	}
+	return false
+}
+
+// emptyPaneBlocked reports keys that reach a mode handler which would index the
+// missing tab. The allowlist is keyed on the mode because Go and Tabs mode
+// reuse letters that Normal mode lets through.
+func (m *model) emptyPaneBlocked(key string) bool {
+	if m.hasTabs() {
+		return false
+	}
+	if m.taskView || m.quitting {
+		return false // the overlays own the keyboard and never touch a tab
+	}
+	switch m.mode {
+	case normalMode, jumpMode:
+		return !emptyPaneKey(key)
+	case goMode:
+		// gs calculates directory sizes and needs a page of items.
+		return key == "s"
+	case tabsMode:
+		switch key {
+		case "esc", "h", "u", "q", "Q":
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+// emptyPaneClick drops pointer events aimed at a pane with no rows to hit. The
+// overlay modes keep their clicks: bookmarks and the tab browser can refill it.
+func (m *model) emptyPaneClick() bool {
+	if m.hasTabs() || m.taskView || m.quitting {
+		return false
+	}
+	return m.mode == normalMode || m.mode == jumpMode
+}
+
 func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 	switch input := msg.(type) {
 	case event.KeyMsg:
@@ -24,13 +76,22 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		if !rangeKey(input.String()) {
 			m.finishRangeSelection()
 		}
+		if m.emptyPaneBlocked(input.String()) {
+			return m, nil
+		}
 	case event.MouseClickMsg:
 		m.clearHover()
 		if !input.Shift && !input.Ctrl {
 			m.finishRangeSelection()
 		}
+		if m.emptyPaneClick() {
+			return m, nil
+		}
 	case event.MouseWheelMsg:
 		m.finishRangeSelection()
+		if m.emptyPaneClick() {
+			return m, nil
+		}
 	case event.BlurMsg, event.WindowSizeMsg:
 		m.clearHover()
 	}
@@ -117,7 +178,8 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 	case massRenameMsg:
 		lines := slices.Collect(readLines(msg.tempFile))
 		os.Remove(msg.tempFile)
-		if m.getTab().dir == msg.dir {
+		// An emptied pane reads like navigating away: the rename is dropped.
+		if m.currentDir() == msg.dir {
 			if slices.Equal(msg.lines, lines) {
 				return m, m.addMessage(msgError, "nothing changed")
 			}
@@ -133,7 +195,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 			pairs := buildRenamePairs(msg.paths, lines)
 			cmd := &fileActionCommand{
 				action: renameFileAction,
-				dir:    m.getTab().dir,
+				dir:    msg.dir,
 				pairs:  pairs,
 			}
 			m.addJob()
@@ -465,12 +527,12 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				return m, nil
 			case "g":
 				m.mode = pathMode
-				dir := m.getTab().dir
+				dir := m.currentDir()
 				if dir != "" && !isUNCRoot(dir) { // these aren't valid directories
 					os.Chdir(dir)
 				}
 				m.pathInput.Reset()
-				m.pathInput.SetValue(m.getTab().dir)
+				m.pathInput.SetValue(dir)
 				m.pathInput.Focus()
 				m.pathInputDir = "nope"
 				return m, textinput.Blink
@@ -509,7 +571,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 					info = fmt.Sprintf("config saved: %s", configPath)
 				}
 
-				dir := m.getTab().dir
+				dir := m.currentDir()
 				cmd := m.addMessage(msgInfo, info)
 				if dir == getConfigDir() {
 					return m, event.Batch(cmd, m.update(dir))
@@ -651,14 +713,9 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				m.currentTab = index
 				return m, m.addMessage(msgInfo, fmt.Sprintf("tab %d", index+1))
 			case "ctrl+w":
-				if len(m.tabs) == 1 {
-					return m, m.addMessage(msgWarning, "can't close the last tab")
-				}
 				m.closedTabs = append(m.closedTabs, m.getTab().dir)
 				m.tabs = slices.Delete(m.tabs, m.currentTab, m.currentTab+1)
-				if m.currentTab >= len(m.tabs) {
-					m.currentTab = len(m.tabs) - 1
-				}
+				m.clampCurrent()
 				return m, nil
 			case "T":
 				return m.handleRestoreTab()
@@ -1321,11 +1378,12 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				m.currentTab = m.tabsCursor
 				return m, nil
 			case "d":
-				if len(m.tabs) == 1 {
-					return m, m.addMessage(msgWarning, "can't close the last tab")
-				}
 				m.closedTabs = append(m.closedTabs, m.tabs[m.tabsCursor].dir)
 				m.tabs = slices.Delete(m.tabs, m.tabsCursor, m.tabsCursor+1)
+				if len(m.tabs) == 0 {
+					m.tabsCursor, m.currentTab, m.tabsStart = 0, 0, 0
+					return m, nil
+				}
 				if m.tabsCursor == m.currentTab {
 					m.tabsCursor = min(m.tabsCursor, len(m.tabs)-1)
 					m.currentTab = m.tabsCursor

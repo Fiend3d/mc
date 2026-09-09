@@ -22,7 +22,7 @@ func (m *model) handleQuit(result bool) (event.Model, event.Cmd) {
 		return m, nil
 	}
 	if result {
-		m.result = m.getTab().dir
+		m.result = m.currentDir()
 	}
 	return m, event.Quit
 }
@@ -157,8 +157,8 @@ func (m *model) handleNewPath(addTab bool) (event.Model, event.Cmd) {
 	dir := m.pathInput.Value()
 	dir = strings.TrimSpace(dir)
 	if isUNCRoot(dir) || dir == "" {
-		if addTab {
-			m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
+		if addTab && m.hasTabs() {
+			m.tabs = append(m.tabs, newTab(m.currentDir(), &page{}))
 			m.currentTab = len(m.tabs) - 1
 		}
 		return m, m.changeDir(dir)
@@ -180,8 +180,8 @@ func (m *model) handleNewPath(addTab bool) (event.Model, event.Cmd) {
 		return m, m.addMessage(msgError, fmt.Sprintf("failed to get the real Windows path:%s", err))
 	}
 
-	if addTab {
-		m.tabs = append(m.tabs, newTab(m.getTab().dir, &page{}))
+	if addTab && m.hasTabs() {
+		m.tabs = append(m.tabs, newTab(m.currentDir(), &page{}))
 		m.currentTab = len(m.tabs) - 1
 	}
 	return m, m.changeDir(dir)

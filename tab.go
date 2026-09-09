@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"slices"
 	"strings"
+
+	"mc/internal/event"
 )
 
 type tab struct {
@@ -146,10 +149,82 @@ func (t *tab) getPageSettings() *pageSettings {
 	return settings
 }
 
+func (p *pane) hasTabs() bool {
+	return len(p.tabs) > 0
+}
+
+// clampCurrent keeps currentTab inside the slice after a tab is removed. An
+// empty pane parks it at 0, so a refill lands on a valid index; -1 would turn
+// every getTab() into a panic instead of an empty check.
+func (p *pane) clampCurrent() {
+	if p.currentTab >= len(p.tabs) {
+		p.currentTab = max(0, len(p.tabs)-1)
+	}
+}
+
+// currentDir is the active tab's directory, or "" when the pane has no tabs.
+// Callers that only want a path use this instead of getTab().dir.
+func (m *model) currentDir() string {
+	return m.paneDir(m.activePane)
+}
+
+func (m *model) paneDir(index int) string {
+	p := m.panes[index]
+	if !p.hasTabs() {
+		return ""
+	}
+	return p.tabs[p.currentTab].dir
+}
+
 func (m *model) multipleTabs() bool {
 	return len(m.tabs) > 1
 }
 
 func (m *model) getTabInfo() string {
 	return fmt.Sprintf(" [%d/%d] ", m.currentTab+1, len(m.tabs))
+}
+
+func paneName(index int) string {
+	if index == 0 {
+		return "left"
+	}
+	return "right"
+}
+
+// sendTab moves or copies the current tab into the pane at dst. A move takes
+// the tab and the focus with it, so the tab stays in front of the user. A copy
+// opens the directory in the other pane and leaves the focus alone, which is
+// what preparing a transfer needs.
+func (m *model) sendTab(dst int, duplicate bool) (bool, event.Cmd) {
+	if dst == m.activePane {
+		return true, m.addMessage(msgWarning, fmt.Sprintf("already the %s pane", paneName(dst)))
+	}
+	src, target := m.panes[m.activePane], m.panes[dst]
+
+	if !src.hasTabs() {
+		return true, m.addMessage(msgWarning, "no tabs to send")
+	}
+
+	if duplicate {
+		dir := src.tabs[src.currentTab].dir
+		tabCopy := newTab(dir, &page{})
+		target.tabs = append(target.tabs, tabCopy)
+		target.currentTab = len(target.tabs) - 1
+		return true, event.Batch(
+			m.addMessage(msgInfo, fmt.Sprintf("tab copied to the %s pane", paneName(dst))),
+			m.readTab(tabCopy),
+		)
+	}
+
+	moved := src.tabs[src.currentTab]
+	src.tabs = slices.Delete(src.tabs, src.currentTab, src.currentTab+1)
+	src.clampCurrent()
+	target.tabs = append(target.tabs, moved)
+	target.currentTab = len(target.tabs) - 1
+
+	m.activePane = dst
+	m.pane = target
+	m.mode = normalMode
+	m.click = mouseClick{}
+	return true, m.addMessage(msgInfo, fmt.Sprintf("tab moved to the %s pane", paneName(dst)))
 }

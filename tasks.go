@@ -116,6 +116,16 @@ func (m *model) tasksPending() bool {
 	}
 	return false
 }
+
+func (m *model) taskStripVisible() bool {
+	for _, t := range m.taskList {
+		switch t.state {
+		case "running", "scanning", "cancelling":
+			return true
+		}
+	}
+	return false
+}
 func (m *model) finishTask(msg taskDoneMsg) event.Cmd {
 	t := m.taskList[msg.id-1]
 	t.cancel()
@@ -158,7 +168,7 @@ func (m *model) finishTask(msg taskDoneMsg) event.Cmd {
 	}
 	if m.quitting && !m.tasksPending() && !m.hasJobs() {
 		if m.quitResult {
-			m.result = m.getTab().dir
+			m.result = m.currentDir()
 		}
 		cmds = append(cmds, event.Quit)
 	}
@@ -343,7 +353,7 @@ func (m *model) updateV2(msg event.Msg) (bool, event.Cmd) {
 				}
 				if !m.tasksPending() {
 					if m.quitResult {
-						m.result = m.getTab().dir
+						m.result = m.currentDir()
 					}
 					return true, event.Quit
 				}
@@ -352,7 +362,7 @@ func (m *model) updateV2(msg event.Msg) (bool, event.Cmd) {
 		}
 		if m.taskView {
 			switch key {
-			case "esc", "ctrl+t":
+			case "esc", "w":
 				m.taskView = false
 			case "j", "down":
 				m.taskCursor = min(len(m.taskList)-1, m.taskCursor+1)
@@ -403,7 +413,15 @@ func (m *model) updateV2(msg event.Msg) (bool, event.Cmd) {
 				m.mode = normalMode
 				m.click = mouseClick{}
 				return true, nil
-			case "ctrl+t":
+			case "ctrl+left":
+				return m.sendTab(0, false)
+			case "ctrl+right":
+				return m.sendTab(1, false)
+			case "shift+left":
+				return m.sendTab(0, true)
+			case "shift+right":
+				return m.sendTab(1, true)
+			case "w":
 				m.taskView = true
 				m.taskCursor = max(0, len(m.taskList)-1)
 				return true, nil
@@ -414,7 +432,7 @@ func (m *model) updateV2(msg event.Msg) (bool, event.Cmd) {
 				}
 				m.transferMove = key == "X"
 				m.resetInput("Destination directory")
-				m.input.SetValue(m.panes[1-m.activePane].tabs[m.panes[1-m.activePane].currentTab].dir)
+				m.input.SetValue(m.paneDir(1 - m.activePane))
 				m.mode = transferMode
 				return true, nil
 			case "u", "U":

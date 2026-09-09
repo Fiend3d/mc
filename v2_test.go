@@ -134,6 +134,35 @@ func TestMouseWheelCanScrollCursorOffscreen(t *testing.T) {
 	}
 }
 
+func TestTaskStripReservesBottomRowOnlyWhileVisible(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "last-row-item"))
+	m := testModel(t, dir)
+	m.screenHeight = 10
+	m.dimensions()
+	applyEffect(m, m.readTab(m.getTab()))
+
+	backend := catatui.NewTestBackend(100, 10)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(backend.Buffer().String(), "\n")
+	if !strings.Contains(lines[len(lines)-1], "last-row-item") {
+		t.Fatalf("unused bottom row without active task: %q", lines[len(lines)-1])
+	}
+
+	m.taskList = []*task{{id: 1, cmd: &fileActionCommand{}, state: "running"}}
+	m.dimensions()
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	lines = strings.Split(backend.Buffer().String(), "\n")
+	if !strings.Contains(lines[len(lines)-1], "running") {
+		t.Fatalf("task strip missing from bottom row: %q", lines[len(lines)-1])
+	}
+}
+
 func TestCalculatedDirectorySizesRenderPersistAndSort(t *testing.T) {
 	dir := t.TempDir()
 	small := filepath.Join(dir, "small")
@@ -199,7 +228,7 @@ func TestCalculatedDirectorySizesRenderPersistAndSort(t *testing.T) {
 func TestStaleReadsAndSelectionsTargetOriginalTab(t *testing.T) {
 	dir := t.TempDir()
 	touch(t, filepath.Join(dir, "a"))
-	m := testModel(t, dir)
+	m := testModel(t, dir, t.TempDir()) // the second pane must hold a tab
 	first := m.readTab(m.getTab())()
 	latest := m.readTab(m.getTab())()
 	m.Update(first)
@@ -338,5 +367,308 @@ func TestNativeViewsAndMouse(t *testing.T) {
 		if err := terminal.Draw(m.draw); err != nil {
 			t.Fatalf("mode %d: %v", mode, err)
 		}
+	}
+}
+
+func TestTabMovesAndCopiesBetweenPanes(t *testing.T) {
+	left, right, extra := t.TempDir(), t.TempDir(), t.TempDir()
+	touch(t, filepath.Join(left, "a"))
+	m := testModel(t, left, right, extra)
+
+	keyEvent(m, "ctrl+left")
+	if len(m.panes[0].tabs) != 2 || len(m.panes[1].tabs) != 1 || m.activePane != 0 {
+		t.Fatal("moving towards the focused pane changed something")
+	}
+
+	keyEvent(m, "ctrl+right")
+	if len(m.panes[0].tabs) != 1 || m.panes[0].tabs[0].dir != extra {
+		t.Fatal("tab not taken from the source pane")
+	}
+	if len(m.panes[1].tabs) != 2 || m.panes[1].currentTab != 1 {
+		t.Fatal("moved tab is not current in the destination pane")
+	}
+	if m.activePane != 1 || m.pane != m.panes[1] || m.getTab().dir != left {
+		t.Fatal("focus did not follow the moved tab")
+	}
+
+	keyEvent(m, "ctrl+left")
+	if len(m.panes[0].tabs) != 2 || m.activePane != 0 || m.getTab().dir != left {
+		t.Fatal("tab did not move back")
+	}
+
+	keyEvent(m, "tab")
+	keyEvent(m, "ctrl+left")
+	if len(m.panes[1].tabs) != 0 || m.panes[1].currentTab != 0 {
+		t.Fatal("a pane kept its last tab")
+	}
+	if len(m.panes[0].tabs) != 3 || m.activePane != 0 {
+		t.Fatal("focus did not follow the last tab out of the pane")
+	}
+	keyEvent(m, "shift+right") // refill the emptied pane
+	keyEvent(m, "ctrl+w")      // and drop the duplicate on this side
+	if len(m.panes[0].tabs) != 2 || len(m.panes[1].tabs) != 1 || m.getTab().dir != left {
+		t.Fatal("could not restore two populated panes")
+	}
+
+	_, cmd := m.Update(event.KeyMsg{Name: "shift+right"})
+	applyEffect(m, cmd)
+	if len(m.panes[0].tabs) != 2 || m.activePane != 0 || m.getTab().dir != left {
+		t.Fatal("copying moved the tab or the focus")
+	}
+	target := m.panes[1]
+	if len(target.tabs) != 2 || target.currentTab != 1 || target.tabs[1].dir != left {
+		t.Fatal("tab not copied to the other pane")
+	}
+	if len(target.tabs[1].page.items) != 1 {
+		t.Fatal("copied tab was not read")
+	}
+	if m.getTab() == target.tabs[1] {
+		t.Fatal("copy shares the tab with the source pane")
+	}
+}
+
+// drawText renders the model and returns the screen as text.
+func drawText(t *testing.T, m *model) string {
+	t.Helper()
+	backend := catatui.NewTestBackend(100, 24)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	return backend.Buffer().String()
+}
+
+func TestPaneCanBeLeftWithoutTabs(t *testing.T) {
+	left, right := t.TempDir(), t.TempDir()
+	touch(t, filepath.Join(left, "a"))
+	m := testModel(t, left, right)
+	applyEffect(m, m.readTab(m.getTab()))
+
+	keyEvent(m, "ctrl+w")
+	if m.hasTabs() || len(m.panes[0].tabs) != 0 || m.currentTab != 0 {
+		t.Fatal("closing the last tab did not empty the pane")
+	}
+
+	// Every key that needs a current tab must be swallowed, not panic.
+	for _, key := range []string{
+		"j", "k", "l", "h", "down", "up", "left", "right", "enter", "space", "insert",
+		"home", "end", "pgup", "pgdown", "shift+up", "shift+down", "ctrl+a", "ctrl+d",
+		"ctrl+r", "d", "r", "y", "x", "p", "P", "f", ",", "a", "c", "s", ":", "B",
+		"[", "]", "1", "0", "ctrl+n", "ctrl+t", "ctrl+b", "ctrl+f", "ctrl+w",
+		"f2", "f3", "f5", "esc",
+	} {
+		keyEvent(m, key)
+		if m.hasTabs() {
+			t.Fatalf("%q created a tab in an empty pane", key)
+		}
+		if m.mode != normalMode {
+			t.Fatalf("%q changed the mode in an empty pane", key)
+		}
+	}
+	m.Update(event.MouseClickMsg{X: 4, Y: 4, Button: event.MouseLeft})
+	m.Update(event.MouseWheelMsg{X: 4, Y: 4, Button: event.MouseWheelDown})
+
+	if out := drawText(t, m); !strings.Contains(out, "no tabs") {
+		t.Fatal("empty pane is not drawn")
+	}
+	if out := drawText(t, m); !strings.Contains(out, filepath.Base(right)) {
+		t.Fatal("the populated pane stopped rendering")
+	}
+
+	keyEvent(m, "q")
+	if m.result != "" {
+		t.Fatalf("quitting an empty pane returned %q", m.result)
+	}
+}
+
+func TestEmptyPaneCanBeRefilled(t *testing.T) {
+	left, right := t.TempDir(), t.TempDir()
+	m := testModel(t, left, right)
+
+	keyEvent(m, "ctrl+w")
+	_, cmd := m.Update(event.KeyMsg{Name: "T"})
+	applyEffect(m, cmd)
+	if !m.hasTabs() || m.getTab().dir != left {
+		t.Fatal("T did not restore a tab into the empty pane")
+	}
+
+	keyEvent(m, "ctrl+w")
+	keyEvent(m, "tab")
+	_, cmd = m.Update(event.KeyMsg{Name: "shift+left"})
+	applyEffect(m, cmd)
+	if len(m.panes[0].tabs) != 1 || m.panes[0].tabs[0].dir != right {
+		t.Fatal("shift+left did not copy a tab into the empty pane")
+	}
+	if m.activePane != 1 {
+		t.Fatal("copying moved the focus")
+	}
+
+	keyEvent(m, "tab")
+	keyEvent(m, "ctrl+w")
+	keyEvent(m, "g")
+	keyEvent(m, "g")
+	if m.mode != pathMode {
+		t.Fatal("gg is unreachable from an empty pane")
+	}
+	m.pathInput.SetValue(left)
+	_, cmd = m.Update(event.KeyMsg{Name: "enter"})
+	applyEffect(m, cmd)
+	if !m.hasTabs() || m.getTab().dir != left {
+		t.Fatal("path mode did not open a tab in the empty pane")
+	}
+}
+
+func TestBothPanesCanBeEmpty(t *testing.T) {
+	m := testModel(t, t.TempDir(), t.TempDir())
+	keyEvent(m, "ctrl+w")
+	keyEvent(m, "tab")
+	keyEvent(m, "ctrl+w")
+	if m.panes[0].hasTabs() || m.panes[1].hasTabs() {
+		t.Fatal("panes are not both empty")
+	}
+	if out := drawText(t, m); strings.Count(out, "no tabs") < 2 {
+		t.Fatal("both empty panes are not drawn")
+	}
+	keyEvent(m, "tab")
+	if m.activePane != 0 {
+		t.Fatal("Tab does not move between empty panes")
+	}
+	keyEvent(m, "g")
+	keyEvent(m, "t")
+	if m.mode != tabsMode {
+		t.Fatal("the tab browser is unreachable")
+	}
+	if out := drawText(t, m); !strings.Contains(out, "no tabs in this pane") {
+		t.Fatal("the tab browser does not report an empty pane")
+	}
+	keyEvent(m, "esc")
+}
+
+func TestTransferPrefillWithEmptyOppositePane(t *testing.T) {
+	left, right := t.TempDir(), t.TempDir()
+	touch(t, filepath.Join(left, "a"))
+	m := testModel(t, left, right)
+	applyEffect(m, m.readTab(m.getTab()))
+
+	keyEvent(m, "tab")
+	keyEvent(m, "ctrl+w")
+	keyEvent(m, "tab")
+	keyEvent(m, "Y")
+	if m.mode != transferMode {
+		t.Fatal("Y did not open the transfer prompt")
+	}
+	if m.input.Value() != "" {
+		t.Fatalf("destination prefilled with %q", m.input.Value())
+	}
+	keyEvent(m, "esc")
+}
+
+func TestSingleDirectoryStartsOnlyTheLeftPane(t *testing.T) {
+	left, right, extra := t.TempDir(), t.TempDir(), t.TempDir()
+
+	m := testModel(t, left)
+	if len(m.panes[0].tabs) != 1 || m.panes[0].tabs[0].dir != left {
+		t.Fatal("left pane not seeded")
+	}
+	if m.panes[1].hasTabs() {
+		t.Fatal("right pane opened the same directory twice")
+	}
+	if m.activePane != 0 || !m.hasTabs() {
+		t.Fatal("focus should start on the populated left pane")
+	}
+	keyEvent(m, "q")
+	if m.result != left {
+		t.Fatalf("quit returned %q", m.result)
+	}
+
+	m = testModel(t, left, right)
+	if len(m.panes[0].tabs) != 1 || len(m.panes[1].tabs) != 1 || m.panes[1].tabs[0].dir != right {
+		t.Fatal("two directories no longer initialize both panes")
+	}
+
+	m = testModel(t, left, right, extra)
+	if len(m.panes[0].tabs) != 2 || m.panes[0].tabs[1].dir != extra {
+		t.Fatal("extra directories are no longer left-pane tabs")
+	}
+}
+
+// typeKeys sends printable characters through the model one at a time.
+func typeKeys(m *model, text string) {
+	for _, r := range text {
+		m.Update(event.KeyMsg{Name: string(r), Text: string(r)})
+	}
+}
+
+func TestPathModeCompletesDrivesWithoutACurrentDirectory(t *testing.T) {
+	drives, err := getDrives()
+	if err != nil || len(drives) == 0 {
+		t.Skip("no drives reported")
+	}
+	first := newDriveItem(drives[0]).getFullPath()
+
+	m := testModel(t, "") // a This PC tab: dir is empty
+	if m.getTab().dir != "" {
+		t.Fatal("expected a This PC tab")
+	}
+	keyEvent(m, "g")
+	keyEvent(m, "g")
+	if m.mode != pathMode {
+		t.Fatal("gg did not open path mode")
+	}
+	typeKeys(m, first[:1])
+	if !m.pathInput.ShowSuggestions {
+		t.Fatal("suggestions are off on a This PC tab")
+	}
+	if got := m.pathInput.MatchedSuggestions(); len(got) == 0 || got[0] != first {
+		t.Fatalf("drive not suggested, got %v", got)
+	}
+	if m.pathInput.CurrentSuggestion() != first {
+		t.Fatalf("tab would not complete to %q", first)
+	}
+
+	// Once a separator is typed the normal directory listing takes over.
+	typeKeys(m, first[1:])
+	if m.pathInputDir != first {
+		t.Fatalf("still completing drives at %q", m.pathInputDir)
+	}
+}
+
+func TestPathModeIsVisibleInAnEmptyPane(t *testing.T) {
+	left, right := t.TempDir(), t.TempDir()
+	m := testModel(t, left, right)
+	keyEvent(m, "ctrl+w")
+	if m.hasTabs() {
+		t.Fatal("pane not emptied")
+	}
+	keyEvent(m, "g")
+	keyEvent(m, "g")
+	typeKeys(m, "Z:")
+	out := drawText(t, m)
+	if !strings.Contains(out, "Z:") {
+		t.Fatal("the path input is not drawn in an empty pane")
+	}
+	if !strings.Contains(out, "PATH") {
+		t.Fatal("the empty pane does not show the mode")
+	}
+	keyEvent(m, "esc")
+}
+
+func TestPathModeStillCompletesInsideADirectory(t *testing.T) {
+	dir := t.TempDir()
+	wd, _ := os.Getwd()
+	t.Cleanup(func() { os.Chdir(wd) }) // path mode chdirs; release the temp dir
+	if err := os.MkdirAll(filepath.Join(dir, "childdir"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	m := testModel(t, dir, t.TempDir())
+	keyEvent(m, "g")
+	keyEvent(m, "g")
+	if m.pathInput.Value() != dir {
+		t.Fatalf("path mode opened with %q", m.pathInput.Value())
+	}
+	typeKeys(m, `\child`) // the input is prefilled with the current directory
+	want := filepath.Join(dir, "childdir")
+	if got := m.pathInput.CurrentSuggestion(); got != want {
+		t.Fatalf("suggestion = %q, want %q", got, want)
 	}
 }

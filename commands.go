@@ -123,9 +123,16 @@ func readItems(dir string) ([]item, error) {
 	return items, nil
 }
 
+// changeDir points the active pane at dir. It is the shared refill path: an
+// empty pane grows a tab here, so bookmarks, gc and path mode all work on one.
 func (m *model) changeDir(dir string) event.Cmd {
-	tab := m.getTab()
 	m.mode = normalMode
+	if !m.hasTabs() {
+		m.tabs = append(m.tabs, newTab(dir, &page{}))
+		m.currentTab = len(m.tabs) - 1
+		return m.readTab(m.getTab())
+	}
+	tab := m.getTab()
 	if !tab.set(dir) {
 		return nil
 	}

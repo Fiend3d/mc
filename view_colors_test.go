@@ -33,10 +33,9 @@ func TestNativeThemeFileColors(t *testing.T) {
 					t.Fatalf("row %d foreground = %v, want %v", row, got, fg)
 				}
 			}
-			for x := uint16(0); x < 100; x++ {
-				if strings.TrimSpace(b.CellAt(x, 23).GetSymbol()) != "" {
-					t.Fatal("idle footer contains text")
-				}
+			lines := strings.Split(b.String(), "\n")
+			if !strings.Contains(lines[len(lines)-1], "folder") {
+				t.Fatal("bottom row does not contain the idle footer")
 			}
 		})
 	}

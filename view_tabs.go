@@ -18,6 +18,9 @@ func viewTabs(m *model) string {
 		tabs = "tab"
 	}
 	header := fmt.Sprintf(" %d %s", len(m.tabs), tabs)
+	if len(m.tabs) == 0 {
+		header = " no tabs in this pane"
+	}
 
 	s.WriteString(empty.Width(m.width).Bold(true).Foreground(m.theme.accentColor3).Render(header))
 	s.WriteRune('\n')
@@ -83,10 +86,12 @@ func viewTabs(m *model) string {
 	gray := empty.Foreground(m.theme.grayColor)
 
 	help := gray.Render("Keys:")
-	help += empty.Render(" d ")
-	help += gray.Render("- close")
-	help += empty.Render(" c ")
-	help += gray.Render("- copy path")
+	if len(m.tabs) > 0 {
+		help += empty.Render(" d ")
+		help += gray.Render("- close")
+		help += empty.Render(" c ")
+		help += gray.Render("- copy path")
+	}
 	if len(m.tabs) > 1 {
 		help += empty.Render(" a ")
 		help += gray.Render("- close all")
