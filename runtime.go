@@ -21,6 +21,7 @@ type delivered struct {
 
 func run(m *model) (err error) {
 	defer term.RecoverAndRestore()
+	defer m.saveTabs()
 	var terminal *catatui.Terminal
 	var restore func()
 	var reader *term.EventReader

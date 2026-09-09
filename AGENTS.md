@@ -90,4 +90,5 @@ Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests cover pane
 - A pane may hold zero tabs. `pane.hasTabs()` guards it; the key gate in `Update` (`emptyPaneBlocked`) swallows tab-dependent keys so handlers can keep calling `getTab()`. Use `currentDir()`/`paneDir()` where only a path is needed. An empty pane parks `currentTab` at 0, never -1.
 - Only the UI loop mutates model state; workers send immutable progress/completion events.
 - Themes set via `g -> T`, saved via `g -> C`
+- The right pane's tab directories persist in `tabs.list` beside `config.toml`/`bookmarks.list`; `run` saves them on exit and `initialModel` restores them when no second directory argument is given. The left pane never persists.
 - Binary files in search are detected by null-byte scan (first 8KB); 5MB size limit for text search

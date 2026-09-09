@@ -17,7 +17,7 @@ mc now uses [catatui](https://github.com/Fiend3d/catatui), with two independent 
 
 Normal transfers choose unique names on collisions; `P` explicitly requests overwrite and confirms collisions. Cancellation retains completed files and removes unfinished temporary copies. Completed reversible work can be undone, including partial tasks. Delete is permanent; overwrites are not undoable. Undo/redo refuses conflicting or changed paths. Reparse points are reported as unsupported for transfers/deletion.
 
-No arguments opens the working directory in the left pane and leaves the right one empty; a single directory argument does the same. Two directories initialize left/right; extra directories become left-pane tabs. The focused pane supplies the directory returned by the PowerShell wrapper. Pane locations and task history are not persisted between sessions.
+No arguments opens the working directory in the left pane and leaves the right one empty; a single directory argument does the same. Two directories initialize left/right; extra directories become left-pane tabs. The focused pane supplies the directory returned by the PowerShell wrapper. The right pane's tabs are saved to `$env:APPDATA\mc\tabs.list` when mc exits and restored at the next launch, unless a second directory argument names its directory. The left pane and task history are not persisted.
 
 Set a theme with `g` -> `T`, save with `g` -> `C`, or edit `$env:APPDATA\mc\config.toml`.
 

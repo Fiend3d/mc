@@ -88,7 +88,7 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 		accent = m.theme.accentColor3
 	}
 	if !p.hasTabs() {
-		m.drawEmptyPane(f, a, style, accent, active)
+		m.drawEmptyPane(f, a, style, accent, paneIndex, active)
 		return
 	}
 	t := p.tabs[p.currentTab]
@@ -235,11 +235,15 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 
 // drawEmptyPane paints a pane that holds no tabs. It keeps the pane's half of
 // the screen so the split never moves, and says how to fill it back up.
-func (m *model) drawEmptyPane(f *catatui.Frame, a catatui.Rect, style paint.Style, accent color.Color, active bool) {
+func (m *model) drawEmptyPane(f *catatui.Frame, a catatui.Rect, style paint.Style, accent color.Color, paneIndex int, active bool) {
 	for row := uint16(0); row < a.Height; row++ {
 		textAt(f, catatui.NewRect(a.X, a.Y+row, a.Width, 1), style.Width(int(a.Width)).Render(""))
 	}
 	hints := []string{"no tabs", "", "T restores the last closed tab", "gg opens a path", "Tab switches panes"}
+	if paneIndex == 1 {
+		// Only this pane is written to tabs.list on exit.
+		hints = append(hints, "", "tabs opened here are saved for the next launch")
+	}
 	top := a.Y + a.Height/2 - uint16(len(hints)/2)
 	for i, hint := range hints {
 		row := top + uint16(i)

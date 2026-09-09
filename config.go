@@ -154,6 +154,51 @@ func saveBookmarks(bookmarks []string) error {
 	return os.WriteFile(path, []byte(data), 0o644)
 }
 
+func getTabsPath() string {
+	dir := getConfigDir()
+	return filepath.Join(dir, "tabs.list")
+}
+
+// thisPC stands in for a tab on the drives view, whose directory is empty and
+// would otherwise be dropped by splitLines.
+const thisPC = "--- THIS PC ---"
+
+func loadTabs() ([]string, error) {
+	path := getTabsPath()
+	if !shutil.PathExists(path) {
+		return nil, nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	dirs := splitLines(string(data))
+	for i := range dirs {
+		if dirs[i] == thisPC {
+			dirs[i] = ""
+		}
+	}
+	return dirs, nil
+}
+
+func saveTabs(dirs []string) error {
+	dir := getConfigDir()
+	if !shutil.DirExists(dir) {
+		err := os.MkdirAll(dir, 0755)
+		if err != nil {
+			return err
+		}
+	}
+	lines := make([]string, len(dirs))
+	for i := range dirs {
+		lines[i] = dirs[i]
+		if lines[i] == "" {
+			lines[i] = thisPC
+		}
+	}
+	return os.WriteFile(getTabsPath(), []byte(strings.Join(lines, "\n")), 0o644)
+}
+
 const SHELL = "powershell"
 
 func getShellHistoryPath() string {

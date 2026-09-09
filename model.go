@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"mc/internal/event"
+	"mc/shutil"
 	"mc/widgets/spinner"
 	"mc/widgets/textinput"
 )
@@ -378,6 +379,17 @@ func (m *model) right(addNewTab bool) (event.Model, event.Cmd) {
 	return m, m.readDir(m.currentTab, dir)
 }
 
+// saveTabs remembers the right pane for the next launch. Errors are dropped:
+// quitting must not fail over this, and the UI is already gone.
+func (m *model) saveTabs() {
+	right := m.panes[1]
+	dirs := make([]string, 0, len(right.tabs))
+	for _, t := range right.tabs {
+		dirs = append(dirs, t.dir)
+	}
+	_ = saveTabs(dirs)
+}
+
 func (m *model) getTab() *tab {
 	return m.tabs[m.currentTab]
 }
@@ -449,11 +461,20 @@ func initialModel(dirs []string) model {
 	setSpinnerStyle(&s, theme)
 
 	// A single directory opens on the left only; the right pane starts empty
-	// rather than showing the same thing twice.
+	// rather than showing the same thing twice, and carries over the tabs it
+	// held last session unless an argument names its directory.
 	left := &pane{tabs: tabs}
 	right := &pane{}
 	if len(dirs) > 1 {
 		right.tabs = []*tab{newTab(dirs[1], &page{})}
+	} else {
+		saved, _ := loadTabs()
+		for _, dir := range saved {
+			if dir != "" && !shutil.DirExists(dir) {
+				continue // the folder is gone, or its drive is unplugged
+			}
+			right.tabs = append(right.tabs, newTab(dir, &page{}))
+		}
 	}
 	return model{
 		pane: left, panes: [2]*pane{left, right}, taskEvents: make(chan event.Msg, 128), taskWorkers: &sync.WaitGroup{},

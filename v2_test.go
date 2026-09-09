@@ -11,6 +11,7 @@ import (
 	"mc/shutil"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -670,5 +671,100 @@ func TestPathModeStillCompletesInsideADirectory(t *testing.T) {
 	want := filepath.Join(dir, "childdir")
 	if got := m.pathInput.CurrentSuggestion(); got != want {
 		t.Fatalf("suggestion = %q, want %q", got, want)
+	}
+}
+
+func TestTabsListRoundTrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	if got, err := loadTabs(); err != nil || got != nil {
+		t.Fatalf("missing file returned %v, %v", got, err)
+	}
+	want := []string{`C:\one`, "", `C:\two`} // "" is the This PC view
+	if err := saveTabs(want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := loadTabs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("loaded %q, want %q", got, want)
+	}
+	if err := saveTabs(nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := loadTabs(); len(got) != 0 {
+		t.Fatalf("an emptied pane loaded %q", got)
+	}
+}
+
+func TestRightPaneRestoresSavedTabs(t *testing.T) {
+	appData, kept, gone := t.TempDir(), t.TempDir(), t.TempDir()
+	if err := os.RemoveAll(gone); err != nil {
+		t.Fatal(err)
+	}
+	// initialModel reads APPDATA, so seed it here rather than via testModel.
+	t.Setenv("APPDATA", appData)
+	if err := saveTabs([]string{kept, gone, ""}); err != nil {
+		t.Fatal(err)
+	}
+
+	left := t.TempDir()
+	m := initialModel([]string{left})
+	if len(m.panes[0].tabs) != 1 || m.panes[0].tabs[0].dir != left {
+		t.Fatal("the left pane should ignore saved tabs")
+	}
+	if len(m.panes[1].tabs) != 2 {
+		t.Fatalf("right pane restored %d tabs", len(m.panes[1].tabs))
+	}
+	if m.panes[1].tabs[0].dir != kept || m.panes[1].tabs[1].dir != "" {
+		t.Fatal("a missing directory was restored, or This PC was dropped")
+	}
+
+	// An explicit second argument wins over the saved list.
+	right := t.TempDir()
+	m = initialModel([]string{left, right})
+	if len(m.panes[1].tabs) != 1 || m.panes[1].tabs[0].dir != right {
+		t.Fatal("the argument did not win")
+	}
+}
+
+func TestSaveTabsWritesTheRightPane(t *testing.T) {
+	left, right := t.TempDir(), t.TempDir()
+	m := testModel(t, left, right) // sets APPDATA to a temp dir of its own
+
+	keyEvent(m, "ctrl+right") // send the left tab across
+	m.saveTabs()
+	got, err := loadTabs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(got, []string{right, left}) {
+		t.Fatalf("saved %q, want %q", got, []string{right, left})
+	}
+
+	keyEvent(m, "ctrl+w")
+	keyEvent(m, "ctrl+w")
+	if m.panes[1].hasTabs() {
+		t.Fatal("right pane not emptied")
+	}
+	m.saveTabs()
+	if got, _ := loadTabs(); len(got) != 0 {
+		t.Fatalf("emptied pane saved %q", got)
+	}
+}
+
+func TestOnlyTheRightPaneAdvertisesSaving(t *testing.T) {
+	m := testModel(t, t.TempDir(), t.TempDir())
+	keyEvent(m, "tab")
+	keyEvent(m, "ctrl+w")
+	if !strings.Contains(drawText(t, m), "saved for the next launch") {
+		t.Fatal("the empty right pane does not mention saving")
+	}
+
+	m = testModel(t, t.TempDir(), t.TempDir())
+	keyEvent(m, "ctrl+w")
+	if strings.Contains(drawText(t, m), "saved for the next launch") {
+		t.Fatal("the empty left pane claims persistence it does not have")
 	}
 }
