@@ -335,6 +335,16 @@ func (m *model) inputEvent(e term.Event) event.Msg {
 			return nil
 		}
 		x, y := int(e.X), int(e.Y)
+		// Help owns drag and release so its scrollbar can be dragged; other
+		// modes never see them, keeping their coordinate handling untouched.
+		if m.mode == helpMode || m.mode == helpFilterMode {
+			switch e.MouseKind {
+			case term.MouseDrag:
+				return event.MouseDragMsg{X: x, Y: y, Button: event.MouseLeft}
+			case term.MouseUp:
+				return event.MouseUpMsg{X: x, Y: y, Button: event.MouseLeft}
+			}
+		}
 		if m.mode == searchMode && e.MouseKind == term.MouseMove {
 			index := y - 3 + m.search.start
 			if y >= 3 && y < m.height-2 && index >= 0 && index < m.search.length() {

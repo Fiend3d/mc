@@ -33,7 +33,7 @@ Run `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` if PowerShell scripts 
 
 ## Architecture
 
-Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, textinput, cursor, key, runeutil) and `shutil/`. Uses catatui (`github.com/Fiend3d/catatui`), with the sibling checkout via a local go.mod replacement.
+Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, textinput, cursor, key, runeutil) and `shutil/`. Uses the released catatui (`github.com/Fiend3d/catatui v0.1.0`) from the module proxy; there is no local go.mod replacement.
 
 ### Key files
 
@@ -44,7 +44,7 @@ Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, 
 | `update.go` | Message handling + event loop (`Update()`) — largest file (~1470 lines) |
 | `view_native.go` | Native catatui pane, dialog and task rendering |
 | `runtime.go` | catatui terminal ownership, input and effect scheduling |
-| `tasks.go` | Sequential cancellable tasks, progress, undo/redo |
+| `tasks.go` | Cancellable tasks, progress, undo/redo. File operations run one at a time; read-only tasks (`task.readOnly`, e.g. calculate size) skip the queue and run alongside them |
 | `shutil/transfer.go` | Atomic copy, safe move and operation journals |
 | `handle.go` | Action handlers (quit, paste, rename, tools, clipboard copy) |
 | `commands.go` | Async command wrappers, directory reading, file ops |

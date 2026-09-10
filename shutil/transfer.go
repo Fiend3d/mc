@@ -16,6 +16,9 @@ type Progress struct {
 	Path              string
 	Bytes, Total      int64
 	Files, TotalFiles int
+	// Steps and TotalSteps carry coarse completion for work whose byte total is
+	// unknowable up front, such as a size walk counting top-level entries.
+	Steps, TotalSteps int
 	Scanning          bool
 }
 type ProgressFunc func(Progress)

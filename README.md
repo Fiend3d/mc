@@ -23,9 +23,9 @@ Set a theme with `g` -> `T`, save with `g` -> `C`, or edit `$env:APPDATA\mc\conf
 
 ### Building v2
 
-Go 1.27 and Windows are required. The development module uses `replace github.com/Fiend3d/catatui => ../catatui`; keep the catatui checkout beside mc, including its input-reader shutdown fix. Run `.\build.ps1` or `.\build.ps1 dist`. The generated executable and zip are standalone; the sibling source checkout is only a build dependency.
+Go 1.27 and Windows are required. The module depends on the released `github.com/Fiend3d/catatui v0.1.0`, so no sibling checkout is needed. Run `.\build.ps1` or `.\build.ps1 dist`. The generated executable and zip are standalone.
 
-Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests include native catatui rendering, queued transfers, cancellation, partial undo/redo, Unicode editing, and an actual Windows pseudoconsole process handoff. Before publishing a source release, publish the catatui changes and replace the development replacement with that revision.
+Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests include native catatui rendering, queued transfers, cancellation, partial undo/redo, Unicode editing, and an actual Windows pseudoconsole process handoff. When catatui needs changes, publish a new catatui tag and bump the requirement here rather than adding a local replacement.
 
 ![mc v2 with two panes and a background transfer](assets/demo/v2.png)
 
@@ -140,6 +140,8 @@ Press `F3` on a line to open it with `bat`; it will jump directly to that line. 
 
 Press `:` to enter shell mode. You can hide and show TUI by pressing `Ctrl+h` to see the result of a command. `#sl` - is a macro that is converted to a list of selected items for a command.
 
+Press `;` in normal mode to rerun the last shell command without reopening shell mode. `#sl` expands against the current selection, so the same command can be applied to different items.
+
 **Ctrl+b** - Back in history.<br/>
 **Ctrl+f** - Forward in history.<br/>
 
@@ -152,7 +154,7 @@ Go mode is just a menu.
 **T** - Set theme.<br/>
 **c** - Open the settings directory. You can also find and delete bookmarks there, for example.<br/>
 **C** - Save settings to config.toml for editing.<br/>
-**s** - Calculate size for the selected directories.<br/>
+**s** - Calculate size for the selected directories. Runs as a background task alongside file operations; watch or cancel it with **w**.<br/>
 
 ### Path Mode
 

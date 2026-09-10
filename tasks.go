@@ -20,6 +20,9 @@ type task struct {
 	progress shutil.Progress
 	err      error
 	cancel   context.CancelFunc
+	// readOnly marks work that never touches the filesystem. Such tasks skip
+	// the queue entirely: they neither wait for nor delay file operations.
+	readOnly bool
 }
 type taskProgressMsg struct {
 	id       int
@@ -37,64 +40,84 @@ func (m *model) enqueue(cmd command, action string) event.Cmd {
 	m.startTask()
 	return nil
 }
+
+// enqueueReadOnly starts read-only work at once instead of queueing it, so a
+// scan never waits behind a long transfer and never holds one up.
+func (m *model) enqueueReadOnly(cmd command, action string) event.Cmd {
+	t := &task{id: len(m.taskList) + 1, cmd: cmd, action: action, state: "scanning", readOnly: true}
+	m.taskList = append(m.taskList, t)
+	m.spawn(t)
+	return nil
+}
+
+// spawn launches t's worker. The caller owns the scheduling decision.
+func (m *model) spawn(t *task) {
+	ctx, cancel := context.WithCancel(context.Background())
+	t.cancel = cancel
+	t.state = "scanning"
+	out := m.taskEvents
+	cmd := t.cmd
+	action := t.action
+	id := t.id
+	m.taskWorkers.Add(1)
+	go func() {
+		defer m.taskWorkers.Done()
+		var last time.Time
+		var latest shutil.Progress
+		report := func(p shutil.Progress) {
+			latest = p
+			if time.Since(last) < 100*time.Millisecond {
+				return
+			}
+			last = time.Now()
+			select {
+			case out <- taskProgressMsg{id, p}:
+			default:
+			}
+		}
+		var err error
+		if action == "undo" {
+			if c, ok := cmd.(*fileActionCommand); ok {
+				err = shutil.UndoJournal(ctx, &c.journal, &c.redoJournal, report)
+			} else {
+				err = cmd.undo()
+			}
+		} else {
+			switch c := cmd.(type) {
+			case *fileActionCommand:
+				if action == "redo" {
+					err = c.redoTask(ctx, report)
+				} else {
+					err = c.executeTask(ctx, report)
+				}
+			case *deleteCommand:
+				err = c.executeTask(ctx, report)
+			case *calcSizeCommand:
+				err = c.executeTask(ctx, report)
+			default:
+				if err = ctx.Err(); err == nil {
+					err = cmd.execute()
+				}
+			}
+		}
+		out <- taskDoneMsg{id, err, latest}
+	}()
+}
+
 func (m *model) startTask() {
 	for _, t := range m.taskList {
+		if t.readOnly {
+			continue // a running scan must not hold the queue
+		}
 		if t.state == "running" || t.state == "scanning" || t.state == "cancelling" {
 			return
 		}
 	}
 	for _, t := range m.taskList {
-		if t.state != "queued" {
+		if t.readOnly || t.state != "queued" {
 			continue
 		}
-		ctx, cancel := context.WithCancel(context.Background())
-		t.cancel = cancel
-		t.state = "scanning"
-		out := m.taskEvents
-		cmd := t.cmd
-		action := t.action
-		id := t.id
-		m.taskWorkers.Add(1)
-		go func() {
-			defer m.taskWorkers.Done()
-			var last time.Time
-			var latest shutil.Progress
-			report := func(p shutil.Progress) {
-				latest = p
-				if time.Since(last) < 100*time.Millisecond {
-					return
-				}
-				last = time.Now()
-				select {
-				case out <- taskProgressMsg{id, p}:
-				default:
-				}
-			}
-			var err error
-			if action == "undo" {
-				if c, ok := cmd.(*fileActionCommand); ok {
-					err = shutil.UndoJournal(ctx, &c.journal, &c.redoJournal, report)
-				} else {
-					err = cmd.undo()
-				}
-			} else {
-				switch c := cmd.(type) {
-				case *fileActionCommand:
-					if action == "redo" {
-						err = c.redoTask(ctx, report)
-					} else {
-						err = c.executeTask(ctx, report)
-					}
-				case *deleteCommand:
-					err = c.executeTask(ctx, report)
-				default:
-					if err = ctx.Err(); err == nil {
-						err = cmd.execute()
-					}
-				}
-			}
-			out <- taskDoneMsg{id, err, latest}
-		}()
+		m.spawn(t)
 		return
 	}
 }
@@ -109,6 +132,21 @@ func (m *model) cancelTask(t *task) {
 }
 func (m *model) tasksPending() bool {
 	for _, t := range m.taskList {
+		switch t.state {
+		case "queued", "running", "scanning", "cancelling":
+			return true
+		}
+	}
+	return false
+}
+
+// mutatingPending reports outstanding file work only. Read-only scans are
+// excluded: they cannot conflict with undo or redo.
+func (m *model) mutatingPending() bool {
+	for _, t := range m.taskList {
+		if t.readOnly {
+			continue
+		}
 		switch t.state {
 		case "queued", "running", "scanning", "cancelling":
 			return true
@@ -161,6 +199,10 @@ func (m *model) finishTask(msg taskDoneMsg) event.Cmd {
 		message += " — " + msg.err.Error()
 	}
 	cmds := []event.Cmd{m.addMessage(msgInfo, message)}
+	if c, ok := t.cmd.(*calcSizeCommand); ok {
+		// Directories measured before a cancellation are still worth keeping.
+		cmds = append(cmds, m.applyDirSizes(c))
+	}
 	for _, p := range m.panes {
 		for _, tab := range p.tabs {
 			cmds = append(cmds, m.readTab(tab))
@@ -436,7 +478,7 @@ func (m *model) updateV2(msg event.Msg) (bool, event.Cmd) {
 				m.mode = transferMode
 				return true, nil
 			case "u", "U":
-				if m.tasksPending() {
+				if m.mutatingPending() {
 					return true, m.addMessage(msgWarning, "Wait for pending file operations before undo/redo")
 				}
 			}

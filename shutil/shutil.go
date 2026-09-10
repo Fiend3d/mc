@@ -1,6 +1,7 @@
 package shutil
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -208,27 +209,81 @@ func TouchFile(path string) error {
 	return os.Chtimes(path, now, now)
 }
 
-func CalcDirSize(path string) (uint64, error) {
+// CalcDirSize walks path and sums file sizes. A cancelled context aborts the
+// walk and returns the bytes counted so far alongside ctx.Err(), so callers can
+// keep partial results.
+//
+// The byte total is unknowable before the walk ends, so Total and TotalFiles
+// stay zero. Instead the walk proceeds one top-level entry at a time and
+// reports Steps/TotalSteps, giving callers a coarse but real completion ratio
+// for the cost of a single extra readdir of path.
+func CalcDirSize(ctx context.Context, path string, report ProgressFunc) (uint64, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		if cerr := ctx.Err(); cerr != nil {
+			return 0, cerr
+		}
+		// An unreadable root measures as zero, as it did before.
+		return 0, nil
+	}
+
 	var size uint64
+	var files int
+	total := len(entries)
 
-	err := filepath.WalkDir(path, func(_ string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	emit := func(current string, done int) {
+		if report != nil {
+			report(Progress{
+				Path: current, Bytes: int64(size), Files: files,
+				Steps: done, TotalSteps: total, Scanning: true,
+			})
 		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return nil
+	}
+
+	for i := range entries {
+		if cerr := ctx.Err(); cerr != nil {
+			return size, cerr
 		}
-		if !entry.IsDir() {
-			info, err := entry.Info()
-			if err != nil {
+		child := filepath.Join(path, entries[i].Name())
+		switch {
+		case entries[i].Type()&os.ModeSymlink != 0:
+			// Symlinks are neither followed nor counted.
+		case entries[i].IsDir():
+			werr := filepath.WalkDir(child, func(p string, entry os.DirEntry, err error) error {
+				if cerr := ctx.Err(); cerr != nil {
+					return cerr
+				}
+				if err != nil {
+					return nil
+				}
+				if entry.Type()&os.ModeSymlink != 0 {
+					return nil
+				}
+				if !entry.IsDir() {
+					info, err := entry.Info()
+					if err != nil {
+						return nil
+					}
+					size += uint64(info.Size())
+					files++
+				}
+				// This entry is still in flight, so the step count stays at i.
+				emit(p, i)
 				return nil
+			})
+			if werr != nil {
+				return size, werr
 			}
-			size += uint64(info.Size())
+		default:
+			if info, err := entries[i].Info(); err == nil {
+				size += uint64(info.Size())
+				files++
+			}
 		}
-		return nil
-	})
+		emit(child, i+1)
+	}
 
-	return size, err
+	return size, nil
 }
 
 func UniquePath(reserved []string, exclude []string, path string) string {

@@ -1,6 +1,8 @@
 package shutil
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -449,7 +451,7 @@ func TestCalcDirSize(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	size, err := CalcDirSize(tmpDir)
+	size, err := CalcDirSize(context.Background(), tmpDir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -458,10 +460,125 @@ func TestCalcDirSize(t *testing.T) {
 	}
 }
 
+func TestCalcDirSizeReportsProgress(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "a.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmpDir, "sub"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "sub", "b.txt"), []byte("world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var reports []Progress
+	size, err := CalcDirSize(context.Background(), tmpDir, func(p Progress) {
+		reports = append(reports, p)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reports) == 0 {
+		t.Fatal("no progress reported")
+	}
+	for i, p := range reports {
+		if !p.Scanning {
+			t.Fatalf("report %d is not marked as scanning", i)
+		}
+		if p.Total != 0 || p.TotalFiles != 0 {
+			t.Fatalf("report %d claims a known total: %+v", i, p)
+		}
+		if p.Path == "" {
+			t.Fatalf("report %d has no path", i)
+		}
+		if i > 0 && (p.Bytes < reports[i-1].Bytes || p.Files < reports[i-1].Files) {
+			t.Fatalf("progress went backwards at %d: %+v after %+v", i, p, reports[i-1])
+		}
+	}
+	last := reports[len(reports)-1]
+	if last.Bytes != int64(size) || last.Files != 2 {
+		t.Fatalf("final report %+v does not match size %d", last, size)
+	}
+}
+
+func TestCalcDirSizeStepsTrackTopLevelEntries(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Three top-level entries: two directories with content, and a loose file.
+	for _, name := range []string{"one", "two"} {
+		if err := os.MkdirAll(filepath.Join(tmpDir, name), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(tmpDir, name, "data"), []byte("ab"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "loose"), []byte("c"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	var reports []Progress
+	size, err := CalcDirSize(context.Background(), tmpDir, func(p Progress) {
+		reports = append(reports, p)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if size != 5 {
+		t.Fatalf("size %d, want 5", size)
+	}
+	for i, p := range reports {
+		if p.TotalSteps != 3 {
+			t.Fatalf("report %d has TotalSteps %d, want 3", i, p.TotalSteps)
+		}
+		if p.Steps > p.TotalSteps {
+			t.Fatalf("report %d overshot: %d of %d", i, p.Steps, p.TotalSteps)
+		}
+		if i > 0 && p.Steps < reports[i-1].Steps {
+			t.Fatalf("steps went backwards at %d: %d after %d", i, p.Steps, reports[i-1].Steps)
+		}
+	}
+	if last := reports[len(reports)-1]; last.Steps != 3 {
+		t.Fatalf("final report reached %d of 3 steps", last.Steps)
+	}
+}
+
+func TestCalcDirSizeEmptyDirectoryHasNoSteps(t *testing.T) {
+	// With nothing to iterate there is no denominator, so callers must fall
+	// back to text rather than divide by zero.
+	var reports []Progress
+	size, err := CalcDirSize(context.Background(), t.TempDir(), func(p Progress) {
+		reports = append(reports, p)
+	})
+	if err != nil || size != 0 {
+		t.Fatalf("size %d, err %v", size, err)
+	}
+	if len(reports) != 0 {
+		t.Fatalf("expected no reports for an empty directory, got %d", len(reports))
+	}
+}
+
+func TestCalcDirSizeCancelled(t *testing.T) {
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "a.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	size, err := CalcDirSize(ctx, tmpDir, nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if size != 0 {
+		t.Fatalf("expected no bytes counted, got %d", size)
+	}
+}
+
 func TestCalcDirSizeEmpty(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	size, err := CalcDirSize(tmpDir)
+	size, err := CalcDirSize(context.Background(), tmpDir, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

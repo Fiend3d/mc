@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -164,6 +165,62 @@ func TestTaskStripReservesBottomRowOnlyWhileVisible(t *testing.T) {
 	}
 }
 
+func TestSizeScanSummaryAndStripPreference(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "an-item"))
+	m := testModel(t, dir)
+	m.screenHeight = 10
+	m.dimensions()
+	applyEffect(m, m.readTab(m.getTab()))
+
+	scan := &task{
+		id:       1,
+		cmd:      newCalcSizeCommand(m.getTab(), []string{dir, dir}),
+		state:    "scanning",
+		readOnly: true,
+		progress: shutil.Progress{Path: dir, Bytes: 4096, Files: 3, Steps: 1, TotalSteps: 4, Scanning: true},
+	}
+	// A walk cannot know its byte total ahead of time, so the counts are live
+	// and the percentage comes from finished top-level entries.
+	if got, want := taskSummary(scan), "#1 calculate size (2 dirs) · scanning · 4.1 kB in 3 files · 25%"; got != want {
+		t.Fatalf("summary got %q, want %q", got, want)
+	}
+
+	backend := catatui.NewTestBackend(100, 10)
+	terminal, _ := catatui.NewTerminal(backend)
+	m.taskList = []*task{scan}
+	m.dimensions()
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(backend.Buffer().String(), "\n")
+	if !strings.Contains(lines[len(lines)-1], "calculate size") {
+		t.Fatalf("lone scan missing from the strip: %q", lines[len(lines)-1])
+	}
+
+	// With file work active the strip belongs to the task that has a real
+	// gauge, and the scan is only counted. The scan is first in the list to
+	// prove the preference is not just list order.
+	m.taskList = []*task{scan, {
+		id:       2,
+		cmd:      &fileActionCommand{},
+		state:    "running",
+		progress: shutil.Progress{Bytes: 50, Total: 100},
+	}}
+	m.dimensions()
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	strip := strings.Split(backend.Buffer().String(), "\n")
+	last := strip[len(strip)-1]
+	if strings.Contains(last, "calculate size") {
+		t.Fatalf("scan took the strip from active file work: %q", last)
+	}
+	if !strings.Contains(last, "+1 more") {
+		t.Fatalf("strip does not acknowledge the concurrent scan: %q", last)
+	}
+}
+
 func TestCalculatedDirectorySizesRenderPersistAndSort(t *testing.T) {
 	dir := t.TempDir()
 	small := filepath.Join(dir, "small")
@@ -188,11 +245,14 @@ func TestCalculatedDirectorySizesRenderPersistAndSort(t *testing.T) {
 	left := m.getTab()
 	applyEffect(m, m.readTab(left))
 	m.addJob()
-	cmd := calculateSize(left, []string{small, large})
+	m.enqueueReadOnly(newCalcSizeCommand(left, []string{small, large}), "execute")
 	keyEvent(m, "tab")
-	applyEffect(m, cmd)
+	finishTasks(t, m)
 	if m.activePane != 1 {
 		t.Fatal("calculation changed the active pane")
+	}
+	if m.jobs != 0 {
+		t.Fatalf("job accounting leaked: %d", m.jobs)
 	}
 	items := left.page.getItems()
 	for _, it := range items {
@@ -249,6 +309,298 @@ func TestStaleReadsAndSelectionsTargetOriginalTab(t *testing.T) {
 		t.Fatal("stale navigation applied")
 	}
 }
+// deepTree builds a directory with enough entries that a size walk is not
+// instantaneous, so a cancellation has something to interrupt.
+func deepTree(t *testing.T, root string) string {
+	t.Helper()
+	for i := 0; i < 40; i++ {
+		dir := filepath.Join(root, "d"+strconv.Itoa(i))
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+		for j := 0; j < 40; j++ {
+			if err := os.WriteFile(filepath.Join(dir, "f"+strconv.Itoa(j)), []byte("x"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return root
+}
+
+func TestTaskRatioFallsBackToStepsWithoutAByteTotal(t *testing.T) {
+	cases := []struct {
+		name     string
+		progress shutil.Progress
+		ratio    float64
+		measured bool
+	}{
+		{"transfer uses bytes", shutil.Progress{Bytes: 50, Total: 100}, 0.5, true},
+		{"transfer scan is unmeasured", shutil.Progress{Bytes: 50, Total: 100, Scanning: true}, 0, false},
+		{"size walk uses steps", shutil.Progress{Steps: 3, TotalSteps: 4, Scanning: true}, 0.75, true},
+		{"bytes win over steps", shutil.Progress{Bytes: 50, Total: 100, Steps: 1, TotalSteps: 4}, 0.5, true},
+		{"empty directory is unmeasured", shutil.Progress{Scanning: true}, 0, false},
+		{"ratio is clamped", shutil.Progress{Steps: 9, TotalSteps: 4, Scanning: true}, 1, true},
+	}
+	for _, tc := range cases {
+		ratio, measured := taskRatio(tc.progress)
+		if measured != tc.measured || ratio != tc.ratio {
+			t.Fatalf("%s: got (%v, %v), want (%v, %v)", tc.name, ratio, measured, tc.ratio, tc.measured)
+		}
+	}
+}
+
+func TestSizeScanStepsDriveTheProgressBar(t *testing.T) {
+	dir := t.TempDir()
+	roots := []string{filepath.Join(dir, "one"), filepath.Join(dir, "two")}
+	for _, root := range roots {
+		// Three top-level entries each: two subdirectories and a loose file.
+		for _, sub := range []string{"a", "b"} {
+			if err := os.MkdirAll(filepath.Join(root, sub), 0755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, sub, "data"), []byte("xy"), 0644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := os.WriteFile(filepath.Join(root, "loose"), []byte("z"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m := testModel(t, dir)
+	c := newCalcSizeCommand(m.getTab(), roots)
+	var reports []shutil.Progress
+	if err := c.executeTask(context.Background(), func(p shutil.Progress) {
+		reports = append(reports, p)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Six top-level entries across both roots, counted by one readdir each.
+	for i, p := range reports {
+		if p.TotalSteps != 6 {
+			t.Fatalf("report %d has TotalSteps %d, want 6", i, p.TotalSteps)
+		}
+		if p.Total != 0 {
+			t.Fatalf("report %d claims a byte total: %+v", i, p)
+		}
+		if i > 0 && p.Steps < reports[i-1].Steps {
+			t.Fatalf("steps went backwards at %d: %d after %d", i, p.Steps, reports[i-1].Steps)
+		}
+	}
+	last := reports[len(reports)-1]
+	if last.Steps != 6 {
+		t.Fatalf("final report reached %d of 6 steps", last.Steps)
+	}
+	if ratio, measured := taskRatio(last); !measured || ratio != 1 {
+		t.Fatalf("finished scan is not a full bar: (%v, %v)", ratio, measured)
+	}
+	// The bar must actually move partway through, not jump 0 -> 100.
+	middle := false
+	for _, p := range reports {
+		if r, _ := taskRatio(p); r > 0 && r < 1 {
+			middle = true
+		}
+	}
+	if !middle {
+		t.Fatal("the bar never showed intermediate progress")
+	}
+}
+
+func TestSizeScanStripRendersAGauge(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "an-item"))
+	m := testModel(t, dir)
+	m.screenHeight = 10
+	m.dimensions()
+	applyEffect(m, m.readTab(m.getTab()))
+
+	m.taskList = []*task{{
+		id:       1,
+		cmd:      newCalcSizeCommand(m.getTab(), []string{dir}),
+		state:    "scanning",
+		readOnly: true,
+		progress: shutil.Progress{Path: dir, Bytes: 4096, Files: 3, Steps: 3, TotalSteps: 4, Scanning: true},
+	}}
+	m.dimensions()
+	backend := catatui.NewTestBackend(100, 10)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(backend.Buffer().String(), "\n")
+	last := lines[len(lines)-1]
+	if !strings.Contains(last, "75%") {
+		t.Fatalf("step percentage missing from the strip: %q", last)
+	}
+	if !strings.Contains(last, "calculate size") {
+		t.Fatalf("scan summary missing from the strip: %q", last)
+	}
+}
+
+func TestGoModeSKeySubmitsAConcurrentSizeTask(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "measured")
+	if err := os.MkdirAll(target, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "data"), bytes.Repeat([]byte{'x'}, 512), 0644); err != nil {
+		t.Fatal(err)
+	}
+	m := testModel(t, dir)
+	applyEffect(m, m.readTab(m.getTab()))
+	for _, it := range m.getPage().getItems() {
+		if it.getName() == "measured" {
+			it.setSelected(true)
+		}
+	}
+
+	keyEvent(m, "g")
+	keyEvent(m, "s")
+	if len(m.taskList) != 1 {
+		t.Fatalf("g+s did not submit a task, taskList has %d", len(m.taskList))
+	}
+	scan := m.taskList[0]
+	if !scan.readOnly {
+		t.Fatal("the size task is not marked read-only, so it would occupy the file queue")
+	}
+	if scan.state == "queued" {
+		t.Fatalf("the size task was queued, state %q", scan.state)
+	}
+	if m.jobs != 1 {
+		t.Fatalf("expected exactly one job registered, got %d", m.jobs)
+	}
+
+	finishTasks(t, m)
+	if m.jobs != 0 {
+		t.Fatalf("job accounting leaked: %d", m.jobs)
+	}
+	for _, it := range m.getPage().getItems() {
+		if it.getName() != "measured" {
+			continue
+		}
+		if file := it.(*filepathItem); file.size != 512 {
+			t.Fatalf("size not applied to the pane: %d (%q)", file.size, file.sizeStr)
+		}
+	}
+}
+
+func TestSizeScanProgressAccumulatesAcrossDirectories(t *testing.T) {
+	dir := t.TempDir()
+	small, large := filepath.Join(dir, "small"), filepath.Join(dir, "large")
+	for _, d := range []string{small, large} {
+		if err := os.MkdirAll(d, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(small, "data"), bytes.Repeat([]byte{'s'}, 128), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(large, "data"), bytes.Repeat([]byte{'l'}, 4096), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := testModel(t, dir)
+	c := newCalcSizeCommand(m.getTab(), []string{small, large})
+	var reports []shutil.Progress
+	if err := c.executeTask(context.Background(), func(p shutil.Progress) {
+		reports = append(reports, p)
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	if c.total != 128+4096 {
+		t.Fatalf("total %d", c.total)
+	}
+	if len(c.results) != 2 {
+		t.Fatalf("expected both directories measured, got %d", len(c.results))
+	}
+	// The counters must carry across directory boundaries rather than restart,
+	// otherwise the strip visibly counts backwards partway through.
+	for i, p := range reports {
+		if i > 0 && (p.Bytes < reports[i-1].Bytes || p.Files < reports[i-1].Files) {
+			t.Fatalf("progress reset at report %d: %+v after %+v", i, p, reports[i-1])
+		}
+	}
+	last := reports[len(reports)-1]
+	if last.Bytes != 128+4096 || last.Files != 2 {
+		t.Fatalf("final report %+v does not cover both directories", last)
+	}
+}
+
+func TestSizeScanRunsBesideFileTasks(t *testing.T) {
+	src, dst := t.TempDir(), t.TempDir()
+	file := filepath.Join(src, "a")
+	touch(t, file)
+	tree := deepTree(t, t.TempDir())
+
+	// The scan is submitted first: the copy must not be stuck behind it.
+	m := testModel(t, src, dst)
+	m.addJob()
+	m.enqueueReadOnly(newCalcSizeCommand(m.getTab(), []string{tree}), "execute")
+	m.addJob()
+	m.enqueue(newFileActionCommand(copyFileAction, []string{file}, dst, false), "execute")
+	if m.taskList[0].state == "queued" {
+		t.Fatal("read-only scan was queued")
+	}
+	if m.taskList[1].state == "queued" {
+		t.Fatal("file task queued behind a read-only scan")
+	}
+	if !m.mutatingPending() {
+		t.Fatal("the copy should count as pending file work")
+	}
+	finishTasks(t, m)
+	if m.jobs != 0 {
+		t.Fatalf("job accounting leaked: %d", m.jobs)
+	}
+	if !shutil.PathExists(filepath.Join(dst, "a")) {
+		t.Fatal("the copy did not run")
+	}
+
+	// And the mirror ordering: a running copy must not delay a scan.
+	m2 := testModel(t, src, dst)
+	m2.addJob()
+	m2.enqueue(newFileActionCommand(copyFileAction, []string{file}, dst, false), "execute")
+	m2.addJob()
+	m2.enqueueReadOnly(newCalcSizeCommand(m2.getTab(), []string{tree}), "execute")
+	if m2.taskList[1].state == "queued" {
+		t.Fatal("scan queued behind a running file task")
+	}
+	finishTasks(t, m2)
+	if m2.jobs != 0 {
+		t.Fatalf("job accounting leaked: %d", m2.jobs)
+	}
+}
+
+func TestSizeScanCancelDoesNotBlockUndo(t *testing.T) {
+	dir := t.TempDir()
+	tree := deepTree(t, filepath.Join(dir, "tree"))
+	m := testModel(t, dir, t.TempDir())
+	applyEffect(m, m.readTab(m.getTab()))
+	m.addJob()
+	m.enqueueReadOnly(newCalcSizeCommand(m.getTab(), []string{tree}), "execute")
+
+	// A read-only scan must not stand in the way of undo/redo.
+	if m.mutatingPending() {
+		t.Fatal("a size scan counts as pending file work")
+	}
+
+	m.taskView, m.taskCursor = true, 0
+	keyEvent(m, "c")
+	if m.taskList[0].state != "cancelling" {
+		t.Fatalf("c did not cancel the scan, state %q", m.taskList[0].state)
+	}
+	finishTasks(t, m)
+	// The worker may have finished before the cancel landed, so either terminal
+	// state is legitimate; what matters is that the bookkeeping is clean.
+	if s := m.taskList[0].state; s != "cancelled" && s != "completed" {
+		t.Fatalf("unexpected terminal state %q", s)
+	}
+	if m.tasksPending() || m.jobs != 0 {
+		t.Fatalf("cancelled scan left bookkeeping behind: pending=%v jobs=%d", m.tasksPending(), m.jobs)
+	}
+}
+
 func TestBackgroundQueueUniqueNamesAndUndoRedo(t *testing.T) {
 	src, dst := t.TempDir(), t.TempDir()
 	file := filepath.Join(src, "a")

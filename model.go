@@ -73,8 +73,11 @@ type model struct {
 	hoverTabPane, hoverTabIndex int
 	hoverPathPane, hoverPathX   int
 
-	help       int
-	helpFilter string
+	help         int
+	helpLines    int // total help lines from the last render, for scroll clamping
+	helpChrome   int // columns reserved beside the text for the scrollbar lane
+	helpDragging bool
+	helpFilter   string
 
 	yes bool
 	cmd command
@@ -109,6 +112,62 @@ type model struct {
 	themeCursor int
 
 	result string
+}
+
+// helpViewport is how many documentation lines fit on screen; the last row
+// belongs to the filter prompt.
+func (m *model) helpViewport() int { return max(0, m.height-1) }
+
+// maxHelpScroll is the furthest offset that still shows content, so the help
+// cannot be scrolled off into blank space.
+func (m *model) maxHelpScroll() int { return max(0, m.helpLines-m.helpViewport()) }
+
+// scrollHelp moves the help offset by delta, clamped to the length measured by
+// the last render. Help that has not been drawn yet has no length to clamp
+// against, so the offset moves freely and viewHelp corrects it on the next
+// frame rather than swallowing the keypress.
+func (m *model) scrollHelp(delta int) int {
+	next := max(0, m.help+delta)
+	if m.helpLines == 0 {
+		return next
+	}
+	return min(next, m.maxHelpScroll())
+}
+
+// helpScrollbarColumn is the screen column the help scrollbar occupies. The
+// help view wraps one column narrower to leave it free.
+func (m *model) helpScrollbarColumn() int { return m.screenWidth - 1 }
+
+// helpThumbLength mirrors the scrollbar widget's thumb sizing so a dragged
+// cursor row can be mapped back to a scroll offset.
+func (m *model) helpThumbLength() int {
+	track := m.helpViewport()
+	extent := m.maxHelpScroll() + track
+	if track <= 0 || extent <= 0 {
+		return max(track, 0)
+	}
+	length := (track*track + extent/2) / extent
+	return min(max(length, 1), track)
+}
+
+// helpOffsetForRow maps a row of the scrollbar track to a scroll offset,
+// centring the thumb on the cursor so a grabbed thumb tracks the pointer.
+func (m *model) helpOffsetForRow(row int) int {
+	track := m.helpViewport()
+	span := track - m.helpThumbLength()
+	scroll := m.maxHelpScroll()
+	if span <= 0 || scroll <= 0 {
+		return 0
+	}
+	start := min(max(row-m.helpThumbLength()/2, 0), span)
+	return min((start*scroll+span/2)/span, scroll)
+}
+
+// helpScrollbarHit reports whether a click at x, y landed on the scrollbar.
+func (m *model) helpScrollbarHit(x, y int) bool {
+	return m.helpLines > m.helpViewport() &&
+		x == m.helpScrollbarColumn() &&
+		y >= 0 && y < m.helpViewport()
 }
 
 func (m *model) addJob() {

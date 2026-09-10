@@ -15,6 +15,56 @@ import (
 	"mc/internal/event"
 )
 
+// runShellCommand runs a command line in the current tab's directory, expanding
+// the #sl macro against whatever is selected right now. Repeating a command
+// therefore applies it to the current selection, not the one it first ran on.
+func (m *model) runShellCommand(cmdText string) event.Cmd {
+	cmd := exec.Command(SHELL, "/C", strings.Join(m.shellArgs(cmdText), " "))
+	dir := m.getTab().dir
+	cmd.Dir = dir
+	return runCmd(cmd, dir)
+}
+
+// shellArgs splits a command line and expands the #sl macro into the selected
+// paths, quoting any that contain spaces.
+func (m *model) shellArgs(cmdText string) []string {
+	tokens := strings.Split(cmdText, " ")
+	args := make([]string, 0, len(tokens))
+	for i := range tokens {
+		switch tokens[i] {
+		case "#sl":
+			paths := m.getPaths()
+			for j := range paths {
+				if strings.Contains(paths[j], " ") {
+					paths[j] = fmt.Sprintf(`"%s"`, paths[j])
+				}
+			}
+			args = append(args, paths...)
+		default:
+			args = append(args, tokens[i])
+		}
+	}
+	return args
+}
+
+// handleRepeatShell reruns the most recent shell command. History is read from
+// disk because it is written there on every run but only loaded into the model
+// when Shell mode opens, so the copy in memory can be a command behind.
+func (m *model) handleRepeatShell() (event.Model, event.Cmd) {
+	history, err := loadShellHistory()
+	if err != nil {
+		return m, m.addMessage(msgError, fmt.Sprintf("failed to load shell history: %s", err))
+	}
+	if len(history) == 0 {
+		return m, m.addMessage(msgError, "no shell history")
+	}
+	cmdText := history[0]
+	return m, event.Batch(
+		m.addMessage(msgInfo, "repeating: "+cmdText),
+		m.runShellCommand(cmdText),
+	)
+}
+
 func (m *model) handleQuit(result bool) (event.Model, event.Cmd) {
 	if m.hasJobs() {
 		m.quitting = true
@@ -222,9 +272,8 @@ func (m *model) handleWheel(steps int) (event.Model, event.Cmd) {
 				min(m.logStart, len(m.log)-m.height))
 		}
 		return m, nil
-	case helpMode:
-		m.help += steps
-		m.help = max(0, m.help)
+	case helpMode, helpFilterMode:
+		m.help = m.scrollHelp(steps)
 		return m, nil
 	case searchMode:
 		m.search.start += steps

@@ -66,6 +66,16 @@ type MouseWheelMsg Mouse
 
 func (m MouseWheelMsg) Mouse() Mouse { return Mouse(m) }
 
+// MouseDragMsg is the pointer moving with a button held down.
+type MouseDragMsg Mouse
+
+func (m MouseDragMsg) Mouse() Mouse { return Mouse(m) }
+
+// MouseUpMsg is the button being released, which ends any drag in progress.
+type MouseUpMsg Mouse
+
+func (m MouseUpMsg) Mouse() Mouse { return Mouse(m) }
+
 type MouseHoverMsg struct {
 	Pane, Index int
 	Search      bool

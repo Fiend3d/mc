@@ -8,6 +8,7 @@ import (
 	"github.com/Fiend3d/catatui/widgets"
 	"github.com/dustin/go-humanize"
 	"mc/internal/paint"
+	"mc/shutil"
 	"strings"
 )
 
@@ -45,6 +46,15 @@ func (m *model) draw(f *catatui.Frame) {
 		var text string
 		switch m.mode {
 		case helpMode, helpFilterMode:
+			// The help body does not reach the scrollbar lane or its gutter, so
+			// give the whole area the body background first. Left on the
+			// frame-wide empty style they read as a stripe down the edge.
+			f.Buffer().SetStyle(content, m.theme.baseStyle.Native())
+			// Wrap two columns narrower: one for the scrollbar's lane and one
+			// as a gutter so long lines do not touch it. The title still
+			// centres over the whole width so it looks centred on screen.
+			m.helpChrome = min(2, int(area.Width)-1)
+			m.width = max(1, int(area.Width)-m.helpChrome)
 			text = viewHelp(m)
 		case messagesMode:
 			text = viewMessages(m)
@@ -56,6 +66,9 @@ func (m *model) draw(f *catatui.Frame) {
 			text = viewSearch(m)
 		}
 		textAt(f, content, text)
+		if m.mode == helpMode || m.mode == helpFilterMode {
+			m.drawHelpScrollbar(f, content)
+		}
 		m.width, m.height = savedWidth, savedHeight
 	default:
 		for i, p := range m.panes {
@@ -368,30 +381,94 @@ func taskSummary(t *task) string {
 	s := fmt.Sprintf("#%d %s%s · %s", t.id, action, t.cmd, t.state)
 	if p.Total > 0 {
 		s += fmt.Sprintf(" · %.0f%% %s/%s", min(100, float64(p.Bytes)*100/float64(p.Total)), humanize.Bytes(uint64(p.Bytes)), humanize.Bytes(uint64(p.Total)))
+	} else if p.Bytes > 0 || p.Files > 0 {
+		// A size walk cannot know its byte total in advance, so it reports the
+		// running counts here and takes its percentage from the step count.
+		s += fmt.Sprintf(" · %s in %d files", humanize.Bytes(uint64(p.Bytes)), p.Files)
 	}
 	if p.TotalFiles > 0 {
 		s += fmt.Sprintf(" · %d/%d files", p.Files, p.TotalFiles)
 	}
+	if p.Total == 0 && p.TotalSteps > 0 {
+		s += fmt.Sprintf(" · %.0f%%", min(100, float64(p.Steps)*100/float64(p.TotalSteps)))
+	}
 	return s
 }
+// taskRatio reports how full the gauge should be, and whether the task can be
+// measured at all. Transfers divide bytes by a known total; a size walk has no
+// byte total, so it falls back to finished top-level entries -- coarse, but it
+// advances for real.
+// drawHelpScrollbar draws the help viewport's scrollbar down the reserved
+// right-hand column. Help that fits on one screen gets no scrollbar at all.
+func (m *model) drawHelpScrollbar(f *catatui.Frame, content catatui.Rect) {
+	viewport := int(content.Height) - 1 // the last row is the filter prompt
+	if viewport <= 0 || m.helpLines <= viewport || content.Width == 0 {
+		return
+	}
+	// The widget derives its extent from contentLength-1+viewport, so it wants
+	// the number of scroll positions rather than the number of lines. Passing
+	// that makes the extent the real line count and lands the thumb flush with
+	// the bottom of the track at maximum scroll.
+	state := widgets.NewScrollbarState(m.maxHelpScroll() + 1).
+		Position(m.help).
+		ViewportContentLength(viewport)
+	// Track and thumb share the body background: differing backgrounds make the
+	// column change colour as the thumb resizes and moves.
+	bar := widgets.NewScrollbar(widgets.ScrollbarVerticalRight).
+		TrackStyle(m.theme.baseStyle.Foreground(m.theme.grayColor).Native()).
+		ThumbStyle(m.theme.baseStyle.Foreground(m.theme.accentColor3).Native()).
+		BeginSymbolNone().
+		EndSymbolNone()
+	area := catatui.NewRect(content.X, content.Y, content.Width, uint16(viewport))
+	catatui.RenderStatefulWidgetOn(f, bar, area, &state)
+}
+
+func taskRatio(p shutil.Progress) (float64, bool) {
+	switch {
+	case p.Total > 0 && !p.Scanning:
+		return min(1, float64(p.Bytes)/float64(p.Total)), true
+	case p.TotalSteps > 0:
+		return min(1, float64(p.Steps)/float64(p.TotalSteps)), true
+	}
+	return 0, false
+}
+
 func (m *model) drawTaskStrip(f *catatui.Frame, a catatui.Rect) {
-	text := ""
+	// File work owns the strip because it has a real gauge; a read-only scan
+	// takes it only when nothing is being modified. The rest are counted.
+	var primary, readOnly *task
+	active := 0
 	for _, t := range m.taskList {
-		if t.state == "running" || t.state == "scanning" || t.state == "cancelling" {
-			text = taskSummary(t)
-			if t.progress.Total > 0 && !t.progress.Scanning {
-				ratio := min(1, float64(t.progress.Bytes)/float64(t.progress.Total))
-				f.RenderWidget(widgets.NewGauge().Ratio(ratio).
-					Label(truncate(text, int(a.Width))).
-					GaugeStyle(m.theme.baseStyle.Foreground(m.theme.accentColor3).Native()), a)
-				return
+		if t.state != "running" && t.state != "scanning" && t.state != "cancelling" {
+			continue
+		}
+		active++
+		if t.readOnly {
+			if readOnly == nil {
+				readOnly = t
 			}
-			break
+		} else if primary == nil {
+			primary = t
 		}
 	}
-	if text != "" {
-		textAt(f, a, m.theme.baseStyle.Foreground(m.theme.accentColor3).Width(int(a.Width)).Render(text))
+	if primary == nil {
+		primary = readOnly
 	}
+	if primary == nil {
+		return
+	}
+	text := taskSummary(primary)
+	if active > 1 {
+		text += fmt.Sprintf(" · +%d more", active-1)
+	}
+	ratio, measured := taskRatio(primary.progress)
+	if measured {
+		f.RenderWidget(widgets.NewGauge().Ratio(ratio).
+			Label(truncate(text, int(a.Width))).
+			GaugeStyle(m.theme.baseStyle.Foreground(m.theme.accentColor3).Native()), a)
+		return
+	}
+	textAt(f, a, m.theme.baseStyle.Foreground(m.theme.accentColor3).Width(int(a.Width)).Render(text))
 }
 func (m *model) drawTasks(f *catatui.Frame, a catatui.Rect) {
 	textAt(f, catatui.NewRect(0, 0, a.Width, 1), m.theme.baseStyle.Bold(true).Render("Tasks · c: cancel · Esc: return"))

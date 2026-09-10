@@ -4,7 +4,7 @@ go 1.27.0
 
 require (
 	github.com/BurntSushi/toml v1.6.0
-	github.com/Fiend3d/catatui v0.0.0
+	github.com/Fiend3d/catatui v0.1.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/dustin/go-humanize v1.0.1
@@ -27,5 +27,3 @@ require (
 	golang.org/x/mobile v0.0.0-20260611195102-4dd8f1dbf5d2 // indirect
 	golang.org/x/term v0.45.0 // indirect
 )
-
-replace github.com/Fiend3d/catatui => ../catatui

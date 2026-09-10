@@ -13,7 +13,6 @@ import (
 	"mc/shutil"
 	"mc/widgets/textinput"
 
-	"github.com/dustin/go-humanize"
 	"mc/internal/event"
 )
 
@@ -113,28 +112,6 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 
 	case processDoneMsg:
 		return m, m.update(msg.dir)
-
-	case calcDirSizeMsg:
-		m.jobDone()
-		tab := msg.target
-		if tab != nil && tab.page == msg.page {
-			items := tab.page.getItems()
-			sizes := make(map[string]uint64, len(msg.dirSizes))
-			for i := range msg.dirSizes {
-				sizes[msg.dirSizes[i].path] = msg.dirSizes[i].size
-			}
-			for j := range items {
-				size, ok := sizes[items[j].getFullPath()]
-				if !ok {
-					continue
-				}
-				if item, ok := items[j].(*filepathItem); ok {
-					item.size = size
-					item.sizeStr = humanize.Bytes(size)
-				}
-			}
-		}
-		return m, m.addMessage(msgDone, fmt.Sprintf("total size: %s", humanize.Bytes(msg.total)))
 
 	case searchTickMsg:
 		if !m.search.working {
@@ -342,6 +319,16 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		}
 		return m, nil
 
+	case event.MouseDragMsg:
+		if m.helpDragging {
+			m.help = m.helpOffsetForRow(msg.Mouse().Y)
+		}
+		return m, nil
+
+	case event.MouseUpMsg:
+		m.helpDragging = false
+		return m, nil
+
 	case event.MouseWheelMsg:
 		m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
 		m.hoverTabPane, m.hoverTabIndex, m.hoverPathPane, m.hoverPathX = -1, -1, -1, -1
@@ -359,6 +346,12 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		case event.MouseLeft:
 			m.click = newClick(data.X, data.Y, &m.click)
 			switch m.mode {
+			case helpMode, helpFilterMode:
+				if m.helpScrollbarHit(m.click.x, m.click.y) {
+					m.helpDragging = true
+					m.help = m.helpOffsetForRow(m.click.y)
+				}
+				return m, nil
 			case normalMode, jumpMode:
 				if m.click.y == 0 {
 					m.finishRangeSelection()
@@ -599,23 +592,23 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 					return m, m.addMessage(msgError, "please select at least one directory")
 				}
 				m.addJob()
-				return m, event.Batch(calculateSize(m.getTab(), paths), m.spinner.Tick)
+				return m, event.Batch(m.enqueueReadOnly(newCalcSizeCommand(m.getTab(), paths), "execute"), m.spinner.Tick)
 			}
 
 		case helpMode:
 			switch msg.String() {
 			case "esc":
 				m.mode = normalMode
+				m.helpDragging = false
 				return m, nil
 			case "j", "down":
-				m.help++
+				m.help = m.scrollHelp(1)
 				return m, nil
 			case "k", "up":
-				m.help--
-				m.help = max(0, m.help)
+				m.help = m.scrollHelp(-1)
 				return m, nil
 			case "pgdown":
-				m.help += (m.height - 1) / 2
+				m.help = m.scrollHelp((m.height - 1) / 2)
 				return m, nil
 			case "pgup":
 				m.help -= (m.height - 1) / 2
@@ -650,6 +643,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				m.mode = helpMode
 				m.help = 0
 				m.helpFilter = ""
+				m.helpDragging = false
 				return m, nil
 			case "Q":
 				return m.handleQuit(false)
@@ -859,6 +853,8 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				m.mode = searchMode
 				return m, m.search.blink()
 
+			case ";":
+				return m.handleRepeatShell()
 			case ":":
 				shellHistory, err := loadShellHistory()
 				if err != nil {
@@ -1049,26 +1045,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				if err != nil {
 					return m, m.addMessage(msgError, fmt.Sprintf("failed to save shell history: %s", err))
 				}
-				tokens := strings.Split(cmdText, " ")
-				args := make([]string, 0)
-				for i := range tokens {
-					switch tokens[i] {
-					case "#sl":
-						paths := m.getPaths()
-						for j := range paths {
-							if strings.Contains(paths[j], " ") {
-								paths[j] = fmt.Sprintf(`"%s"`, paths[j])
-							}
-						}
-						args = append(args, paths...)
-					default:
-						args = append(args, tokens[i])
-					}
-				}
-				cmd := exec.Command(SHELL, "/C", strings.Join(args, " "))
-				dir := m.getTab().dir
-				cmd.Dir = dir
-				return m, runCmd(cmd, dir)
+				return m, m.runShellCommand(cmdText)
 			}
 
 		case jumpMode:
