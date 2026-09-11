@@ -81,6 +81,7 @@ type MouseHoverMsg struct {
 	Search      bool
 	Tab         bool
 	Path        bool
+	Git         bool
 	X           int
 }
 

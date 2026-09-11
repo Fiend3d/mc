@@ -51,6 +51,20 @@ func (q refreshQueue) drain(m *model, now time.Time) []event.Cmd {
 	return cmds
 }
 
+// liveTab reports whether an async result still belongs to the tab it was
+// started for: the tab is still held by a pane, and has neither navigated nor
+// been handed a new page since the work began.
+func (m *model) liveTab(t *tab, dir string, page *page) bool {
+	for _, p := range m.panes {
+		for _, candidate := range p.tabs {
+			if candidate == t {
+				return t.dir == dir && t.page == page
+			}
+		}
+	}
+	return false
+}
+
 // Compare raw metadata independently of sorting, selections and calculated
 // directory sizes, so periodic safety reads do not disrupt an active range.
 func unchangedListing(old, fresh []item) bool {
@@ -70,6 +84,7 @@ func unchangedListing(old, fresh []item) bool {
 			}
 			x, y := *a, *b
 			x.selected, y.selected = false, false
+			x.git, y.git = gitNone, gitNone
 			if x.isDir && y.isDir {
 				x.size, y.size, x.sizeStr, y.sizeStr = 0, 0, "", ""
 			}

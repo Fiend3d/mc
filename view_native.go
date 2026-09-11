@@ -39,7 +39,7 @@ func (m *model) draw(f *catatui.Frame) {
 		return
 	}
 	switch m.mode {
-	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode:
+	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode, gitListMode:
 		savedWidth, savedHeight := m.width, m.height
 		m.width = int(area.Width)
 		m.height = int(content.Height)
@@ -64,6 +64,8 @@ func (m *model) draw(f *catatui.Frame) {
 			text = viewTabs(m)
 		case searchMode:
 			text = viewSearch(m)
+		case gitListMode:
+			text = viewGitList(m)
 		}
 		textAt(f, content, text)
 		if m.mode == helpMode || m.mode == helpFilterMode {
@@ -123,16 +125,43 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 	if path == "" {
 		path = "This PC"
 	}
+	pathWidth, summary := gitPathLane(t, int(a.Width), active && m.mode == pathMode)
+	// The two lanes of the row never light up together. A breadcrumb component
+	// is measured before the path is truncated, so a long path leaves cut-off
+	// components sitting under the summary's columns; without this they would
+	// highlight from a pointer that is nowhere near them.
+	pathHover, summaryHover := -1, -1
+	if m.hoverPathPane == paneIndex {
+		if m.hoverPathX < pathWidth {
+			pathHover = m.hoverPathX
+		} else {
+			summaryHover = m.hoverPathX
+		}
+	}
 	if active && m.mode == pathMode {
 		path = m.pathInput.View()
 	} else {
-		hoverX := -1
-		if m.hoverPathPane == paneIndex {
-			hoverX = m.hoverPathX
+		hoverX := pathHover
+		rootEnd := -1
+		if t.git != nil {
+			// The root is a prefix of the directory by construction, so its
+			// length is where the component that names the repository ends.
+			rootEnd = len(t.git.root)
 		}
-		path = colorizeDirHover(path, style.Bold(true).Foreground(m.theme.whiteColor), style.Bold(true).Foreground(m.theme.accentColor5), style.Bold(true).Foreground(m.theme.whiteColor), int(a.Width), hoverX)
+		path = colorizeDirRoot(path,
+			style.Bold(true).Foreground(m.theme.whiteColor),
+			style.Bold(true).Foreground(m.theme.accentColor5),
+			style.Bold(true).Foreground(m.theme.whiteColor),
+			style.Bold(true).Foreground(m.gitRootColor(t.git)),
+			rootEnd, pathWidth, hoverX)
 	}
 	textAt(f, catatui.NewRect(a.X, 1, a.Width, 1), path)
+	if summary != "" {
+		// Right-aligned, so it stays put while the path grows and shrinks
+		// underneath it.
+		lane := catatui.NewRect(a.X+uint16(pathWidth), 1, a.Width-uint16(pathWidth), 1)
+		textAt(f, lane, style.Width(int(lane.Width)).Align(paint.Right).Render(m.gitSummary(t, int(a.Width), summaryHover)))
+	}
 	rows := int(a.Height) - 4
 	settings := t.getPageSettings()
 	items := t.page.getItems()
@@ -185,6 +214,19 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 			} else if strings.HasSuffix(strings.ToLower(it.getName()), ".exe") {
 				nameStyle = s.Foreground(m.theme.greenColor)
 			}
+			// The git column is only taken when the directory is in a
+			// repository, so listings elsewhere keep every column they have.
+			git := ""
+			if t.git != nil {
+				state := gitNone
+				if file, ok := it.(*filepathItem); ok {
+					state = file.git
+				}
+				git = s.Bold(true).Foreground(m.gitColor(state)).Render(state.letter()) + s.Render(" ")
+				if state != gitNone {
+					nameStyle = s.Foreground(m.gitColor(state))
+				}
+			}
 			name = nameStyle.Render(name)
 			if it.isDirectory() {
 				name += s.Bold(true).Render("/")
@@ -204,8 +246,8 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 			if a.Width >= 65 {
 				metadata += s.Foreground(m.theme.grayColor).Render(" " + it.getModTime().Format("02.01.06 15:04"))
 			}
-			nameWidth := max(1, int(a.Width)-3-paint.Width(metadata))
-			line = action + cursor + mark + paint.PlaceHorizontal(nameWidth, paint.Left, truncate(name, nameWidth)) + metadata
+			nameWidth := max(1, int(a.Width)-3-paint.Width(git)-paint.Width(metadata))
+			line = action + cursor + mark + git + paint.PlaceHorizontal(nameWidth, paint.Left, truncate(name, nameWidth)) + metadata
 		} else if items == nil && row == 0 {
 			line = "Loading…"
 		}
@@ -237,6 +279,9 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 			} else if len(items) > 0 {
 				it := items[settings.cursor]
 				footer = it.getName() + "  " + it.getExtra()
+				if file, ok := it.(*filepathItem); ok && file.git != gitNone {
+					footer += "  " + file.git.name()
+				}
 				if drive, ok := it.(*driveItem); ok {
 					footer = fmt.Sprintf("%s free / %s · %s", humanize.Bytes(drive.free), humanize.Bytes(drive.total), drive.driveType)
 				}
@@ -244,6 +289,104 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 		}
 	}
 	textAt(f, catatui.NewRect(a.X, a.Height-1, a.Width, 1), footer)
+}
+
+// gitPathLane splits the path row in two: the breadcrumb keeps the left, the
+// repository summary takes the right. A pane with no room for both keeps the
+// path whole -- knowing where you are outranks knowing the branch -- and so
+// does one whose path row has been taken over by Path mode.
+func gitPathLane(t *tab, width int, editing bool) (int, string) {
+	if t.git == nil || editing {
+		return width, ""
+	}
+	summary := t.git.summary()
+	if summary == "" {
+		return width, ""
+	}
+	lane := paint.Width(summary) + 1
+	if width-lane < gitPathMin {
+		return width, ""
+	}
+	return width - lane, summary
+}
+
+// gitPathMin is the narrowest the breadcrumb may be squeezed to before the
+// summary gives up its lane.
+const gitPathMin = 24
+
+// gitSummaryStart is the column the summary's first character lands on: the
+// lane is right-aligned, so the text hugs the end of the row. Hit testing and
+// rendering both measure from here, and it is the one place the alignment is
+// assumed.
+func gitSummaryStart(t *tab, width int) int {
+	return width - paint.Width(t.git.summary())
+}
+
+// gitSummaryAtX reports the tally whose text covers x on the path row, the way
+// paneTabAtX reports the tab under a click. gitNone means nothing clickable is
+// there -- the branch, an arrow, or somewhere else on the row entirely.
+func gitSummaryAtX(t *tab, width, x int) gitState {
+	if _, summary := gitPathLane(t, width, false); summary == "" {
+		return gitNone // no lane on this row, so nothing on it to hit
+	}
+	position := gitSummaryStart(t, width)
+	for _, segment := range t.git.segments() {
+		segmentWidth := paint.Width(segment.text)
+		if segment.tally != gitNone && x >= position && x < position+segmentWidth {
+			return segment.tally
+		}
+		position += segmentWidth
+	}
+	return gitNone
+}
+
+// gitSummary renders the summary segment by segment so the tally under the
+// pointer can light up on its own. It lights up the way a breadcrumb component
+// does -- the text turns white, the background stays where it is -- because
+// both are the same gesture: pointing at something on the path row that a
+// click will act on.
+func (m *model) gitSummary(t *tab, width, hoverX int) string {
+	base := m.theme.emptyStyle.Foreground(m.gitRootColor(t.git))
+	position := gitSummaryStart(t, width)
+	var out strings.Builder
+	for _, segment := range t.git.segments() {
+		segmentWidth := paint.Width(segment.text)
+		style := base
+		if segment.tally != gitNone && hoverX >= position && hoverX < position+segmentWidth {
+			style = m.theme.emptyStyle.Bold(true).Foreground(m.theme.whiteColor)
+		}
+		out.WriteString(style.Render(segment.text))
+		position += segmentWidth
+	}
+	return out.String()
+}
+
+// gitRootColor colours the component of the path that names the repository,
+// and the summary beside it: a work tree with changes in it takes an accent of
+// its own, a clean one goes green. The path's own colour is accentColor5, so
+// the mark has to come from somewhere else to be seen at all.
+func (m *model) gitRootColor(info *gitInfo) color.Color {
+	if info.dirty() {
+		return m.theme.accentColor1
+	}
+	return m.theme.greenColor
+}
+
+// gitColor gives each state its colour: what is staged reads green, changed
+// work yellow, trouble red, and anything git is not tracking stays gray.
+func (m *model) gitColor(state gitState) color.Color {
+	switch state {
+	case gitConflicted, gitDeleted:
+		return m.theme.redColor
+	case gitModified:
+		return m.theme.accentColor5
+	case gitAdded, gitRenamed:
+		return m.theme.greenColor
+	case gitUntracked:
+		return m.theme.accentColor2
+	}
+	// Ignored entries, and anything git says nothing about, stay quiet.
+	return m.theme.grayColor
 }
 
 // drawEmptyPane paints a pane that holds no tabs. It keeps the pane's half of
@@ -349,7 +492,7 @@ func (m *model) drawMode(f *catatui.Frame, a catatui.Rect) {
 		}
 		m.dialog(f, a, "Confirm", fmt.Sprintf("%s\n%s\n%s\ny: confirm    n / Esc: cancel", m.cmd, detail, choice))
 	case goMode:
-		m.dialog(f, a, "Go", "g  Change path\nt  Tabs\nT  Theme\nc  Config directory\nC  Save config\ns  Calculate size")
+		m.dialog(f, a, "Go", "g  Change path      m  Modified files\nt  Tabs             u  Untracked files\nT  Theme            a  Added files\nc  Config directory\nC  Save config\ns  Calculate size")
 	case sortMode:
 		m.dialog(f, a, "Sort", "m  Modified time    a  Alphabetical\nn  Normal           e  Extension\ns  Size             r  Random\nUppercase reverses order")
 	case copyMode:
@@ -640,7 +783,7 @@ func (m *model) dimensions() {
 	}
 	m.height = max(4, m.screenHeight-1-reservedRows)
 	switch m.mode {
-	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode:
+	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode, gitListMode:
 		m.width = max(1, m.screenWidth)
 		m.height = max(4, m.screenHeight-reservedRows)
 	}

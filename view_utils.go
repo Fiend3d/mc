@@ -11,16 +11,29 @@ func colorizeDir(dir string, sepStyle paint.Style, dirStyle paint.Style, width i
 }
 
 func colorizeDirHover(dir string, sepStyle, dirStyle, hoverStyle paint.Style, width, hoverX int) string {
+	return colorizeDirRoot(dir, sepStyle, dirStyle, hoverStyle, dirStyle, -1, width, hoverX)
+}
+
+// colorizeDirRoot renders a breadcrumb with one component -- the one ending at
+// byte offset rootEnd, which is where a repository begins -- in a style of its
+// own, so the path itself says which part of it is the work tree. A negative
+// rootEnd marks no component at all.
+func colorizeDirRoot(dir string, sepStyle, dirStyle, hoverStyle, rootStyle paint.Style, rootEnd, width, hoverX int) string {
 	var dirBuilder strings.Builder
 	component := strings.Builder{}
 	x := 0
-	flush := func() {
+	flush := func(end int) {
 		text := component.String()
 		if text == "" {
 			return
 		}
 		style := dirStyle
+		if end == rootEnd {
+			style = rootStyle
+		}
 		componentWidth := paint.Width(text)
+		// Hovering outranks the root mark: the pointer has to keep showing
+		// what a click would do.
 		if hoverX >= x && hoverX < x+componentWidth {
 			style = hoverStyle
 		}
@@ -28,16 +41,16 @@ func colorizeDirHover(dir string, sepStyle, dirStyle, hoverStyle paint.Style, wi
 		x += componentWidth
 		component.Reset()
 	}
-	for _, r := range dir {
+	for i, r := range dir {
 		if r == '/' || r == '\\' {
-			flush()
+			flush(i)
 			dirBuilder.WriteString(sepStyle.Render(string(r)))
 			x++
 		} else {
 			component.WriteRune(r)
 		}
 	}
-	flush()
+	flush(len(dir))
 	return truncate(dirBuilder.String(), width)
 }
 

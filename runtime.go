@@ -345,6 +345,9 @@ func (m *model) inputEvent(e term.Event) event.Msg {
 				return event.MouseUpMsg{X: x, Y: y, Button: event.MouseLeft}
 			}
 		}
+		if m.mode == gitListMode && e.MouseKind == term.MouseMove {
+			return event.MouseHoverMsg{Index: m.gitListRowAtY(y), Git: true}
+		}
 		if m.mode == searchMode && e.MouseKind == term.MouseMove {
 			index := y - 3 + m.search.start
 			if y >= 3 && y < m.height-2 && index >= 0 && index < m.search.length() {

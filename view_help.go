@@ -218,7 +218,7 @@ func viewHelp(m *model) string {
 		{"", "An empty pane keeps its half of the screen; T, b or gg fill it again."},
 		{"Shift+Left/Right", "Copy the current tab to the left or right pane, staying where you are."},
 		{"Y / X", "Copy or move to the other pane, with an editable destination."},
-		{"w", "Show background tasks; press c to cancel the highlighted one."},
+		{"w", "Enter Tasks mode, which lists this session's background work."},
 		{"f", "Enter Filter mode, which narrows the current tab to matching items."},
 		{"c", "Enter Copy mode, which copies the paths and names of the selected items to the clipboard."},
 		{"B", "Bookmark the current directory."},
@@ -265,6 +265,44 @@ func viewHelp(m *model) string {
 	}
 	pathDocs := newHelpTopic("Path Mode", pathDocsData, m)
 
+	gitDocsData := [][]string{
+		{"", "Inside a git work tree every entry carries its status in the column before the name." +
+			" The path row names the repository: the directory the work tree starts at is" +
+			" highlighted, coloured while anything is uncommitted and green once nothing is, and" +
+			" the branch, how far it is ahead or behind, and the tallies sit at the end of that" +
+			" row. A directory takes the most serious state of anything inside it, so a change is" +
+			" visible before you descend to it. It needs git on PATH; elsewhere mc never runs it." +
+			" Set git = false in config.toml to turn it off."},
+		{"M", "Modified."},
+		{"A", "Added to the index."},
+		{"D", "Deleted."},
+		{"R", "Renamed or copied."},
+		{"U", "Conflicted -- a merge left it unresolved."},
+		{"?", "Untracked."},
+		{"", "Ignored entries get no letter: they are dimmed instead, which is quieter than a" +
+			" column of marks beside every build artefact."},
+		{"+N ~N ?N", "The tallies on the path row are buttons. Point at one to light it up, click it" +
+			" for the list of exactly those files, anywhere in the repository."},
+		{"gm, gu, ga", "The same three lists from the keyboard: modified, untracked, added."},
+		{"", "In the list: j and k move, enter jumps to the file and leaves it, F2 to F12 run their" +
+			" tools on the highlighted one, and Esc closes it. A double click does what enter does."},
+	}
+	gitDocs := newHelpTopic("Git", gitDocsData, m)
+
+	tasksDocsData := [][]string{
+		{"", "The work this session has started in the background: copies, moves, deletions and size" +
+			" scans, each with its state and how far it has got. The file the selected task is on," +
+			" or the error that stopped it, is spelled out underneath. Enter this mode from Normal" +
+			" mode with w. While something is running the bottom row already carries a gauge for" +
+			" it, so the list is for everything else."},
+		{"j, down", "Move the cursor down."},
+		{"k, up", "Move the cursor up."},
+		{"c", "Cancel the selected task: a queued one never starts, a running one stops where it got to."},
+		{"", "Quitting while tasks are unfinished asks first, and cancels them all if you agree."},
+		{"w, Esc", "Return to Normal mode."},
+	}
+	tasksDocs := newHelpTopic("Tasks Mode", tasksDocsData, m)
+
 	searchDocsData := [][]string{
 		{"", "Search the current tab's directory tree for files by name, for text inside them, or" +
 			" for both at once. The search runs in the background and lists matches as it finds them."},
@@ -289,7 +327,7 @@ func viewHelp(m *model) string {
 	}
 	shellDocs := newHelpTopic("Shell Mode", shellDocsData, m)
 
-	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &searchDocs, &shellDocs}
+	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &tasksDocs, &searchDocs, &shellDocs, &gitDocs}
 	keyWidth := helpKeyColumn(topics)
 	for _, topic := range topics {
 		docs = addTopic(docs, topic, m, keyWidth)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -10,7 +11,10 @@ import (
 
 type tab struct {
 	readGeneration uint64
+	gitGeneration  uint64
 	pendingReads   int
+	git            *gitInfo
+	gitCancel      context.CancelFunc
 	lastReadError  string
 	sortMethod     sortMethod
 	sortReverse    bool

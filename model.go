@@ -35,6 +35,7 @@ const (
 	copyMode
 	bookmarksMode
 	searchMode
+	gitListMode
 	shellMode
 	themeMode
 	transferMode
@@ -104,8 +105,10 @@ type model struct {
 	logStart int
 	ticks    int
 
-	bm     *bookmarks
-	search *search
+	bm       *bookmarks
+	search   *search
+	gitList  gitList
+	hoverGitIndex int
 
 	theme       *theme
 	themeOld    *theme
@@ -236,8 +239,17 @@ func revealCursor(settings *pageSettings, rows int) {
 }
 
 func (m *model) clearHover() {
+	m.clearItemHover()
+	m.hoverPathPane, m.hoverPathX = -1, -1
+}
+
+// clearItemHover drops only the hover that is an index into something: a row,
+// a tab, a search hit. The path row's hover is an x on the breadcrumb, so a
+// listing that reloads underneath it has no reason to take the highlight away
+// while the pointer has not moved.
+func (m *model) clearItemHover() {
 	m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
-	m.hoverTabPane, m.hoverTabIndex, m.hoverPathPane, m.hoverPathX = -1, -1, -1, -1
+	m.hoverTabPane, m.hoverTabIndex, m.hoverGitIndex = -1, -1, -1
 }
 
 func (m *model) updateTabsStart() {
@@ -309,6 +321,12 @@ func (m *message) render(theme *theme, renderTime bool) string {
 }
 
 func (m *model) getPaths() []string {
+	if m.mode == gitListMode {
+		if entry := m.gitList.current(); entry != nil {
+			return []string{entry.path}
+		}
+		return nil
+	}
 	if m.mode == searchMode {
 		i, _ := m.search.mapIndex(m.search.cursor)
 		if i < 0 || i >= len(m.search.items) {
@@ -539,6 +557,7 @@ func initialModel(dirs []string) model {
 		pane: left, panes: [2]*pane{left, right}, taskEvents: make(chan event.Msg, 128), taskWorkers: &sync.WaitGroup{},
 		hoverPane: -1, hoverIndex: -1, hoverSearchIndex: -1,
 		hoverTabPane: -1, hoverTabIndex: -1, hoverPathPane: -1, hoverPathX: -1,
+		hoverGitIndex: -1,
 		cfg:       cfg,
 		mode:      normalMode,
 		theme:     theme,

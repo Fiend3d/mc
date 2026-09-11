@@ -46,6 +46,9 @@ type filepathItem struct {
 	modTime    time.Time
 	sizeStr    string
 	mode       string
+
+	// git is filled in after the listing, once git has answered.
+	git gitState
 }
 
 func newFilepathItem(clipboardFiles []string, op OpType, entry os.DirEntry, dir string) (*filepathItem, error) {

@@ -195,18 +195,25 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		revealCursor(settings, max(1, m.screenHeight-5))
 		return m, nil
 
+	case gitStatusMsg:
+		// A repository that cannot be read -- mid-rebase, locked, or simply
+		// slower than the timeout -- leaves the previous markers alone rather
+		// than filling the message log with something the user cannot act on.
+		if msg.err != nil || !m.liveTab(msg.target, msg.dir, msg.page) || msg.target.gitGeneration != msg.generation {
+			return m, nil
+		}
+		msg.target.git = msg.info
+		for _, it := range msg.target.page.items {
+			if file, ok := it.(*filepathItem); ok {
+				file.git = msg.info.states[file.fullPath]
+			}
+		}
+		return m, nil
+
 	case readDirMsg:
 		tab := msg.target
 		tab.pendingReads = max(0, tab.pendingReads-1)
-		found := false
-		for _, p := range m.panes {
-			for _, t := range p.tabs {
-				if t == tab {
-					found = true
-				}
-			}
-		}
-		if !found || tab.dir != msg.dir || tab.page != msg.page || tab.readGeneration != msg.generation {
+		if !m.liveTab(tab, msg.dir, msg.page) || tab.readGeneration != msg.generation {
 			return m, nil
 		}
 		if msg.err != nil {
@@ -218,9 +225,11 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		}
 		tab.lastReadError = ""
 		if msg.automatic && unchangedListing(tab.page.items, msg.items) {
-			return m, nil
+			// The listing is the same, but a commit or a staging leaves no
+			// trace in it, so git is asked again all the same.
+			return m, m.readGitStatus(tab)
 		}
-		m.clearHover()
+		m.clearItemHover()
 		settings := tab.getPageSettings()
 		cursor, start := settings.cursor, settings.start
 		cursorPath, topPath := "", ""
@@ -232,6 +241,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 			topPath = previous[start].getFullPath()
 		}
 		selected := map[string]bool{}
+		gitStates := map[string]gitState{}
 		calculatedSizes := map[string]struct {
 			size uint64
 			text string
@@ -239,6 +249,9 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		for _, it := range tab.page.items {
 			if it.isSelected() {
 				selected[it.getFullPath()] = true
+			}
+			if old, ok := it.(*filepathItem); ok && old.git != gitNone {
+				gitStates[old.getFullPath()] = old.git
 			}
 			if old, ok := it.(*filepathItem); ok && old.isDir && old.sizeStr != "" {
 				calculatedSizes[old.getFullPath()] = struct {
@@ -249,8 +262,11 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		}
 		for _, it := range msg.items {
 			it.setSelected(selected[it.getFullPath()])
-			if current, ok := it.(*filepathItem); ok && current.isDir {
-				if saved, ok := calculatedSizes[current.getFullPath()]; ok {
+			if current, ok := it.(*filepathItem); ok {
+				// The markers are carried over so a refresh does not blank the
+				// column for as long as git takes to answer again.
+				current.git = gitStates[current.getFullPath()]
+				if saved, ok := calculatedSizes[current.getFullPath()]; ok && current.isDir {
 					current.size, current.sizeStr = saved.size, saved.text
 				}
 			}
@@ -280,7 +296,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 			settings.sel = nil
 			revealCursor(settings, max(1, m.screenHeight-5))
 		}
-		return m, nil
+		return m, m.readGitStatus(tab)
 
 	case event.WindowSizeMsg:
 		m.width = msg.Width
@@ -288,6 +304,10 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		return m, nil
 
 	case event.MouseHoverMsg:
+		if msg.Git {
+			m.hoverGitIndex = msg.Index
+			return m, nil
+		}
 		if msg.Search {
 			m.hoverSearchIndex = msg.Index
 			m.hoverPane, m.hoverIndex = -1, -1
@@ -355,9 +375,18 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 			case normalMode, jumpMode:
 				if m.click.y == 0 {
 					m.finishRangeSelection()
-					dir := m.getTab().dir
-					if target := breadcrumbAtX(dir, m.click.x, m.width); target != "" {
+					tab := m.getTab()
+					// Hit testing uses the width the breadcrumb was drawn in,
+					// not the pane's: the git summary owns the rest of the row,
+					// and a click there belongs to no component.
+					pathWidth, _ := gitPathLane(tab, m.width, false)
+					if target := breadcrumbAtX(tab.dir, m.click.x, pathWidth); target != "" {
 						return m, m.changeDir(target)
+					}
+					// Past the breadcrumb the row belongs to the git summary,
+					// where each tally stands for a list of files.
+					if tally := gitSummaryAtX(tab, m.width, m.click.x); tally != gitNone {
+						return m.openGitList(tally)
 					}
 				} else if m.click.y < m.height-2 {
 					tab := m.getTab()
@@ -374,6 +403,14 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 						}
 					}
 				}
+			case gitListMode:
+				if index := m.gitListRowAtY(m.click.y); index >= 0 {
+					m.gitList.cursor = index
+					if m.click.doubleClick {
+						return m.gitListJump()
+					}
+				}
+				return m, nil
 			case tabsMode:
 				if m.click.y > 0 &&
 					m.click.y < m.height-1 &&
@@ -593,7 +630,20 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				}
 				m.addJob()
 				return m, event.Batch(m.enqueueReadOnly(newCalcSizeCommand(m.getTab(), paths), "execute"), m.spinner.Tick)
+			case "m", "u", "a":
+				// The same three lists the tallies on the path row open.
+				m.mode = normalMode
+				switch msg.String() {
+				case "m":
+					return m.openGitList(gitModified)
+				case "u":
+					return m.openGitList(gitUntracked)
+				}
+				return m.openGitList(gitAdded)
 			}
+
+		case gitListMode:
+			return m.handleGitList(msg.String())
 
 		case helpMode:
 			switch msg.String() {

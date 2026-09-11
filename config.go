@@ -17,6 +17,7 @@ type ToolConfig struct {
 
 type Config struct {
 	Theme string      `toml:"theme"`
+	Git   bool        `toml:"git"`
 	F2    *ToolConfig `toml:"F2"`
 	F3    *ToolConfig `toml:"F3"`
 	F4    *ToolConfig `toml:"F4"`
@@ -49,6 +50,7 @@ func getConfigPath() string {
 func loadConfig() (*Config, error) {
 	cfg := &Config{
 		Theme: "dracula",
+		Git:   true,
 		F2:    &ToolConfig{Command: "deps", Args: []string{}, Type: "path"},
 		// F3:    &ToolConfig{Command: "bat", Args: []string{"--color=always", "-p", "--pager", "less -c -R -S"}, Type: "path"},
 		F3: &ToolConfig{Command: "koneko", Args: []string{}, Type: "path"},

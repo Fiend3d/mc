@@ -50,6 +50,9 @@ Single Go module (`module mc`), single `package main` plus `widgets/` (spinner, 
 | `commands.go` | Async command wrappers, directory reading, file ops |
 | `commandmanager.go` | Command pattern (undo/redo); delete is NOT undoable |
 | `item.go` | Item interface + 3 implementations: `filepathItem`, `driveItem`, `sharedItem` |
+| `git.go` | Git status for the listing: repository lookup, `git status --porcelain` parsing, roll-up onto directories |
+| `git_list.go` | The overlay behind a path-row tally: a snapshot of the repository's changed files, its cursor and its jump |
+| `view_git.go` | Git list rendering |
 | `search.go` | Full-text/content search with gitignore support |
 | `sort.go` | Sorting methods (modified time, alpha, extension, size, random) |
 | `tab.go` | Tab structure, navigation history, forward/back |
@@ -89,6 +92,7 @@ Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests cover pane
 - Pane/tab state is independent. Async reads carry the target tab, page and generation.
 - A pane may hold zero tabs. `pane.hasTabs()` guards it; the key gate in `Update` (`emptyPaneBlocked`) swallows tab-dependent keys so handlers can keep calling `getTab()`. Use `currentDir()`/`paneDir()` where only a path is needed. An empty pane parks `currentTab` at 0, never -1.
 - Only the UI loop mutates model state; workers send immutable progress/completion events.
+- Git status is read in the background after every directory read and applied through `gitStatusMsg`, guarded by `liveTab` and `tab.gitGeneration` like directory reads. `findRepoRoot` keeps mc from spawning git outside a repository; markers are calculated data, so they are carried across re-reads and excluded from `unchangedListing`. The path row is split by `gitPathLane` — breadcrumb on the left, repository summary on the right — and both `drawPane` and the breadcrumb click handler must size it through that helper or hit testing drifts from what is drawn. The summary is a list of `gitSegment`s: rendering, hover and `gitSummaryAtX` all walk it, so what is clickable is defined once. `gitTally` groups states for both the counters and the lists, which keeps a tally and its list the same length.
 - Themes set via `g -> T`, saved via `g -> C`
 - The right pane's tab directories persist in `tabs.list` beside `config.toml`/`bookmarks.list`; `run` saves them on exit and `initialModel` restores them when no second directory argument is given. The left pane never persists.
 - Binary files in search are detected by null-byte scan (first 8KB); 5MB size limit for text search

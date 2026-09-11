@@ -30,6 +30,15 @@ type readDirMsg struct {
 	automatic  bool
 }
 
+type gitStatusMsg struct {
+	target     *tab
+	generation uint64
+	page       *page
+	dir        string
+	info       *gitInfo
+	err        error
+}
+
 func (m *model) update(dir string) event.Cmd {
 	var cmds []event.Cmd
 	for _, p := range m.panes {
@@ -56,6 +65,37 @@ func (m *model) readTabMode(t *tab, automatic bool) event.Cmd {
 	return func() event.Msg {
 		items, err := readItems(dir)
 		return readDirMsg{target: t, generation: generation, page: page, items: items, dir: dir, err: err, automatic: automatic}
+	}
+}
+
+// readGitStatus asks git about the tab's directory in the background, the way
+// readTabMode reads the directory itself. Outside a repository -- or without
+// git on PATH at all -- it costs one walk up the path and nothing else.
+func (m *model) readGitStatus(t *tab) event.Cmd {
+	if m.cfg == nil || !m.cfg.Git || gitBinary() == "" {
+		t.git = nil
+		return nil
+	}
+	root := findRepoRoot(t.dir)
+	if root == "" {
+		t.git = nil
+		return nil
+	}
+	// Holding down a movement key walks through directories faster than git
+	// can answer for them, so each read kills the one it supersedes instead of
+	// leaving a queue of git processes behind.
+	if t.gitCancel != nil {
+		t.gitCancel()
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	t.gitCancel = cancel
+	t.gitGeneration++
+	generation := t.gitGeneration
+	dir, page := t.dir, t.page
+	return func() event.Msg {
+		defer cancel()
+		info, err := readGitInfo(ctx, dir, root)
+		return gitStatusMsg{target: t, generation: generation, page: page, dir: dir, info: info, err: err}
 	}
 }
 
