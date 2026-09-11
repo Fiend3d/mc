@@ -372,25 +372,42 @@ func (m *model) drawMode(f *catatui.Frame, a catatui.Rect) {
 		m.dialog(f, a, action+" to directory", m.input.View()+"\nEnter: submit    Esc: cancel")
 	}
 }
-func taskSummary(t *task) string {
-	p := t.progress
-	action := ""
+// taskLabel names the work itself: the command, prefixed by the action when it
+// is being undone or redone.
+func taskLabel(t *task) string {
 	if t.action == "undo" || t.action == "redo" {
-		action = t.action + " "
+		return fmt.Sprintf("%s %s", t.action, t.cmd)
 	}
-	s := fmt.Sprintf("#%d %s%s · %s", t.id, action, t.cmd, t.state)
+	return fmt.Sprint(t.cmd)
+}
+
+// taskProgress is the measured half of a summary -- percentages and counts --
+// returned in pieces so the task list can give them a column of their own.
+func taskProgress(t *task) []string {
+	p := t.progress
+	var parts []string
 	if p.Total > 0 {
-		s += fmt.Sprintf(" · %.0f%% %s/%s", min(100, float64(p.Bytes)*100/float64(p.Total)), humanize.Bytes(uint64(p.Bytes)), humanize.Bytes(uint64(p.Total)))
+		parts = append(parts, fmt.Sprintf("%.0f%% %s/%s", min(100, float64(p.Bytes)*100/float64(p.Total)), humanize.Bytes(uint64(p.Bytes)), humanize.Bytes(uint64(p.Total))))
 	} else if p.Bytes > 0 || p.Files > 0 {
 		// A size walk cannot know its byte total in advance, so it reports the
 		// running counts here and takes its percentage from the step count.
-		s += fmt.Sprintf(" · %s in %d files", humanize.Bytes(uint64(p.Bytes)), p.Files)
+		parts = append(parts, fmt.Sprintf("%s in %d files", humanize.Bytes(uint64(p.Bytes)), p.Files))
 	}
 	if p.TotalFiles > 0 {
-		s += fmt.Sprintf(" · %d/%d files", p.Files, p.TotalFiles)
+		parts = append(parts, fmt.Sprintf("%d/%d files", p.Files, p.TotalFiles))
 	}
 	if p.Total == 0 && p.TotalSteps > 0 {
-		s += fmt.Sprintf(" · %.0f%%", min(100, float64(p.Steps)*100/float64(p.TotalSteps)))
+		parts = append(parts, fmt.Sprintf("%.0f%%", min(100, float64(p.Steps)*100/float64(p.TotalSteps))))
+	}
+	return parts
+}
+
+// taskSummary is the one-line form the strip uses, where a single task has the
+// whole row to itself.
+func taskSummary(t *task) string {
+	s := fmt.Sprintf("#%d %s · %s", t.id, taskLabel(t), t.state)
+	for _, part := range taskProgress(t) {
+		s += " · " + part
 	}
 	return s
 }
@@ -470,28 +487,146 @@ func (m *model) drawTaskStrip(f *catatui.Frame, a catatui.Rect) {
 	}
 	textAt(f, a, m.theme.baseStyle.Foreground(m.theme.accentColor3).Width(int(a.Width)).Render(text))
 }
+// taskStateColumn is the width of the state column, sized to "cancelling", the
+// longest state a task can be in.
+const taskStateColumn = 10
+
+// taskStateColor tells the states apart at a glance: work in flight takes the
+// accent, a failure red, a finished task green, anything dormant gray.
+func (m *model) taskStateColor(state string) color.Color {
+	switch state {
+	case "running", "scanning":
+		return m.theme.accentColor3
+	case "cancelling":
+		return m.theme.accentColor4
+	case "completed":
+		return m.theme.greenColor
+	case "failed":
+		return m.theme.redColor
+	}
+	return m.theme.grayColor
+}
+
+// taskHeader counts the list the way the tabs and bookmarks headers do, and
+// says which slice of it is on screen when the list is longer than the view.
+func taskHeader(tasks []*task, start, shown int) string {
+	if len(tasks) == 0 {
+		return " no tasks in this session"
+	}
+	word := "tasks"
+	if len(tasks) == 1 {
+		word = "task"
+	}
+	active := 0
+	for _, t := range tasks {
+		switch t.state {
+		case "running", "scanning", "cancelling":
+			active++
+		}
+	}
+	header := fmt.Sprintf(" %d %s", len(tasks), word)
+	if active > 0 {
+		header += fmt.Sprintf(" · %d active", active)
+	}
+	if shown < len(tasks) {
+		header += fmt.Sprintf(" · showing %d-%d", start+1, start+shown)
+	}
+	return header
+}
+
+// taskRow lays out one task: the cursor, its number, what it is doing, the
+// state in a column of its own and the figures trailing in gray. Every row
+// shares the columns, so the states read straight down the list.
+func (m *model) taskRow(t *task, selected bool, idWidth, labelWidth, width int) string {
+	style := m.theme.baseStyle
+	cursor := "   "
+	if selected {
+		style, cursor = m.theme.cursorStyle, " > "
+	}
+	row := style.Bold(true).Render(cursor)
+	row += style.Foreground(m.theme.grayColor).Width(idWidth+1).Render(fmt.Sprintf("[%d]", t.id))
+	row += style.Width(labelWidth+1).Render(truncate(taskLabel(t), labelWidth))
+	row += style.Bold(true).Foreground(m.taskStateColor(t.state)).Width(taskStateColumn+1).Render(t.state)
+	rest := max(0, width-len(cursor)-idWidth-labelWidth-taskStateColumn-3)
+	row += style.Foreground(m.theme.grayColor).Width(rest).Render(truncate(strings.Join(taskProgress(t), " · "), rest))
+	return row
+}
+
+// taskDetail spells out where the selected task has got to: the path it
+// reached, or why it stopped.
+func (m *model) taskDetail() (string, bool) {
+	if m.taskCursor < 0 || m.taskCursor >= len(m.taskList) {
+		return "", false
+	}
+	t := m.taskList[m.taskCursor]
+	if t.err != nil {
+		return " " + t.err.Error(), true
+	}
+	return " " + t.progress.Path, false
+}
+
+// drawTasks lists the session's tasks in the shape of the other overlays: a
+// counted header, a scrolling list under a cursor, then the selected task's
+// detail and the keys that act on it.
 func (m *model) drawTasks(f *catatui.Frame, a catatui.Rect) {
-	textAt(f, catatui.NewRect(0, 0, a.Width, 1), m.theme.baseStyle.Bold(true).Render("Tasks · c: cancel · Esc: return"))
-	start := max(0, m.taskCursor-(int(a.Height)-4)/2)
-	for row, i := 1, start; i < len(m.taskList) && row < int(a.Height)-2; i, row = i+1, row+1 {
-		t := m.taskList[i]
-		style := m.theme.baseStyle
-		if i == m.taskCursor {
-			style = m.theme.cursorStyle
-		}
-		textAt(f, catatui.NewRect(0, uint16(row), a.Width, 1), style.Width(int(a.Width)).Render(taskSummary(t)))
+	width, height := int(a.Width), int(a.Height)
+	empty := m.theme.emptyStyle
+	gray := empty.Foreground(m.theme.grayColor)
+
+	// The list leaves the last two rows to the detail and the keys, and scrolls
+	// to hold the cursor near the middle once the tasks no longer fit.
+	rows := max(1, height-3)
+	start := 0
+	if len(m.taskList) > rows {
+		start = min(max(0, m.taskCursor-rows/2), len(m.taskList)-rows)
 	}
-	if len(m.taskList) == 0 {
-		textAt(f, catatui.NewRect(0, 2, a.Width, 1), "No tasks in this session")
+	idWidth, labelWidth := 3, 0
+	for _, t := range m.taskList {
+		idWidth = max(idWidth, len(fmt.Sprintf("[%d]", t.id)))
+		labelWidth = max(labelWidth, paint.Width(taskLabel(t)))
 	}
+	// Half the row is as much as a command name may take: the figures after it
+	// are what the list is opened for.
+	labelWidth = min(labelWidth, max(8, width/2))
+
+	var list strings.Builder
+	drawn := 0
+	for i := start; i < len(m.taskList) && drawn < rows; i, drawn = i+1, drawn+1 {
+		list.WriteString(m.taskRow(m.taskList[i], i == m.taskCursor, idWidth, labelWidth, width))
+		list.WriteRune('\n')
+	}
+	for pad := drawn; pad < rows; pad++ {
+		list.WriteString(empty.Width(width).Render(" "))
+		list.WriteRune('\n')
+	}
+
+	var s strings.Builder
+	header := truncate(taskHeader(m.taskList, start, drawn), width)
+	s.WriteString(empty.Width(width).Bold(true).Foreground(m.theme.accentColor3).Render(header))
+	s.WriteRune('\n')
+	s.WriteString(list.String())
+
+	detail, failed := m.taskDetail()
+	detailStyle := gray
+	if failed {
+		detailStyle = empty.Foreground(m.theme.redColor)
+	}
+	s.WriteString(detailStyle.Width(width).Render(truncate(detail, width)))
+	s.WriteRune('\n')
+
+	help := gray.Render(" Keys:")
 	if m.taskCursor >= 0 && m.taskCursor < len(m.taskList) {
-		t := m.taskList[m.taskCursor]
-		detail := t.progress.Path
-		if t.err != nil {
-			detail = t.err.Error()
+		switch m.taskList[m.taskCursor].state {
+		case "queued", "running", "scanning":
+			help += empty.Render(" c ")
+			help += gray.Render("- cancel")
 		}
-		textAt(f, catatui.NewRect(0, a.Height-1, a.Width, 1), detail)
 	}
+	help += empty.Render(" Esc ")
+	help += gray.Render("- return")
+	s.WriteString(gray.Width(width).Render(truncate(help, width)))
+
+	textAt(f, a, s.String())
 }
 
 func (m *model) dimensions() {

@@ -178,6 +178,8 @@ func viewHelp(m *model) string {
 	docs = addTitle(docs, m, base.Foreground(m.theme.accentColor2).Bold(true).Render("Modal Commander")+base.Render(header))
 
 	normalDocsData := [][]string{
+		{"", "The mode the file manager starts in and the one every other mode comes back to:" +
+			" walk the directory tree, select items and act on them."},
 		{"q", "Quit and return the current directory."},
 		{"Q", "Quit without returning a directory."},
 		{"g", "Enter Go mode."},
@@ -264,6 +266,8 @@ func viewHelp(m *model) string {
 	pathDocs := newHelpTopic("Path Mode", pathDocsData, m)
 
 	searchDocsData := [][]string{
+		{"", "Search the current tab's directory tree for files by name, for text inside them, or" +
+			" for both at once. The search runs in the background and lists matches as it finds them."},
 		{"F1", "Toggle .gitignore filtering."},
 		{"F2", "Toggle case sensitivity."},
 		{"F5", "Start the search, or restart it."},
@@ -276,7 +280,9 @@ func viewHelp(m *model) string {
 	searchDocs := newHelpTopic("Search Mode", searchDocsData, m)
 
 	shellDocsData := [][]string{
-		{"", "Remember that Ctrl+h in Normal mode hides the interface and brings it back."},
+		{"", "Run a command line in the current tab's directory. The interface steps aside while the" +
+			" command runs and comes back when it exits. Remember that Ctrl+h in Normal mode hides" +
+			" the interface and brings it back."},
 		{"#sl", "Stands in for the selected files and directories."},
 		{"Ctrl+b", "Go back in shell history."},
 		{"Ctrl+f", "Go forward in shell history."},

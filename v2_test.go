@@ -221,6 +221,49 @@ func TestSizeScanSummaryAndStripPreference(t *testing.T) {
 	}
 }
 
+func TestTaskViewLaysOutColumnsAndTheSelectedDetail(t *testing.T) {
+	dir := t.TempDir()
+	touch(t, filepath.Join(dir, "an-item"))
+	m := testModel(t, dir)
+	m.taskList = []*task{
+		{id: 1, cmd: &fileActionCommand{}, state: "completed",
+			progress: shutil.Progress{Bytes: 100, Total: 100}},
+		{id: 2, cmd: &deleteCommand{}, state: "failed", err: fmt.Errorf("access is denied")},
+	}
+	m.taskView, m.taskCursor = true, 1
+	m.screenWidth, m.screenHeight = 90, 12
+	m.dimensions()
+
+	backend := catatui.NewTestBackend(90, 12)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(backend.Buffer().String(), "\n")
+
+	if !strings.HasPrefix(lines[0], " 2 tasks") {
+		t.Fatalf("header does not count the list: %q", lines[0])
+	}
+	// The state column is shared, so the states start at the same column no
+	// matter how long the command names are.
+	first, second := strings.Index(lines[1], "completed"), strings.Index(lines[2], "failed")
+	if first < 0 || second < 0 || first != second {
+		t.Fatalf("states are not in one column: %d vs %d (%q, %q)", first, second, lines[1], lines[2])
+	}
+	if !strings.HasPrefix(lines[2], " > [2]") {
+		t.Fatalf("the cursor does not mark the selected task: %q", lines[2])
+	}
+	// The failure of the selected task is spelled out under the list, and the
+	// keys that can act on it stay on the last row above the strip.
+	if !strings.Contains(lines[len(lines)-2], "access is denied") {
+		t.Fatalf("selected task's error is missing: %q", lines[len(lines)-2])
+	}
+	footer := lines[len(lines)-1]
+	if !strings.Contains(footer, "Esc") || strings.Contains(footer, "cancel") {
+		t.Fatalf("footer offers the wrong keys for a finished task: %q", footer)
+	}
+}
+
 func TestCalculatedDirectorySizesRenderPersistAndSort(t *testing.T) {
 	dir := t.TempDir()
 	small := filepath.Join(dir, "small")
