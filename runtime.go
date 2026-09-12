@@ -56,6 +56,7 @@ func run(m *model) (err error) {
 	var workers sync.WaitGroup
 	defer func() {
 		cancel()
+		m.compare.stop()
 		for _, t := range m.taskList {
 			if t.cancel != nil {
 				t.cancel()

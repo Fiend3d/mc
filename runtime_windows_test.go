@@ -80,6 +80,7 @@ func testConPTYHandoff(t *testing.T) {
 		}
 	}
 	touch(t, filepath.Join(left, "sample.txt"))
+	touch(t, filepath.Join(right, "sample.txt"))
 	t.Setenv("APPDATA", dir)
 	t.Setenv("MC_TEST_CHILD", "1")
 	t.Setenv("MC_TEST_LEFT", left)
@@ -167,6 +168,15 @@ func testConPTYHandoff(t *testing.T) {
 		}
 	}
 	wait("first frame", contains("sample.txt"))
+	// Exercise the actual Windows key-record path: Ctrl+J must remain
+	// distinct from Enter, which legacy LF-only input cannot express.
+	send("\x1b[74;36;10;1;8;1_\x1b[74;36;10;0;8;1_")
+	wait("Jump shortcut", contains("JUMP"))
+	send("\t") // Tab leaves Jump and switches panes.
+	send("\x1b[68;32;68;1;16;1_\x1b[68;32;68;0;16;1_")
+	wait("Compare shortcut", contains("Differences"))
+	wait("comparison loaded", contains("Files are identical"))
+	send("q") // Close Compare before exercising the editor handoff.
 	send("\x1b[115;62;0;1;0;1_\x1b[115;62;0;0;0;1_") // F4 down/up
 	wait("external tool", contains("MC-TOOL-READY"))
 	for _, r := range "handoff works\r" {

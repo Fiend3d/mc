@@ -10,6 +10,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fsnotify/fsnotify v1.10.1
 	github.com/gonutz/w32 v1.0.0
+	github.com/rivo/uniseg v0.4.7
 	golang.design/x/clipboard v0.8.0
 	golang.org/x/sys v0.47.0
 )
@@ -20,7 +21,6 @@ require (
 	github.com/ebitengine/purego v0.10.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-runewidth v0.0.24 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
 	golang.design/x/x11 v0.2.0 // indirect
 	golang.org/x/exp/shiny v0.0.0-20260611194520-c48552f49976 // indirect
 	golang.org/x/image v0.43.0 // indirect

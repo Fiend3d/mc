@@ -96,7 +96,7 @@ func TestPaneInitializationSelectionAndIsolation(t *testing.T) {
 	if m.getTab().getPageSettings().cursor != saved || !m.getTab().page.items[0].isSelected() {
 		t.Fatal("pane state lost")
 	}
-	keyEvent(m, "shift+tab")
+	keyEvent(m, "ctrl+j")
 	if m.mode != jumpMode {
 		t.Fatal("Jump key missing")
 	}
@@ -352,6 +352,7 @@ func TestStaleReadsAndSelectionsTargetOriginalTab(t *testing.T) {
 		t.Fatal("stale navigation applied")
 	}
 }
+
 // deepTree builds a directory with enough entries that a size walk is not
 // instantaneous, so a cancellation has something to interrupt.
 func deepTree(t *testing.T, root string) string {

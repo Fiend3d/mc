@@ -39,6 +39,8 @@ func (m *model) draw(f *catatui.Frame) {
 		return
 	}
 	switch m.mode {
+	case compareMode:
+		m.drawCompare(f, content)
 	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode, gitListMode:
 		savedWidth, savedHeight := m.width, m.height
 		m.width = int(area.Width)
@@ -515,6 +517,7 @@ func (m *model) drawMode(f *catatui.Frame, a catatui.Rect) {
 		m.dialog(f, a, action+" to directory", m.input.View()+"\nEnter: submit    Esc: cancel")
 	}
 }
+
 // taskLabel names the work itself: the command, prefixed by the action when it
 // is being undone or redone.
 func taskLabel(t *task) string {
@@ -554,6 +557,7 @@ func taskSummary(t *task) string {
 	}
 	return s
 }
+
 // taskRatio reports how full the gauge should be, and whether the task can be
 // measured at all. Transfers divide bytes by a known total; a size walk has no
 // byte total, so it falls back to finished top-level entries -- coarse, but it
@@ -630,6 +634,7 @@ func (m *model) drawTaskStrip(f *catatui.Frame, a catatui.Rect) {
 	}
 	textAt(f, a, m.theme.baseStyle.Foreground(m.theme.accentColor3).Width(int(a.Width)).Render(text))
 }
+
 // taskStateColumn is the width of the state column, sized to "cancelling", the
 // longest state a task can be in.
 const taskStateColumn = 10
@@ -687,9 +692,9 @@ func (m *model) taskRow(t *task, selected bool, idWidth, labelWidth, width int) 
 		style, cursor = m.theme.cursorStyle, " > "
 	}
 	row := style.Bold(true).Render(cursor)
-	row += style.Foreground(m.theme.grayColor).Width(idWidth+1).Render(fmt.Sprintf("[%d]", t.id))
-	row += style.Width(labelWidth+1).Render(truncate(taskLabel(t), labelWidth))
-	row += style.Bold(true).Foreground(m.taskStateColor(t.state)).Width(taskStateColumn+1).Render(t.state)
+	row += style.Foreground(m.theme.grayColor).Width(idWidth + 1).Render(fmt.Sprintf("[%d]", t.id))
+	row += style.Width(labelWidth + 1).Render(truncate(taskLabel(t), labelWidth))
+	row += style.Bold(true).Foreground(m.taskStateColor(t.state)).Width(taskStateColumn + 1).Render(t.state)
 	rest := max(0, width-len(cursor)-idWidth-labelWidth-taskStateColumn-3)
 	row += style.Foreground(m.theme.grayColor).Width(rest).Render(truncate(strings.Join(taskProgress(t), " · "), rest))
 	return row

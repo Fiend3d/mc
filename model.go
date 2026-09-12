@@ -39,6 +39,7 @@ const (
 	shellMode
 	themeMode
 	transferMode
+	compareMode
 )
 
 type pane struct {
@@ -105,9 +106,10 @@ type model struct {
 	logStart int
 	ticks    int
 
-	bm       *bookmarks
-	search   *search
-	gitList  gitList
+	bm            *bookmarks
+	search        *search
+	gitList       gitList
+	compare       comparison
 	hoverGitIndex int
 
 	theme       *theme
@@ -558,12 +560,12 @@ func initialModel(dirs []string) model {
 		hoverPane: -1, hoverIndex: -1, hoverSearchIndex: -1,
 		hoverTabPane: -1, hoverTabIndex: -1, hoverPathPane: -1, hoverPathX: -1,
 		hoverGitIndex: -1,
-		cfg:       cfg,
-		mode:      normalMode,
-		theme:     theme,
-		input:     input,
-		pathInput: pathInput,
-		spinner:   s,
-		cm:        newCommandManager(),
+		cfg:           cfg,
+		mode:          normalMode,
+		theme:         theme,
+		input:         input,
+		pathInput:     pathInput,
+		spinner:       s,
+		cm:            newCommandManager(),
 	}
 }

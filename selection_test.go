@@ -65,8 +65,12 @@ func TestRangeInputAndMouse(t *testing.T) {
 		}
 	}
 	m.Update(m.inputEvent(term.Event{Kind: term.EventKey, Key: term.KeyBackTab, Mods: term.ModShift}))
+	if m.mode != normalMode {
+		t.Fatal("Shift+Tab still enters Jump")
+	}
+	m.Update(m.inputEvent(term.Event{Kind: term.EventKey, Key: term.KeyRune, Rune: 'j', Mods: term.ModCtrl}))
 	if m.mode != jumpMode {
-		t.Fatal("Shift+Tab did not enter Jump")
+		t.Fatal("Ctrl+J did not enter Jump")
 	}
 	m.Update(m.inputEvent(term.Event{Kind: term.EventKey, Key: term.KeyDown, Mods: term.ModShift}))
 	assertSelection(t, m, "ab")

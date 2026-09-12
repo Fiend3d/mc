@@ -23,7 +23,7 @@ func emptyPaneKey(key string) bool {
 	switch key {
 	case "tab", "ctrl+left", "ctrl+right", "shift+left", "shift+right":
 		return true
-	case "T", "b", "g":
+	case "T", "b", "g", "D":
 		return true // refill routes: restore, bookmarks, Go mode
 	case "q", "Q", "w", "f1", "`", "ctrl+h":
 		return true
@@ -96,6 +96,27 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 	}
 	if handled, cmd := m.updateV2(msg); handled {
 		return m, cmd
+	}
+	if result, ok := msg.(compareDoneMsg); ok {
+		m.applyComparison(result)
+		return m, nil
+	}
+	if m.mode == compareMode {
+		switch input := msg.(type) {
+		case event.KeyMsg:
+			return m.handleCompare(input.String())
+		case event.MouseWheelMsg:
+			if !m.taskView && !m.quitting {
+				steps := 3
+				if input.Button == event.MouseWheelUp {
+					steps = -3
+				}
+				m.compare.scroll(steps, m.compareRows())
+			}
+			return m, nil
+		case event.MouseClickMsg, event.MouseTabMsg, event.MouseHoverMsg, event.MouseDragMsg, event.MouseUpMsg, event.PasteMsg:
+			return m, nil
+		}
 	}
 	switch msg := msg.(type) {
 
@@ -796,7 +817,9 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				}
 				dir := tab.next()
 				return m, m.readDir(m.currentTab, dir)
-			case "shift+tab":
+			case "D":
+				return m.openCompare()
+			case "ctrl+j":
 				m.mode = jumpMode
 				return m, nil
 			case "f":

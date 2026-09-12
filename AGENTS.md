@@ -88,7 +88,8 @@ Run `go test ./...`, `go test -race ./...`, and `go vet ./...`. Tests cover pane
 - `#sl` macro in shell mode expands to selected file paths
 - File filter uses comma/semicolon-separated patterns (case-insensitive `Contains`)
 - Delete and overwrites are not undoable; other completed file work is journaled, including partial operations.
-- Tab switches panes; Ctrl+Left/Right move the current tab across panes and Shift+Left/Right copy it; Shift+Tab enters Jump; Y/X transfer to the opposite pane; w opens tasks.
+- Tab switches panes; Ctrl+Left/Right move the current tab across panes and Shift+Left/Right copy it; Ctrl+J enters Jump; Shift+D compares the cursor file in each pane (ignoring marked selections); Y/X transfer to the opposite pane; w opens tasks.
+- Compare is a read-only snapshot with cancellable, generation-guarded worker results. `compare.go` handles loading and bounded diffs; `view_compare.go` renders aligned lines. Its input must not reach pane actions. F5 reloads the captured paths.
 - Pane/tab state is independent. Async reads carry the target tab, page and generation.
 - A pane may hold zero tabs. `pane.hasTabs()` guards it; the key gate in `Update` (`emptyPaneBlocked`) swallows tab-dependent keys so handlers can keep calling `getTab()`. Use `currentDir()`/`paneDir()` where only a path is needed. An empty pane parks `currentTab` at 0, never -1.
 - Only the UI loop mutates model state; workers send immutable progress/completion events.

@@ -13,7 +13,8 @@ mc now uses [catatui](https://github.com/Fiend3d/catatui), with two independent 
 - `Shift+Up/Down` extends or shrinks a range; `Shift+Home/End` extends to the first or last item; `Ctrl+click` extends to the clicked item. Earlier selections are preserved. Ordinary navigation starts a new range anchor. `Shift+click` also works in terminals that forward it, but Windows Terminal reserves it for terminal text selection.
 - `Y` copies and `X` moves selected items to the opposite pane. Enter confirms the editable destination. Existing `y/x/p/P` clipboard operations are unchanged.
 - `w` opens tasks; `c` cancels the highlighted task and Escape returns to browsing. File operations run sequentially while browsing remains available. Progress shows bytes and file counts, with scanning shown before totals are known.
-- `Shift+Tab` enters Jump mode. `Ctrl+N` still opens a directory in a new tab.
+- `Ctrl+J` enters Jump mode. `Ctrl+N` still opens a directory in a new tab.
+- `Shift+D` opens Compare mode for the file under each pane's cursor, ignoring marked selections.
 - Inside a git work tree each entry carries its status in a column before the name (`M` modified, `A` added, `D` deleted, `R` renamed, `U` conflicted, `?` untracked, ignored entries dimmed), and a directory takes the most severe state of anything inside it. The path row says where the repository is: the component the work tree starts at is highlighted — coloured while anything is uncommitted, green once nothing is — and the branch with its `↑↓` and `+~?` tallies sits at the end of the same row, stepping aside when the pane is too narrow for both. The tallies are clickable: point at `~10` to light it up and click for the list of exactly those files anywhere in the repository, where `enter` jumps to one, `F2`-`F12` run their tools on it and `Esc` closes it; `gm`, `gu` and `ga` open the same three lists from the keyboard. It needs `git` on `PATH`; elsewhere mc never even spawns it. Set `git = false` in `config.toml` to turn it off.
 
 Normal transfers choose unique names on collisions; `P` explicitly requests overwrite and confirms collisions. Cancellation retains completed files and removes unfinished temporary copies. Completed reversible work can be undone, including partial tasks. Delete is permanent; overwrites are not undoable. Undo/redo refuses conflicting or changed paths. Reparse points are reported as unsupported for transfers/deletion.
@@ -91,7 +92,15 @@ Directories update automatically from filesystem notifications, with periodic ch
 
 ### Jump Mode
 
-Can be entered by pressing `Shift+Tab` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item.
+Can be entered by pressing `Ctrl+J` in the normal mode. Jump mode is to mimic Explorer's behavior when pressing buttons to jump to the needed item.
+
+### Compare mode
+
+Press `Shift+D` in Normal mode to compare the files under the left and right pane cursors. The read-only Differences view aligns lines side by side, with red/green changes and inline highlights. Marked selections are ignored. Both cursors must point to files.
+
+Use `n`/`p` for the next/previous difference, `j`/`k` or arrows and the mouse wheel to scroll, `PgUp`/`PgDn` to page, `Home`/`End` for the beginning/end, and `h`/`l` or left/right to pan long lines. `F5` reloads the same two paths; `w` opens Tasks. `Esc` or `q` returns to the panes with their state preserved.
+
+UTF-8 text (including BOM) up to 5 MiB per file gets detailed comparison. Whitespace, line endings and missing final newlines remain significant. Binary files, unsupported encodings, larger files and comparisons exceeding the work or 100,000 line-break limit get a streamed identical/different summary. This is a snapshot; refresh with `F5` after external edits.
 
 ### Filter Mode
 

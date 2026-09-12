@@ -24,9 +24,9 @@ type helpTopic struct {
 }
 
 const (
-	helpMargin   = " "   // left margin shared by headers, descriptions and the footer
-	helpIndent   = "   " // leading space before a shortcut
-	helpGap      = "  "  // between the key column and the description
+	helpMargin  = " "   // left margin shared by headers, descriptions and the footer
+	helpIndent  = "   " // leading space before a shortcut
+	helpGap     = "  "  // between the key column and the description
 	helpKeyMin  = 6
 	helpKeyMax  = 22
 	helpTextMin = 20
@@ -212,7 +212,8 @@ func viewHelp(m *model) string {
 		{"h, left", "Go up to the parent directory."},
 		{"Ctrl+b", "Go back in history."},
 		{"Ctrl+f", "Go forward in history."},
-		{"Shift+Tab", "Enter Jump mode, where each item's first letter becomes a shortcut."},
+		{"Ctrl+j", "Enter Jump mode, where each item's first letter becomes a shortcut."},
+		{"Shift+d", "Compare the file under each pane's cursor; marked selections are ignored."},
 		{"Tab", "Switch the focused pane."},
 		{"Ctrl+Left/Right", "Move the current tab to the left or right pane and follow it."},
 		{"", "An empty pane keeps its half of the screen; T, b or gg fill it again."},
@@ -327,7 +328,17 @@ func viewHelp(m *model) string {
 	}
 	shellDocs := newHelpTopic("Shell Mode", shellDocsData, m)
 
-	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &tasksDocs, &searchDocs, &shellDocs, &gitDocs}
+	compareDocs := newHelpTopic("Compare Mode", [][]string{
+		{"", "A read-only snapshot of the two cursor files, aligned side by side with line and inline differences. Text up to 5 MiB per file is shown in detail; binary, unsupported encodings and larger or overly complex files get a byte equality summary. Whitespace, line endings and missing final newlines count as differences."},
+		{"n / p", "Jump to the next or previous difference."},
+		{"j/k, Up/Down", "Scroll both files together; the mouse wheel also scrolls."},
+		{"PgUp/PgDn", "Scroll a page. Home/End go to the beginning/end."},
+		{"h/l, Left/Right", "Pan both files horizontally; lines do not wrap."},
+		{"F5", "Reload the same two files."},
+		{"w", "Open the Tasks overlay."},
+		{"Esc / q", "Close Compare and return to the panes."},
+	}, m)
+	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &tasksDocs, &searchDocs, &shellDocs, &gitDocs, &compareDocs}
 	keyWidth := helpKeyColumn(topics)
 	for _, topic := range topics {
 		docs = addTopic(docs, topic, m, keyWidth)
