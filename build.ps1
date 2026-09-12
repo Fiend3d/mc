@@ -59,6 +59,9 @@ try {
             $archivePath = Join-Path $distPath "mc_$version.zip"
             Get-ChildItem -LiteralPath $stagePath | Compress-Archive -DestinationPath $archivePath -Force
             Write-Host "Created $archivePath"
+            # dist is on PATH, so keep the unpacked tools there too: F2/F3 find deps and koneko through it.
+            Get-ChildItem -LiteralPath $stagePath | Copy-Item -Destination $distPath -Force
+            Write-Host "Updated $distPath"
         } finally {
             $resolvedStage = [System.IO.Path]::GetFullPath($stagePath)
             if ([System.IO.Path]::GetDirectoryName($resolvedStage) -ne $distPath -or
