@@ -37,3 +37,29 @@ A useful script that launches Windows Terminal in the current working directory.
 `zz` is a zip bomb detector. It safely unzips archives using `7z` (https://www.7-zip.org/download.html).
 
 There's no need to check the contents of an archive before unzipping.
+
+# pp — paste picture
+
+`pp.ps1` saves an image from the Windows clipboard into the current directory.
+Add the directory containing `pp.ps1` to your `PATH` (release archives include it),
+then run it from PowerShell:
+
+```powershell
+pp                 # image.png, image1.png, image2.png, ...
+pp screenshot      # screenshot.png
+pp "my screenshot" # my screenshot.png
+pp photo.jpg       # JPEG instead of PNG
+```
+
+Without PATH setup, use `& C:\path\to\pp.ps1` instead of `pp`.
+PNG is the default; `.png`, `.jpg`, `.jpeg` and `.bmp` extensions choose the format.
+Existing files and directories are never overwritten: `pp photo.jpg` tries
+`photo1.jpg`, `photo2.jpg`, etc. if needed, choosing the first available name.
+Supply a filename only, not a path. Unsupported extensions and invalid Windows
+filenames are rejected.
+
+The saved file's full path is printed. If the clipboard contains only text,
+copied file paths or no image, nothing is created and a clear error is shown.
+Clipboard and write failures are also reported without closing your shell.
+Works on Windows PowerShell 5.1 and PowerShell 7 on Windows; no external tools
+are needed. Non-STA hosts delegate clipboard access to Windows PowerShell.
