@@ -169,14 +169,14 @@ repository/
   src/
     components/
       [M] button.go  +1 −1
-        @@ -12,3 +12,3 @@
+        Lines 12–14  +1 −1  in func render()
              12    12   context
              13       -old line
                    13 +new line
              14    14   context
 ```
 
-The tree contains only changed files and their parent directories. Files expand into diff hunks with three surrounding context lines. Added lines are green, deleted lines red; the two line-number columns refer to the baseline and current file. Folders, files and hunks start expanded.
+The tree contains only changed files and their parent directories. Files expand into diff hunks with three surrounding context lines. A hunk is labelled by the lines it spans in the current file, its added and deleted counts, and the enclosing function when Git can tell. Added lines are green, deleted lines red; the two line-number columns refer to the baseline and current file. Folders, files and hunks start expanded.
 
 Vibe compares the working files against **HEAD**, combining staged and unstaged changes. Edits that cancel out relative to HEAD have no net diff. Untracked files appear individually as additions; ignored files are excluded. Before the first commit, the baseline is empty. Git must be on PATH and `git = true` enabled in config.toml.
 
@@ -197,7 +197,7 @@ Vibe compares the working files against **HEAD**, combining staged and unstaged 
 
 The repository root stays expanded. `c` collapses its descendants, leaving top-level files and folders visible.
 
-Click selects a row. Double-click toggles a branch or views a line. F3 on a file or hunk opens its first change. Added and context lines open the current file; deleted lines open a temporary read-only copy of the displayed baseline. Renames retain the original path, so historical viewing also works for renamed and entirely deleted files. Koneko receives mc's theme and selects the requested line; historical copies disable its Git gutter. Custom F3 viewers are honored, with line targeting available for koneko. Temporary copies are removed after viewing or a launch failure.
+Click selects a row. Double-click toggles a branch or views a line. F3 on a file or hunk opens its first change. Vibe only ever opens the current working file: added and context lines open at that line, and a deleted line opens where it used to be, at its replacement or the next surviving line. An entirely deleted file has nothing to open, and the status row says so. Koneko receives mc's theme and selects the requested line. Custom F3 viewers are honored, with line targeting available for koneko.
 
 **Automatic updates:** Vibe refreshes every two seconds while visible, including changes to files, the index, branch and HEAD. Refreshes run in the background; repeated requests coalesce. The tree preserves expansion, selection and scroll position where possible. If the selected row disappears, selection moves to a surviving parent. A refresh failure retains the previous tree and retries. Polling pauses during external viewing and refreshes immediately on return. F5 requests an immediate refresh.
 
@@ -205,7 +205,7 @@ Long tree labels and diff text wrap to the available width. Continuation lines r
 
 Press `w` to toggle wrapping; the footer shows its state. A scrollbar on the right shows your position and supports clicking and dragging, like the F1 help scrollbar.
 
-Vibe is read-only. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes appear as summaries. Text previews and historical viewing are limited to 5 MiB per file; patches are bounded at 32 MiB and displayed diff lines at 100,000 per refresh. Current files remain viewable from summary rows. Vibe complements the Git tally lists (files grouped by status) and Compare mode (two cursor files from the panes).
+Vibe is read-only. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes appear as summaries. Text previews are limited to 5 MiB per file; patches are bounded at 32 MiB and displayed diff lines at 100,000 per refresh. Current files remain viewable from summary rows. Vibe complements the Git tally lists (files grouped by status) and Compare mode (two cursor files from the panes).
 
 </details>
 

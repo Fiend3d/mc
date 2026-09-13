@@ -210,50 +210,69 @@ func TestVibeRefreshPreservesPositionAndRejectsStale(t *testing.T) {
 	}
 }
 
-func TestVibeViewerHistoricalAndUnicode(t *testing.T) {
+func TestVibeViewerOpensCurrentFile(t *testing.T) {
 	root := vibeRepo(t)
-	vibeWrite(t, root, "old.go", "old 👩‍💻\n")
+	vibeWrite(t, root, "old.go", "a\nold\nb\n")
+	vibeWrite(t, root, "gone.go", "gone\n")
 	vibeCommit(t, root)
-	vibeWrite(t, root, "old.go", "new\n")
+	vibeWrite(t, root, "old.go", "a\nnew 👩‍💻\nb\n")
+	if err := os.Remove(filepath.Join(root, "gone.go")); err != nil {
+		t.Fatal(err)
+	}
 	m := testModel(t, root)
 	_, cmd := m.openVibe()
 	applyEffect(m, cmd)
 	for i, r := range m.vibe.rows {
-		if r.kind == 'l' && strings.HasPrefix(r.text, "-") {
+		if r.kind == 'l' && r.text == "-old" {
 			m.vibe.cursor = i
 			break
 		}
 	}
-	prepare := m.viewVibe()
-	ready := prepare().(vibeViewerReadyMsg)
-	if ready.err != nil || string(ready.data) != "old 👩‍💻\n" || ready.line != 1 {
-		t.Fatalf("snapshot = %#v", ready)
+	// A deleted line opens the working file at its replacement, never a copy.
+	ready := m.viewVibe()().(vibeViewerReadyMsg)
+	if ready.err != nil || ready.path != filepath.Join(root, "old.go") || ready.line != 2 {
+		t.Fatalf("request = %#v", ready)
 	}
-	// Commit the new file after capture: F3 still uses the selected blob.
-	vibeCommit(t, root)
-	effect := m.startVibeViewer(ready)
-	process := effect().(event.ProcessMsg)
-	path := process.Command.Args[len(process.Command.Args)-1]
-	data, err := os.ReadFile(path)
-	if err != nil || string(data) != "old 👩‍💻\n" || filepath.Ext(path) != ".go" {
-		t.Fatal("incorrect historical file")
+	process := m.startVibeViewer(ready)().(event.ProcessMsg)
+	if path := process.Command.Args[len(process.Command.Args)-1]; path != filepath.Join(root, "old.go") {
+		t.Fatalf("viewer opened %s", path)
 	}
-	for _, arg := range []string{"-theme=dracula", "-no-git", "-select=1:1-1:6"} {
+	for _, arg := range []string{"-theme=dracula", "-select=2:1-2:6"} {
 		if !slices.Contains(process.Command.Args, arg) {
 			t.Fatalf("missing %s in %v", arg, process.Command.Args)
 		}
 	}
-	done := process.Next(errors.New("viewer launch failed"))
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		t.Fatal("temporary file retained")
+	if slices.Contains(process.Command.Args, "-no-git") {
+		t.Fatal("current file opened without Git markers")
 	}
-	m.Update(done)
+	m.Update(process.Next(errors.New("viewer launch failed")))
 	if m.vibe.viewing {
 		t.Fatal("viewer did not resume refresh")
 	}
-	custom := vibeViewerCommand(ToolConfig{Command: "custom-viewer", Type: "path", Args: []string{"--option"}}, "nord", ready, "snapshot.go")
-	if !slices.Equal(custom.Args, []string{"custom-viewer", "--option", "snapshot.go"}) {
+	for i, r := range m.vibe.rows {
+		if r.kind == 'f' && r.path == "gone.go" {
+			m.vibe.cursor = i
+			break
+		}
+	}
+	if m.viewVibe() != nil || m.vibe.viewing || !strings.Contains(m.vibe.viewerErr, "deleted") {
+		t.Fatal("deleted file did not explain that nothing can be opened")
+	}
+	custom := vibeViewerCommand(ToolConfig{Command: "custom-viewer", Type: "path", Args: []string{"--option"}}, "nord", ready)
+	if !slices.Equal(custom.Args, []string{"custom-viewer", "--option", ready.path}) {
 		t.Fatal("custom viewer arguments changed")
+	}
+}
+
+func TestVibeViewLine(t *testing.T) {
+	h := vibeHunk{new: 10, lines: []vibeLine{{kind: ' ', new: 10}, {kind: '-'}, {kind: '+', new: 11}, {kind: '-'}}}
+	for index, want := range []int{10, 11, 11, 11} {
+		if got := vibeViewLine(h, index).new; got != want {
+			t.Errorf("line %d opens at %d, want %d", index, got, want)
+		}
+	}
+	if got := vibeViewLine(vibeHunk{new: 4, lines: []vibeLine{{kind: '-'}}}, 0).new; got != 4 {
+		t.Errorf("pure deletion opens at %d, want 4", got)
 	}
 }
 
@@ -608,5 +627,50 @@ func TestVibeExpandCollapseAll(t *testing.T) {
 	keyEvent(m, "e")
 	if m.vibe.current().id != selected {
 		t.Fatal("expand all lost selection")
+	}
+}
+
+func TestVibeHunkLabel(t *testing.T) {
+	for _, test := range []struct {
+		hunk vibeHunk
+		want string
+	}{
+		{vibeHunk{header: "@@ -12,3 +12,3 @@ func render() {", new: 12, lines: []vibeLine{{kind: ' '}, {kind: '-'}, {kind: '+'}, {kind: ' '}}}, "Lines 12–14  +1 −1  in func render() {"},
+		{vibeHunk{header: "@@ -0,0 +1 @@", new: 1, lines: []vibeLine{{kind: '+'}}}, "Line 1  +1 −0"},
+		{vibeHunk{header: "@@ -5,2 +4,0 @@", new: 4, lines: []vibeLine{{kind: '-'}, {kind: '-'}, {kind: '!'}}}, "Removed after line 4  +0 −2"},
+		{vibeHunk{header: "@@ -1 +0,0 @@", lines: []vibeLine{{kind: '-'}}}, "Removed at the start  +0 −1"},
+	} {
+		if got := vibeHunkLabel(test.hunk); got != test.want {
+			t.Errorf("label = %q, want %q", got, test.want)
+		}
+	}
+}
+
+func TestVibeCursorOutranksHoverAndChromeFits(t *testing.T) {
+	m := testModel(t, t.TempDir())
+	m.mode = vibeMode
+	m.screenWidth = 60
+	m.screenHeight = 12
+	file := vibeFile{path: "file", status: "M", hunks: []vibeHunk{{header: "@@ -1 +1 @@", new: 1, lines: []vibeLine{{kind: '+', new: 1, text: "x"}}}}}
+	m.vibe = vibeState{root: "repo", collapsed: map[string]bool{}, snapshot: vibeSnapshot{branch: "main", files: []vibeFile{file}}}
+	m.vibe.rebuild()
+	m.vibe.cursor = 1
+	m.vibe.hover = m.vibe.rows[1].id
+	backend := catatui.NewTestBackend(60, 12)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	if backend.Buffer().CellAt(0, 3).Bg != m.theme.cursorStyle.Native().GetBg() {
+		t.Fatal("hover replaced the cursor highlight")
+	}
+	for y := 0; y < 12; y++ {
+		var line strings.Builder
+		for x := 0; x < 60; x++ {
+			line.WriteString(backend.Buffer().CellAt(uint16(x), uint16(y)).Symbol)
+		}
+		if strings.Contains(line.String(), "…") {
+			t.Fatalf("row %d is clipped: %q", y, line.String())
+		}
 	}
 }

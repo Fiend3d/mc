@@ -19,10 +19,8 @@ type vibeRow struct {
 }
 type vibeState struct {
 	root                               string
-	tempPath                           string
 	generation                         uint64
 	cancel                             context.CancelFunc
-	viewerCancel                       context.CancelFunc
 	loading, pending, viewing, invalid bool
 	snapshot                           vibeSnapshot
 	rows                               []vibeRow
@@ -49,12 +47,6 @@ func (v *vibeState) stop() {
 		v.cancel = nil
 	}
 }
-func (v *vibeState) stopViewer() {
-	if v.viewerCancel != nil {
-		v.viewerCancel()
-		v.viewerCancel = nil
-	}
-}
 func (m *model) openVibe() (event.Model, event.Cmd) {
 	if !m.cfg.Git {
 		return m, m.addMessage(msgWarning, "Vibe requires git = true in config.toml")
@@ -68,7 +60,6 @@ func (m *model) openVibe() (event.Model, event.Cmd) {
 	}
 	generation := m.vibe.generation + 1
 	m.vibe.stop()
-	m.vibe.stopViewer()
 	m.vibe = vibeState{root: root, generation: generation, collapsed: map[string]bool{}}
 	m.vibe.snapshot.root = root
 	m.vibe.rebuild()
@@ -341,7 +332,6 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 	switch key {
 	case "esc", "q":
 		v.stop()
-		v.stopViewer()
 		v.generation++
 		v.loading = false
 		v.pending = false
@@ -475,7 +465,6 @@ func (m *model) updateVibe(msg event.Msg) (bool, event.Cmd) {
 		return true, m.startVibeViewer(e)
 	case vibeViewerDoneMsg:
 		if m.mode == vibeMode && e.generation == m.vibe.generation {
-			m.vibe.tempPath = ""
 			m.vibe.viewing = false
 			if e.err != nil {
 				m.vibe.viewerErr = e.err.Error()

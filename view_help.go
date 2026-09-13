@@ -351,13 +351,13 @@ func viewHelp(m *model) string {
 		{"Space", "Toggle the selected branch. Click selects; double-click toggles a branch or views a line."},
 		{"e / c", "Expand all / collapse branches beneath the repository root. The root stays expanded, keeping top-level files and folders visible."},
 		{"[ / ]", "Jump to the previous/next hunk, expanding its ancestors if needed."},
-		{"Enter / F3", "View the first change in a file/hunk or the selected line. Enter on a directory toggles it. Added/context lines open the current file; deleted lines open a temporary read-only copy of the displayed baseline, even for renamed or entirely deleted files."},
-		{"", "F3 honors your configured viewer. Koneko receives mc's theme and a grapheme-based line selection; historical copies disable its Git markers. Other viewers receive the file. Temporary copies are removed after the viewer closes or fails to launch."},
+		{"Enter / F3", "View the first change in a file/hunk or the selected line. Enter on a directory toggles it. Only the current working file is opened: a deleted line opens where it used to be, at its replacement or the next surviving line. An entirely deleted file has nothing to open."},
+		{"", "F3 honors your configured viewer. Koneko receives mc's theme and a grapheme-based line selection. Other viewers receive the file."},
 		{"F5", "Refresh now. Repeated requests coalesce while a refresh is running."},
 		{"w", "Toggle word wrap, enabled initially. The footer shows its current state."},
 		{"Scrollbar", "The right scrollbar shows the viewport position; click or drag it to scroll without moving selection."},
 		{"Esc / q", "Close Vibe, keeping the underlying pane state."},
-		{"", "Vibe is read-only: it does not stage, revert or edit. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes remain visible as summaries. Text previews and historical viewing are limited to 5 MiB per file, patches to 32 MiB and diff lines to 100,000 per refresh. Current files can still be opened in the viewer from a summary."},
+		{"", "Vibe is read-only: it does not stage, revert or edit. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes remain visible as summaries. Text previews are limited to 5 MiB per file, patches to 32 MiB and diff lines to 100,000 per refresh. Current files can still be opened in the viewer from a summary."},
 	}, m)
 	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &tasksDocs, &searchDocs, &shellDocs, &gitDocs, &compareDocs, &vibeDocs}
 	keyWidth := helpKeyColumn(topics)

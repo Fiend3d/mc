@@ -58,8 +58,6 @@ func run(m *model) (err error) {
 		cancel()
 		m.compare.stop()
 		m.vibe.stop()
-		m.vibe.stopViewer()
-		cleanupVibeTemp(m.vibe.tempPath)
 		for _, t := range m.taskList {
 			if t.cancel != nil {
 				t.cancel()

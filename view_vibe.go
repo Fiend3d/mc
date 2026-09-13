@@ -7,6 +7,7 @@ import (
 
 	"github.com/Fiend3d/catatui"
 	"github.com/Fiend3d/catatui/widgets"
+	"mc/internal/paint"
 )
 
 type vibeVisualRow struct {
@@ -97,6 +98,8 @@ func (v *vibeState) layout(width int) {
 			if f.oldPath != "" && f.oldPath != f.path {
 				text += " ← " + compareLiteral(f.oldPath)
 			}
+		case 'h':
+			text = vibeHunkLabel(v.snapshot.files[r.file].hunks[r.hunk])
 		case 'l':
 			l := v.snapshot.files[r.file].hunks[r.hunk].lines[r.line]
 			old, newLine := "", ""
@@ -139,6 +142,43 @@ func (v *vibeState) layout(width int) {
 			v.visual = append(v.visual, vibeVisualRow{index, p, line, i > 0})
 		}
 	}
+}
+
+// vibeHunkLabel describes a hunk by where it lands in the current file rather
+// than by its raw "@@ -a,b +c,d @@" header. A pure deletion has no current
+// lines, so it is placed after the line that precedes it.
+func vibeHunkLabel(h vibeHunk) string {
+	current, added, deleted := 0, 0, 0
+	for _, l := range h.lines {
+		switch l.kind {
+		case ' ':
+			current++
+		case '+':
+			current++
+			added++
+		case '-':
+			deleted++
+		}
+	}
+	var text string
+	switch {
+	case current == 0 && h.new == 0:
+		text = "Removed at the start"
+	case current == 0:
+		text = fmt.Sprintf("Removed after line %d", h.new)
+	case current == 1:
+		text = fmt.Sprintf("Line %d", h.new)
+	default:
+		text = fmt.Sprintf("Lines %d–%d", h.new, h.new+current-1)
+	}
+	text += fmt.Sprintf("  +%d −%d", added, deleted)
+	// Git appends the enclosing function or section after the closing @@.
+	if _, rest, ok := strings.Cut(strings.TrimPrefix(h.header, "@@"), "@@"); ok {
+		if context := strings.TrimSpace(rest); context != "" {
+			text += "  in " + compareLiteral(context)
+		}
+	}
+	return text
 }
 
 // Build connectors from the entire visible tree, so scrolling into a branch
@@ -190,12 +230,17 @@ func (m *model) drawVibe(f *catatui.Frame, area catatui.Rect) {
 	put := func(y int, text string) {
 		textAt(f, catatui.NewRect(area.X, area.Y+uint16(y), uint16(bodyWidth), 1), truncate(text, bodyWidth))
 	}
+	// Chrome rows span the scrollbar column too. Clip the plain text before
+	// styling so padding never triggers an ellipsis.
+	chrome := func(y int, text string, style paint.Style) {
+		textAt(f, catatui.NewRect(area.X, area.Y+uint16(y), area.Width, 1), style.Width(w).Render(truncate(text, w)))
+	}
 	title := fmt.Sprintf(" Vibe · %s · %d changed files", compareLiteral(v.snapshot.branch), len(v.snapshot.files))
 	initial := v.snapshot.fingerprint == [32]byte{}
 	if v.loading && initial {
 		title += " · refreshing"
 	}
-	put(0, base.Bold(true).Foreground(t.accentColor3).Width(w).Render(title))
+	chrome(0, title, base.Bold(true).Foreground(t.accentColor3))
 	status := " Live · refreshes every 2s · changes since HEAD + untracked"
 	if v.err != "" {
 		status = " Refresh error: " + compareLiteral(v.err)
@@ -204,16 +249,16 @@ func (m *model) drawVibe(f *catatui.Frame, area catatui.Rect) {
 	} else if len(v.snapshot.files) == 0 && !initial {
 		status = " Working tree matches HEAD · watching for changes"
 	}
-	put(1, base.Foreground(t.grayColor).Width(w).Render(status))
+	chrome(1, status, base.Foreground(t.grayColor))
 	for y := 0; y < h-3 && v.start+y < len(v.visual); y++ {
 		segment := v.visual[v.start+y]
 		index := segment.row
 		r := v.rows[index]
+		// The cursor outranks hover: the pointer must not hide the selection.
 		style := base
 		if index == v.cursor {
 			style = t.cursorStyle
-		}
-		if r.id == v.hover {
+		} else if r.id == v.hover {
 			style = t.selectionStyle
 		}
 		f.Buffer().SetStyle(catatui.NewRect(area.X, area.Y+uint16(y+2), area.Width, 1), style.Native())
@@ -251,19 +296,19 @@ func (m *model) drawVibe(f *catatui.Frame, area catatui.Rect) {
 	if v.noWrap {
 		wrap = "off"
 	}
-	key := func(k, action string) string {
-		return base.Foreground(t.accentColor3).Bold(true).Render(k) + base.Foreground(t.grayColor).Render(" "+action)
+	// Same shape as the bookmarks, tabs and Git list key lines. Keys are listed
+	// by importance and dropped whole from the end when the row is too narrow.
+	gray := base.Foreground(t.grayColor)
+	footer, used := gray.Render(" Keys:"), len(" Keys:")
+	for _, k := range [][2]string{{"F3", "view"}, {"[ ]", "prev/next hunk"}, {"space", "toggle"}, {"e", "expand all"}, {"c", "collapse all"}, {"w", "wrap:" + wrap}, {"Esc", "close"}} {
+		cells := ansi.StringWidth(" " + k[0] + " - " + k[1])
+		if used+cells > w {
+			break
+		}
+		footer += base.Render(" "+k[0]+" ") + gray.Render("- "+k[1])
+		used += cells
 	}
-	separator := base.Foreground(t.grayColor).Render("  ·  ")
-	footer := " " + key("e", "expand all") + separator + key("c", "collapse all")
-	if w >= 90 {
-		footer += separator + key("[", "prev hunk") + "  " + key("]", "next hunk") + separator + key("w", "wrap "+wrap) + separator + key("F3", "view")
-	} else if w >= 65 {
-		footer += separator + key("[", "prev") + "  " + key("]", "next") + separator + key("F3", "view")
-	} else {
-		footer = " " + key("e", "expand") + separator + key("c", "collapse") + separator + key("F3", "view")
-	}
-	put(h-1, base.Width(w).Render(footer))
+	textAt(f, catatui.NewRect(area.X, area.Y+uint16(h-1), area.Width, 1), base.Width(w).Render(footer))
 	viewport := max(1, h-3)
 	state := widgets.NewScrollbarState(max(0, len(v.visual)-viewport) + 1).Position(v.start).ViewportContentLength(viewport)
 	bar := widgets.NewScrollbar(widgets.ScrollbarVerticalRight).TrackStyle(base.Foreground(t.grayColor).Native()).ThumbStyle(base.Foreground(t.accentColor3).Native()).BeginSymbolNone().EndSymbolNone()

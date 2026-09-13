@@ -1,15 +1,12 @@
 package main
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/rivo/uniseg"
 	"mc/internal/event"
@@ -19,13 +16,29 @@ type vibeViewerReadyMsg struct {
 	generation       uint64
 	path, root, text string
 	line             int
-	historical       bool
-	data             []byte
 	err              error
 }
 type vibeViewerDoneMsg struct {
 	generation uint64
 	err        error
+}
+
+// vibeViewLine picks the current-file line a row opens at. Deleted lines no
+// longer exist, so they open where they used to be: at the next surviving line
+// (usually their replacement), or the previous one at the end of a hunk.
+func vibeViewLine(h vibeHunk, index int) vibeLine {
+	current := func(l vibeLine) bool { return l.kind == ' ' || l.kind == '+' }
+	for i := index; i < len(h.lines); i++ {
+		if current(h.lines[i]) {
+			return h.lines[i]
+		}
+	}
+	for i := min(index, len(h.lines)) - 1; i >= 0; i-- {
+		if current(h.lines[i]) {
+			return h.lines[i]
+		}
+	}
+	return vibeLine{new: max(1, h.new)}
 }
 
 func (m *model) viewVibe() event.Cmd {
@@ -38,32 +51,28 @@ func (m *model) viewVibe() event.Cmd {
 		return m.addMessage(msgWarning, "F3 viewer is not configured")
 	}
 	f := v.snapshot.files[r.file]
+	if f.status == "D" {
+		v.viewerErr = compareLiteral(f.path) + " was deleted; there is no current file to open"
+		return nil
+	}
 	line := vibeLine{new: 1}
 	if len(f.hunks) > 0 {
-		hi := 0
+		hi, li := 0, 0
 		if r.kind == 'h' || r.kind == 'l' {
 			hi = r.hunk
 		}
 		h := f.hunks[hi]
 		if r.kind == 'l' {
-			line = h.lines[r.line]
+			li = r.line
 		} else {
-			for _, l := range h.lines {
-				if l.kind == '+' || l.kind == '-' {
-					line = l
-					break
-				}
-			}
+			// A file or hunk opens at its first change.
+			li = slices.IndexFunc(h.lines, func(l vibeLine) bool { return l.kind == '+' || l.kind == '-' })
+			li = max(0, li)
 		}
+		line = vibeViewLine(h, li)
 	}
-	historical := line.kind == '-' || f.status == "D"
 	path := filepath.Join(v.root, filepath.FromSlash(f.path))
-	number := line.new
-	if historical {
-		path = filepath.Join(v.root, filepath.FromSlash(f.oldPath))
-		number = line.old
-	}
-	request := vibeViewerReadyMsg{generation: v.generation, path: path, root: v.root, line: max(1, number), text: line.text, historical: historical}
+	request := vibeViewerReadyMsg{generation: v.generation, path: path, root: v.root, line: max(1, line.new), text: line.text}
 	v.viewing = true
 	v.viewerErr = ""
 	v.pending = true
@@ -71,35 +80,13 @@ func (m *model) viewVibe() event.Cmd {
 		v.invalid = true
 		v.stop()
 	}
-	blob := f.blob
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	v.viewerCancel = cancel
 	return func() event.Msg {
-		defer cancel()
-		if historical {
-			if blob == "" {
-				request.err = fmt.Errorf("no historical version is available for %s", f.path)
-				return request
-			}
-			request.data, request.err = vibeGit(ctx, request.root, compareTextLimit, "cat-file", "blob", blob)
-			if errors.Is(request.err, errVibeLimit) {
-				request.err = fmt.Errorf("historical file exceeds the 5 MiB viewing limit")
-			}
-		} else {
-			info, err := os.Stat(path)
-			request.err = err
-			if err == nil && !info.Mode().IsRegular() {
-				request.err = fmt.Errorf("%s is not a regular file", path)
-			}
+		info, err := os.Stat(path)
+		request.err = err
+		if err == nil && !info.Mode().IsRegular() {
+			request.err = fmt.Errorf("%s is not a regular file", path)
 		}
 		return request
-	}
-}
-
-func cleanupVibeTemp(path string) {
-	if path != "" {
-		_ = os.Chmod(path, 0600)
-		_ = os.Remove(path)
 	}
 }
 
@@ -113,38 +100,11 @@ func (m *model) startVibeViewer(msg vibeViewerReadyMsg) event.Cmd {
 		v.viewerErr = msg.err.Error()
 		return nil
 	}
-	path := msg.path
-	if msg.historical {
-		file, err := os.CreateTemp("", "mc-vibe-*"+filepath.Ext(path))
-		if err != nil {
-			v.viewing = false
-			v.viewerErr = err.Error()
-			return nil
-		}
-		path = file.Name()
-		_, err = file.Write(msg.data)
-		closeErr := file.Close()
-		if err == nil {
-			err = closeErr
-		}
-		if err == nil {
-			err = os.Chmod(path, 0444)
-		}
-		if err != nil {
-			cleanupVibeTemp(path)
-			v.viewing = false
-			v.viewerErr = err.Error()
-			return nil
-		}
-		v.tempPath = path
-	}
-	tool := *m.cfg.F3
-	cmd := vibeViewerCommand(tool, m.cfg.Theme, msg, path)
-	temp := v.tempPath
-	return event.ExecProcess(cmd, func(err error) event.Msg { cleanupVibeTemp(temp); return vibeViewerDoneMsg{msg.generation, err} })
+	cmd := vibeViewerCommand(*m.cfg.F3, m.cfg.Theme, msg)
+	return event.ExecProcess(cmd, func(err error) event.Msg { return vibeViewerDoneMsg{msg.generation, err} })
 }
 
-func vibeViewerCommand(tool ToolConfig, theme string, msg vibeViewerReadyMsg, path string) *exec.Cmd {
+func vibeViewerCommand(tool ToolConfig, theme string, msg vibeViewerReadyMsg) *exec.Cmd {
 	args := slices.Clone(tool.Args)
 	name := strings.TrimSuffix(strings.ToLower(filepath.Base(tool.Command)), ".exe")
 	if name == "koneko" && tool.Type == "path" {
@@ -164,16 +124,13 @@ func vibeViewerCommand(tool ToolConfig, theme string, msg vibeViewerReadyMsg, pa
 		}
 		args = filtered
 		args = append(args, "-theme="+theme, fmt.Sprintf("-select=%d:1-%d:%d", msg.line, msg.line, uniseg.GraphemeClusterCount(msg.text)+1))
-		if msg.historical {
-			args = append(args, "-no-git")
-		}
 	}
 	switch tool.Type {
 	case "dir":
 		args = append(args, filepath.Dir(msg.path))
 	case "none":
 	default:
-		args = append(args, path)
+		args = append(args, msg.path)
 	}
 	cmd := exec.Command(tool.Command, args...)
 	cmd.Dir = msg.root
