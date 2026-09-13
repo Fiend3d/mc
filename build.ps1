@@ -15,7 +15,8 @@ try {
 
     $commit    = git rev-parse --short HEAD
     $buildTime = Get-Date -Format "dd.MM.yyyy HH:mm"
-    $version   = (Get-Content -LiteralPath (Join-Path $PSScriptRoot "VERSION") -Raw).Trim()
+    $version   = git describe --tags --abbrev=0 --always
+    if ($LASTEXITCODE -ne 0) { throw "Could not determine version from Git" }
     $dirty     = git status --porcelain
 
     if (-not $version) { $version = "dev" }
@@ -43,6 +44,36 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Go build failed" }
 
     if ($dist) {
+        $dependencies = @("deps", "koneko") | ForEach-Object {
+            $directory = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\$_"))
+            $script = Join-Path $directory "build.ps1"
+            if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+                throw "Distribution builds require the sibling $_ checkout with build.ps1: $directory"
+            }
+            [pscustomobject]@{
+                Name = $_
+                Directory = $directory
+                Script = $script
+                Binary = Join-Path $directory "$_.exe"
+            }
+        }
+        # Isolate dependency scripts from our variables and run in their own repositories.
+        $buildHost = (Get-Process -Id $PID).Path
+        foreach ($dependency in $dependencies) {
+            Write-Host "Rebuilding $($dependency.Name)..."
+            Push-Location -LiteralPath $dependency.Directory
+            try {
+                & $buildHost -NoProfile -File $dependency.Script
+                if ($LASTEXITCODE -ne 0) {
+                    throw "$($dependency.Name) build failed with exit code $LASTEXITCODE"
+                }
+                if (-not (Test-Path -LiteralPath $dependency.Binary -PathType Leaf)) {
+                    throw "$($dependency.Name) build did not produce $($dependency.Binary)"
+                }
+            } finally {
+                Pop-Location
+            }
+        }
         $distPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "dist"))
         New-Item -Path $distPath -ItemType Directory -Force | Out-Null
         $stagePath = Join-Path $distPath (".package-" + [guid]::NewGuid().ToString("N"))
@@ -51,10 +82,8 @@ try {
             Copy-Item -LiteralPath $output -Destination $stagePath
             Get-ChildItem -Path ".\scripts" -Include "*.bat", "*.ps1" -Recurse |
                 Copy-Item -Destination $stagePath
-            foreach ($dependency in @("..\deps\deps.exe", "..\koneko\koneko.exe")) {
-                if (Test-Path -LiteralPath $dependency) {
-                    Copy-Item -LiteralPath $dependency -Destination $stagePath
-                }
+            foreach ($dependency in $dependencies) {
+                Copy-Item -LiteralPath $dependency.Binary -Destination $stagePath
             }
             $archivePath = Join-Path $distPath "mc_$version.zip"
             Get-ChildItem -LiteralPath $stagePath | Compress-Archive -DestinationPath $archivePath -Force

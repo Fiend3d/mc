@@ -327,6 +327,12 @@ Requires Windows and Go 1.27.0. The released catatui dependency is fetched throu
 .\build.ps1 icon  # Embed the icon (requires rsrc)
 ```
 
+`dist` also runs `build.ps1` in the sibling `..\deps` and `..\koneko` checkouts
+before packaging their newly built executables. Both checkouts are required for
+distribution builds; a missing checkout or failed tool build stops packaging.
+This builds their current local sources; it does not fetch or pull Git updates.
+Plain `.\build.ps1` builds only mc.
+
 If that doesn't work, you may need to enable PowerShell scripts first:
 
 ```powershell
@@ -341,7 +347,12 @@ go test -race ./...
 go vet ./...
 ```
 
-Version, Git commit and build time are embedded at build time. Use `mc.exe -version` (or `-v`) to inspect the version. The `-o` and `-tf path` flags support the optional shell wrapper's temporary-file output.
+Version, Git commit and build time are embedded at build time. The build script
+uses the nearest Git tag as the version (or the commit hash if no tag exists),
+appending `-dirty` for uncommitted changes. Tag a release commit before building
+its distribution, for example `git tag -a v2.0.0 -m "Release v2.0.0"`.
+Use `mc.exe -version` (or `-v`) to inspect the version. The `-o` and `-tf path`
+flags support the optional shell wrapper's temporary-file output.
 
 <details>
 <summary>Legacy v1 screenshot gallery</summary>
