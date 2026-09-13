@@ -239,7 +239,8 @@ func viewHelp(m *model) string {
 		{"F6", "File explorer (configurable)."},
 		{"F7", "VS Code paths (configurable)."},
 		{"F8", "VS Code directory (configurable)."},
-		{"F9-F12", "Unassigned (configurable)."},
+		{"F9", "Open lazygit in the current directory (requires lazygit on PATH, configurable)."},
+		{"F10-F12", "Unassigned (configurable)."},
 	}
 	normalDocs := newHelpTopic("Normal Mode", normalDocsData, m)
 

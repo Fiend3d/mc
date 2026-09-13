@@ -235,7 +235,8 @@ Press `gg` to enter path mode.
 **F6** - Open the directory in Explorer.<br/>
 **F7** - Open the files in VS Code.<br/>
 **F8** - Open the directory in VS Code.<br/>
-**F9-F12** - Unassigned (configurable).<br/>
+**F9** - Open lazygit in the current directory (requires `lazygit` on PATH, configurable).<br/>
+**F10-F12** - Unassigned (configurable).<br/>
 
 ## How to Build
 

@@ -58,6 +58,7 @@ func loadConfig() (*Config, error) {
 		F6: &ToolConfig{Command: "explorer", Args: []string{}, Type: "dir"},
 		F7: &ToolConfig{Command: "code", Args: []string{}, Type: "path"},
 		F8: &ToolConfig{Command: "code", Args: []string{}, Type: "dir"},
+		F9: &ToolConfig{Command: "lazygit", Args: []string{}, Type: "none"},
 	}
 
 	configPath := getConfigPath()
