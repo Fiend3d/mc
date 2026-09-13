@@ -1,6 +1,10 @@
 package main
 
 import (
+	"errors"
+	"slices"
+	"strings"
+
 	"github.com/Fiend3d/catatui/term"
 	"mc/internal/event"
 	"mc/internal/paint"
@@ -180,5 +184,44 @@ func TestPaneTabsHoverAndSwitchDirectly(t *testing.T) {
 	m.Update(msg)
 	if m.currentTab != 1 || m.mode != normalMode {
 		t.Fatalf("direct tab switch produced tab=%d mode=%d", m.currentTab, m.mode)
+	}
+}
+
+func TestOpenSelectionWithDefaultApp(t *testing.T) {
+	m := selectionModel(t)
+	var opened []string
+	original := shellExecute
+	t.Cleanup(func() { shellExecute = original })
+	shellExecute = func(path, dir string) error {
+		if dir != m.getTab().dir {
+			t.Errorf("opened %s from %s", path, dir)
+		}
+		opened = append(opened, filepath.Base(path))
+		if filepath.Base(path) == "d" {
+			return errors.New("no association")
+		}
+		return nil
+	}
+
+	_, cmd := m.Update(event.KeyMsg{Name: "e"})
+	applyEffect(m, cmd)
+	if !slices.Equal(opened, []string{"a"}) {
+		t.Fatalf("without marks opened %v, want the cursor item", opened)
+	}
+
+	opened = nil
+	m.getPage().items[1].setSelected(true)
+	m.getPage().items[3].setSelected(true)
+	_, cmd = m.Update(event.KeyMsg{Name: "e"})
+	applyEffect(m, cmd)
+	if !slices.Equal(opened, []string{"b", "d"}) {
+		t.Fatalf("opened %v, want the marked items", opened)
+	}
+	last := m.log[len(m.log)-1]
+	if last.messageType != msgError || !strings.Contains(last.message, "d: no association") {
+		t.Fatalf("failure not reported: %+v", last)
+	}
+	if m.mode != normalMode {
+		t.Fatal("opening changed the mode")
 	}
 }

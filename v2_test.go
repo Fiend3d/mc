@@ -850,7 +850,7 @@ func TestPaneCanBeLeftWithoutTabs(t *testing.T) {
 	for _, key := range []string{
 		"j", "k", "l", "h", "down", "up", "left", "right", "enter", "space", "insert",
 		"home", "end", "pgup", "pgdown", "shift+up", "shift+down", "ctrl+a", "ctrl+d",
-		"ctrl+r", "d", "r", "y", "x", "p", "P", "f", ",", "a", "c", "s", ":", "B",
+		"ctrl+r", "d", "e", "r", "y", "x", "p", "P", "f", ",", "a", "c", "s", ":", "B",
 		"[", "]", "1", "0", "ctrl+n", "ctrl+t", "ctrl+b", "ctrl+f", "ctrl+w",
 		"f2", "f3", "f5", "esc",
 	} {

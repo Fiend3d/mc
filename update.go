@@ -796,6 +796,16 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 				}
 				m.confirm(&deleteCommand{m.getTab().dir, paths})
 				return m, nil
+			case "e":
+				paths := m.getPaths()
+				if len(paths) == 0 {
+					return m, m.addMessage(msgWarning, "nothing selected")
+				}
+				opening := fmt.Sprintf("opening %d items", len(paths))
+				if len(paths) == 1 {
+					opening = "opening " + filepath.Base(paths[0])
+				}
+				return m, event.Batch(m.addMessage(msgInfo, opening), shellOpen(paths, m.getTab().dir))
 			case "r":
 				return m.handleRename()
 			case "j":

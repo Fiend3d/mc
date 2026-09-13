@@ -199,6 +199,7 @@ func viewHelp(m *model) string {
 		{"Ctrl+w", "Close the current tab. Closing the last one leaves the pane empty."},
 		{"T", "Reopen the last closed tab."},
 		{"d", "Delete the selected items for good; they do not go to the Recycle Bin."},
+		{"e", "Open the selected items with their Windows default app, as a double click in Explorer would; folders open in Explorer."},
 		{"r", "Rename the selected items."},
 		{"y", "Copy the selected items."},
 		{"x", "Cut the selected items."},

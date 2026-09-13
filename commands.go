@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 	"mc/shutil"
 
 	"github.com/dustin/go-humanize"
+	"golang.org/x/sys/windows"
 )
 
 type errorMsg struct {
@@ -324,4 +326,42 @@ func runCmd(cmd *exec.Cmd, dir string) event.Cmd {
 	return event.ExecProcess(cmd, func(err error) event.Msg {
 		return processDoneMsg{dir: dir}
 	})
+}
+
+// shellExecute opens one path with the shell's default verb, which is what an
+// Explorer double-click does: associated apps for files, a window for folders.
+// Tests replace it so they never launch anything.
+var shellExecute = func(path, dir string) error {
+	file, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return err
+	}
+	cwd, err := windows.UTF16PtrFromString(dir)
+	if err != nil {
+		return err
+	}
+	return windows.ShellExecute(0, nil, file, nil, cwd, windows.SW_SHOWNORMAL)
+}
+
+// shellOpen launches the paths off the UI loop; a slow handler or an
+// unreachable share must not freeze the panes. The apps outlive mc.
+func shellOpen(paths []string, dir string) event.Cmd {
+	return func() event.Msg {
+		// Some shell extensions need COM initialised on the calling thread.
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+		if windows.CoInitializeEx(0, windows.COINIT_APARTMENTTHREADED|windows.COINIT_DISABLE_OLE1DDE) == nil {
+			defer windows.CoUninitialize()
+		}
+		var errs []error
+		for _, path := range paths {
+			if err := shellExecute(path, dir); err != nil {
+				errs = append(errs, fmt.Errorf("failed to open %s: %w", filepath.Base(path), err))
+			}
+		}
+		if len(errs) > 0 {
+			return errorMsg{errors.Join(errs...)}
+		}
+		return nil
+	}
 }

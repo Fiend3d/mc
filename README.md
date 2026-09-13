@@ -38,6 +38,7 @@ Keys are case-sensitive: `Y` means Shift+Y. Sequences such as `gg` mean press th
 | Arrows or `h/j/k/l`, `Enter` | Navigate and open items |
 | `Tab` | Switch panes |
 | `Space` / `Insert` | Select an item and advance |
+| `e` | Open selected items with their Windows default app |
 | `Y` / `X` | Copy / move selected items to the opposite pane |
 | `y` / `x`, then `p` | Copy / cut, then paste through the Windows clipboard |
 | `w` | View background tasks |
