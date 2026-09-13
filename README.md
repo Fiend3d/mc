@@ -102,6 +102,53 @@ Use `n`/`p` for the next/previous difference, `j`/`k` or arrows and the mouse wh
 
 UTF-8 text (including BOM) up to 5 MiB per file gets detailed comparison. Whitespace, line endings and missing final newlines remain significant. Binary files, unsupported encodings, larger files and comparisons exceeding the work or 100,000 line-break limit get a streamed identical/different summary. This is a snapshot; refresh with `F5` after external edits.
 
+### Vibe Mode
+
+Press **v** in Normal mode anywhere inside a Git working tree. Vibe opens a live tree rooted at the **Git repository root**, even when your pane is in a subdirectory:
+
+```text
+repository/
+  src/
+    components/
+      [M] button.go  +1 −1
+        @@ -12,3 +12,3 @@
+             12    12   context
+             13       -old line
+                   13 +new line
+             14    14   context
+```
+
+The tree contains only changed files and their parent directories. Files expand into diff hunks with three surrounding context lines. Added lines are green, deleted lines red; the two line-number columns refer to the baseline and current file. Folders, files and hunks start expanded.
+
+Vibe compares the working files against **HEAD**, combining staged and unstaged changes. Edits that cancel out relative to HEAD have no net diff. Untracked files appear individually as additions; ignored files are excluded. Before the first commit, the baseline is empty. Git must be on PATH and `git = true` enabled in config.toml.
+
+| Key | Action |
+|---|---|
+| `j/k`, Up/Down | Move through visible rows |
+| Mouse wheel | Scroll the view without moving the selection |
+| `PgUp/PgDn`, `Home/End` | Page or jump to the first/last row |
+| `h/Left` | Collapse a branch, or select its parent |
+| `l/Right` | Expand a branch, or enter it |
+| `Space` | Toggle expansion |
+| `e` / `c` | Expand all / collapse all branches |
+| `[` / `]` | Previous/next hunk; expand its ancestors |
+| `Enter/F3` | View the selected file/change; Enter toggles directories |
+| `F5` | Refresh immediately |
+| `w` | Toggle word wrap (on by default) |
+| `Esc/q` | Return to the panes |
+
+The repository root stays expanded. `c` collapses its descendants, leaving top-level files and folders visible.
+
+Click selects a row. Double-click toggles a branch or views a line. F3 on a file or hunk opens its first change. Added and context lines open the current file; deleted lines open a temporary read-only copy of the displayed baseline. Renames retain the original path, so historical viewing also works for renamed and entirely deleted files. Koneko receives mc's theme and selects the requested line; historical copies disable its Git gutter. Custom F3 viewers are honored, with line targeting available for koneko. Temporary copies are removed after viewing or a launch failure.
+
+**Automatic updates:** Vibe refreshes every two seconds while visible, including changes to files, the index, branch and HEAD. Refreshes run in the background; repeated requests coalesce. The tree preserves expansion, selection and scroll position where possible. If the selected row disappears, selection moves to a surviving parent. A refresh failure retains the previous tree and retries. Polling pauses during external viewing and refreshes immediately on return. F5 requests an immediate refresh.
+
+Long tree labels and diff text wrap to the available width. Continuation lines retain the outer tree branches and belong to the same selectable row. Mouse hover highlights the entire row, including its wrapped lines. The mouse wheel scrolls screen lines without changing selection.
+
+Press `w` to toggle wrapping; the footer shows its state. A scrollbar on the right shows your position and supports clicking and dragging, like the F1 help scrollbar.
+
+Vibe is read-only. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes appear as summaries. Text previews and historical viewing are limited to 5 MiB per file; patches are bounded at 32 MiB and displayed diff lines at 100,000 per refresh. Current files remain viewable from summary rows. Vibe complements the Git tally lists (files grouped by status) and Compare mode (two cursor files from the panes).
+
 ### Filter Mode
 
 Entered by pressing `f` in the normal mode. Current tab can be filtered.
@@ -142,7 +189,7 @@ Entered by pressing `` ` `` (backtick). The message history can be viewed here.
 
 Press `s` to enter search mode. Use `tab` to cycle through focus. By default, search respects `.gitignore`, but you can disable this by pressing `F1` while in search mode. Search is case-insensitive by default; toggle with `F2`.
 
-Press `F3` on a line to open it with `bat`; it will jump directly to that line. Press `n` to jump to the next match (or `N` to go backwards). Press `h` to hide all matched lines.
+Press `F3` on a line to open it in the configured viewer (`koneko` by default), jumping to the match when supported. Press `n` to jump to the next match (or `N` to go backwards). Press `h` to hide all matched lines.
 
 `F5` or `Enter` while focussing a text input - start searching.
 

@@ -39,6 +39,8 @@ func (m *model) draw(f *catatui.Frame) {
 		return
 	}
 	switch m.mode {
+	case vibeMode:
+		m.drawVibe(f, content)
 	case compareMode:
 		m.drawCompare(f, content)
 	case helpMode, helpFilterMode, messagesMode, bookmarksMode, tabsMode, searchMode, gitListMode:

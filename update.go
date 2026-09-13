@@ -97,6 +97,9 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 	if handled, cmd := m.updateV2(msg); handled {
 		return m, cmd
 	}
+	if handled, cmd := m.updateVibe(msg); handled {
+		return m, cmd
+	}
 	if result, ok := msg.(compareDoneMsg); ok {
 		m.applyComparison(result)
 		return m, nil
@@ -710,6 +713,8 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 
 		case normalMode:
 			switch msg.String() {
+			case "v":
+				return m.openVibe()
 			case "f1":
 				m.mode = helpMode
 				m.help = 0

@@ -40,6 +40,7 @@ const (
 	themeMode
 	transferMode
 	compareMode
+	vibeMode
 )
 
 type pane struct {
@@ -110,6 +111,7 @@ type model struct {
 	search        *search
 	gitList       gitList
 	compare       comparison
+	vibe          vibeState
 	hoverGitIndex int
 
 	theme       *theme
@@ -250,6 +252,7 @@ func (m *model) clearHover() {
 // listing that reloads underneath it has no reason to take the highlight away
 // while the pointer has not moved.
 func (m *model) clearItemHover() {
+	m.vibe.hover = ""
 	m.hoverPane, m.hoverIndex, m.hoverSearchIndex = -1, -1, -1
 	m.hoverTabPane, m.hoverTabIndex, m.hoverGitIndex = -1, -1, -1
 }

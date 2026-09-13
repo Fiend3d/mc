@@ -38,6 +38,7 @@ func TestConPTYChild(t *testing.T) {
 	if os.Getenv("MC_TEST_TOOL_KIND") == "powershell" {
 		m.cfg.F4 = &ToolConfig{Command: "powershell", Type: "none", Args: []string{"-NoProfile", "-Command", `Write-Host MC-TOOL-READY; $line=[Console]::ReadLine(); [IO.File]::WriteAllText($env:MC_TEST_TOOL_RESULT,$line)`}}
 	}
+	m.cfg.F3 = m.cfg.F4
 
 	if err := run(&m); err != nil {
 		t.Fatal(err)
@@ -81,6 +82,10 @@ func testConPTYHandoff(t *testing.T) {
 	}
 	touch(t, filepath.Join(left, "sample.txt"))
 	touch(t, filepath.Join(right, "sample.txt"))
+	if os.Getenv("MC_TEST_TOOL_KIND") == "go" {
+		vibeTestGit(t, dir, "init", "-b", "main")
+		vibeCommit(t, dir)
+	}
 	t.Setenv("APPDATA", dir)
 	t.Setenv("MC_TEST_CHILD", "1")
 	t.Setenv("MC_TEST_LEFT", left)
@@ -177,7 +182,17 @@ func testConPTYHandoff(t *testing.T) {
 	wait("Compare shortcut", contains("Differences"))
 	wait("comparison loaded", contains("Files are identical"))
 	send("q") // Close Compare before exercising the editor handoff.
-	send("\x1b[115;62;0;1;0;1_\x1b[115;62;0;0;0;1_") // F4 down/up
+	if os.Getenv("MC_TEST_TOOL_KIND") == "go" {
+		send("v")
+		wait("Vibe mode", contains("Vibe"))
+		wait("initial Vibe load", contains("matches HEAD"))
+		vibeWrite(t, left, "nested/vibe-live.txt", "automatic refresh\n")
+		wait("automatic repository refresh", contains("vibe-live.txt"))
+		send("]")
+		send("\x1b[114;61;0;1;0;1_\x1b[114;61;0;0;0;1_") // F3 on the hunk
+	} else {
+		send("\x1b[115;62;0;1;0;1_\x1b[115;62;0;0;0;1_") // F4 down/up
+	}
 	wait("external tool", contains("MC-TOOL-READY"))
 	for _, r := range "handoff works\r" {
 		send(fmt.Sprintf("\x1b[%d;0;%d;1;0;1_\x1b[%d;0;%d;0;0;1_", unicode.ToUpper(r), r, unicode.ToUpper(r), r))
@@ -186,6 +201,9 @@ func testConPTYHandoff(t *testing.T) {
 	// Use actual Ctrl+H key records: the legacy byte 8 means Backspace.
 	count := func(s string) int { mu.Lock(); defer mu.Unlock(); return bytes.Count(output.Bytes(), []byte(s)) }
 	wait("resumed frame", func() bool { return count("?1049h") >= 2 })
+	if os.Getenv("MC_TEST_TOOL_KIND") == "go" {
+		send("q")
+	} // Return from Vibe to Normal.
 	before := count("?1049l")
 	ctrlH := "\x1b[72;35;8;1;8;1_\x1b[72;35;8;0;8;1_"
 	send(ctrlH)

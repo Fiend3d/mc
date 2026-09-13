@@ -57,6 +57,9 @@ func run(m *model) (err error) {
 	defer func() {
 		cancel()
 		m.compare.stop()
+		m.vibe.stop()
+		m.vibe.stopViewer()
+		cleanupVibeTemp(m.vibe.tempPath)
 		for _, t := range m.taskList {
 			if t.cancel != nil {
 				t.cancel()
@@ -211,6 +214,10 @@ func run(m *model) (err error) {
 			reconcileWatches(retry)
 			if retry {
 				lastFallback = now
+				if m.mode == vibeMode && !m.taskView {
+					execute(m.refreshVibe())
+					dirty = true
+				}
 				for _, p := range m.panes {
 					for _, t := range p.tabs {
 						// Also catches missed notifications and clipboard changes.
@@ -336,6 +343,20 @@ func (m *model) inputEvent(e term.Event) event.Msg {
 			return nil
 		}
 		x, y := int(e.X), int(e.Y)
+		if m.mode == vibeMode {
+			if e.MouseKind == term.MouseDrag {
+				return event.MouseDragMsg{X: x, Y: y, Button: event.MouseLeft}
+			}
+			if e.MouseKind == term.MouseUp {
+				return event.MouseUpMsg{X: x, Y: y, Button: event.MouseLeft}
+			}
+		}
+		if m.mode == vibeMode && e.MouseKind == term.MouseMove {
+			if x == m.screenWidth-1 {
+				return event.MouseHoverMsg{Index: -1}
+			}
+			return event.MouseHoverMsg{Index: m.vibe.rowAtY(y, m.vibeHeight())}
+		}
 		// Help owns drag and release so its scrollbar can be dragged; other
 		// modes never see them, keeping their coordinate handling untouched.
 		if m.mode == helpMode || m.mode == helpFilterMode {

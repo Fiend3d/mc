@@ -214,6 +214,7 @@ func viewHelp(m *model) string {
 		{"Ctrl+f", "Go forward in history."},
 		{"Ctrl+j", "Enter Jump mode, where each item's first letter becomes a shortcut."},
 		{"Shift+d", "Compare the file under each pane's cursor; marked selections are ignored."},
+		{"v", "Enter Vibe mode inside a Git repository: a live tree of changes rooted at the repository."},
 		{"Tab", "Switch the focused pane."},
 		{"Ctrl+Left/Right", "Move the current tab to the left or right pane and follow it."},
 		{"", "An empty pane keeps its half of the screen; T, b or gg fill it again."},
@@ -310,7 +311,7 @@ func viewHelp(m *model) string {
 		{"F1", "Toggle .gitignore filtering."},
 		{"F2", "Toggle case sensitivity."},
 		{"F5", "Start the search, or restart it."},
-		{"F3", "Open the selected line with less, or the F3 command from your config."},
+		{"F3", "Open the selected match in the configured viewer (koneko by default), at its line when supported."},
 		{"Esc", "Leave Search mode, or stop a search that is running."},
 		{"h", "Hide or show the matching lines."},
 		{"tab", "Cycle the focus: filename, then text, then results."},
@@ -338,7 +339,26 @@ func viewHelp(m *model) string {
 		{"w", "Open the Tasks overlay."},
 		{"Esc / q", "Close Compare and return to the panes."},
 	}, m)
-	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &tasksDocs, &searchDocs, &shellDocs, &gitDocs, &compareDocs}
+	vibeDocs := newHelpTopic("Vibe Mode", [][]string{
+		{"", "Press v in Normal mode anywhere inside a Git working tree. Vibe shows the repository root, its directories, changed files, hunks, and numbered diff lines with three lines of context. Green + lines are additions; red - lines are deletions. Both old and new line numbers are shown. Folder branches include only changed descendants."},
+		{"", "The diff combines staged and unstaged work against HEAD, plus individual untracked files. Changes that cancel out against HEAD disappear; ignored files are excluded. A repository with no commits uses an empty baseline. Git must be on PATH and git = true must be enabled."},
+		{"", "Vibe refreshes automatically every two seconds while visible. Refreshes run in the background and preserve the cursor, scroll position and collapsed branches where possible. If a row disappears, selection returns to a surviving parent. A failed refresh retains the previous tree and retries. Polling pauses for external viewers and resumes immediately when they close."},
+		{"j/k, Up/Down", "Move through visible rows. PgUp/PgDn move a page; Home/End go to the first/last row."},
+		{"Mouse wheel", "Scroll the view without moving the selected row. Keyboard navigation brings the selection back into view."},
+		{"", "Long labels and diff text wrap. Hover highlights the whole row, including continuation lines; clicking any continuation selects its original row."},
+		{"h/l, Left/Right", "Collapse/select the parent, or expand/enter a branch."},
+		{"Space", "Toggle the selected branch. Click selects; double-click toggles a branch or views a line."},
+		{"e / c", "Expand all / collapse branches beneath the repository root. The root stays expanded, keeping top-level files and folders visible."},
+		{"[ / ]", "Jump to the previous/next hunk, expanding its ancestors if needed."},
+		{"Enter / F3", "View the first change in a file/hunk or the selected line. Enter on a directory toggles it. Added/context lines open the current file; deleted lines open a temporary read-only copy of the displayed baseline, even for renamed or entirely deleted files."},
+		{"", "F3 honors your configured viewer. Koneko receives mc's theme and a grapheme-based line selection; historical copies disable its Git markers. Other viewers receive the file. Temporary copies are removed after the viewer closes or fails to launch."},
+		{"F5", "Refresh now. Repeated requests coalesce while a refresh is running."},
+		{"w", "Toggle word wrap, enabled initially. The footer shows its current state."},
+		{"Scrollbar", "The right scrollbar shows the viewport position; click or drag it to scroll without moving selection."},
+		{"Esc / q", "Close Vibe, keeping the underlying pane state."},
+		{"", "Vibe is read-only: it does not stage, revert or edit. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes remain visible as summaries. Text previews and historical viewing are limited to 5 MiB per file, patches to 32 MiB and diff lines to 100,000 per refresh. Current files can still be opened in the viewer from a summary."},
+	}, m)
+	topics := []*helpTopic{&normalDocs, &goDocs, &pathDocs, &tasksDocs, &searchDocs, &shellDocs, &gitDocs, &compareDocs, &vibeDocs}
 	keyWidth := helpKeyColumn(topics)
 	for _, topic := range topics {
 		docs = addTopic(docs, topic, m, keyWidth)
