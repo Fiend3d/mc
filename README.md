@@ -19,7 +19,7 @@ Modal Commander (`mc`) is a keyboard-driven file manager for the Windows termina
 
 1. Download a Windows archive from [GitHub Releases](https://github.com/Fiend3d/mc/releases).
 2. Extract it and run `mc.exe` from your terminal. No Go installation is needed for a release binary.
-3. Optionally add the extracted directory to `PATH` to run `mc` from anywhere.
+3. To run `mc` from anywhere, add the extracted directory to your user `PATH`: open **Edit environment variables for your account**, edit **Path**, and add that directory. Open a new terminal after saving.
 
 Open two directories side by side:
 
@@ -51,7 +51,16 @@ Keys are case-sensitive: `Y` means Shift+Y. Sequences such as `gg` mean press th
 
 Normal transfers choose unique names on collisions. `P` requests overwrite with confirmation. **Delete is permanent; overwrites are not undoable.** Other completed reversible work, including partial transfers, can be undone.
 
-Want your shell to follow the directory you exit from? Install the optional [PowerShell `cd` wrapper](scripts/readme.md). The focused pane supplies the returned directory; `Q` exits without returning one.
+### Set up your shell and tools
+
+For the PowerShell wrapper and helper scripts, see the [scripts directory and setup instructions](https://github.com/Fiend3d/mc/tree/master/scripts).
+
+1. Open your PowerShell profile (`notepad $PROFILE`). If it does not exist, create its parent directory and the profile file first.
+2. Paste the `function m` wrapper from the scripts README into your profile, save it, and open a new PowerShell session.
+3. Run `m` to launch mc. When you quit with `q`, your shell changes to the focused pane's directory; `Q` exits without changing directory. Running `mc` directly cannot change the parent shell's directory.
+4. In mc, press `gC` to save the default configuration, then `gc` to open its directory. Edit `$env:APPDATA\mc\config.toml` to configure your F-key tools; put the tools you use on `PATH`.
+
+The scripts directory also includes `t.bat` to launch Windows Terminal in the current directory and `pp.ps1` to save clipboard images. Add their containing directory to `PATH` to invoke them as `t` and `pp`. If PowerShell blocks scripts, the [local setup guide](scripts/readme.md) explains the execution-policy setting.
 
 ### Requirements and optional tools
 
