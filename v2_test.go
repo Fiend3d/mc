@@ -675,6 +675,26 @@ func TestBackgroundQueueUniqueNamesAndUndoRedo(t *testing.T) {
 		t.Fatal("redo did not restore copied file")
 	}
 }
+func TestCreatedItemIsSelected(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"a", "b", "c"} {
+		touch(t, filepath.Join(dir, name))
+	}
+	m := testModel(t, dir, t.TempDir())
+	applyEffect(m, m.readTab(m.getTab()))
+	m.sort(alphabeticSort, false)
+	for _, name := range []string{"zz.txt", "new dir\\"} {
+		keyEvent(m, "a")
+		m.input.SetValue(name)
+		keyEvent(m, "enter")
+		finishTasks(t, m)
+		want := filepath.Join(dir, strings.TrimSuffix(name, "\\"))
+		tab := m.getTab()
+		if got := tab.page.getItems()[tab.getPageSettings().cursor].getFullPath(); got != want {
+			t.Fatalf("after creating %q the cursor is on %q", name, got)
+		}
+	}
+}
 func TestDirectTransferCapturesSourceAndDestination(t *testing.T) {
 	src, dst := t.TempDir(), t.TempDir()
 	touch(t, filepath.Join(src, "a"))

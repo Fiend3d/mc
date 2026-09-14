@@ -312,7 +312,7 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 		settings.update(tab.page.length())
 		if settings.sel != nil {
 			for i, it := range tab.page.getItems() {
-				if it.getFullPath() == *settings.sel {
+				if samePath(it.getFullPath(), *settings.sel) {
 					settings.cursor = i
 					break
 				}

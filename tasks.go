@@ -192,6 +192,18 @@ func (m *model) finishTask(msg taskDoneMsg) event.Cmd {
 			m.cm.pushHistory(t.cmd)
 		}
 	}
+	if t.action != "undo" && msg.err == nil {
+		// The next read of a visible tab showing the result moves its cursor there.
+		if sel := t.cmd.sel(); sel != nil {
+			for _, p := range m.panes {
+				if p.hasTabs() {
+					if tab := p.tabs[p.currentTab]; samePath(tab.dir, t.cmd.getDir()) {
+						tab.getPageSettings().sel = sel
+					}
+				}
+			}
+		}
+	}
 	m.jobDone()
 	m.startTask()
 	message := fmt.Sprintf("Task %d %s: %s", t.id, t.state, t.cmd)
