@@ -173,6 +173,11 @@ func testConPTYHandoff(t *testing.T) {
 		}
 	}
 	wait("first frame", contains("sample.txt"))
+	// A host that parses win32-input-mode key records announces it on startup.
+	// Older hosts, such as the Windows 10 inbox conhost, drop the records.
+	if !contains("\x1b[?9001h")() {
+		t.Skip("ConPTY host does not support win32-input-mode key records")
+	}
 	// Exercise the actual Windows key-record path: Ctrl+J must remain
 	// distinct from Enter, which legacy LF-only input cannot express.
 	send("\x1b[74;36;10;1;8;1_\x1b[74;36;10;0;8;1_")
