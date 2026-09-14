@@ -29,6 +29,8 @@ mc.exe C:\projects C:\downloads
 
 With no directory arguments, the left pane opens your working directory. The right pane restores its saved tabs, or starts empty if none are saved. A second directory argument overrides restoration; extra directories become left-pane tabs. Only right-pane tabs persist between sessions.
 
+The terminal title follows the focused pane’s current directory, for example `mc - C:\projects\mc`. It returns to the previous title when mc exits.
+
 ### Your first session
 
 Keys are case-sensitive: `Y` means Shift+Y. Sequences such as `gg` mean press the keys in order.
@@ -52,16 +54,76 @@ Keys are case-sensitive: `Y` means Shift+Y. Sequences such as `gg` mean press th
 
 Normal transfers choose unique names on collisions. `P` requests overwrite with confirmation. **Delete is permanent; overwrites are not undoable.** Other completed reversible work, including partial transfers, can be undone.
 
-### Set up your shell and tools
+### Change your shell directory on exit
 
-For the PowerShell wrapper and helper scripts, see the [scripts directory and setup instructions](https://github.com/Fiend3d/mc/tree/master/scripts).
+Running `mc.exe` directly cannot change the parent shell's directory. Set up this PowerShell wrapper once, then launch with `m` to `cd` to the focused pane's directory when you quit.
 
-1. Open your PowerShell profile (`notepad $PROFILE`). If it does not exist, create its parent directory and the profile file first.
-2. Paste the `function m` wrapper from the scripts README into your profile, save it, and open a new PowerShell session.
-3. Run `m` to launch mc. When you quit with `q`, your shell changes to the focused pane's directory; `Q` exits without changing directory. Running `mc` directly cannot change the parent shell's directory.
-4. In mc, press `gC` to save the default configuration, then `gc` to open its directory. Edit `$env:APPDATA\mc\config.toml` to configure your F-key tools; put the tools you use on `PATH`.
+Create your PowerShell profile if needed and open it (use your preferred editor instead of Notepad if you like):
 
-The scripts directory also includes `t.bat` to launch Windows Terminal in the current directory and `pp.ps1` to save clipboard images. Add their containing directory to `PATH` to invoke them as `t` and `pp`. If PowerShell blocks scripts, the [local setup guide](scripts/readme.md) explains the execution-policy setting.
+```powershell
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $PROFILE) | Out-Null
+if (-not (Test-Path -LiteralPath $PROFILE)) {
+    New-Item -ItemType File -Path $PROFILE | Out-Null
+}
+notepad $PROFILE
+```
+
+Paste this function into the profile and save it. Make sure `mc.exe` is on `PATH` as described above.
+
+```powershell
+function m {
+    $tmp = (New-TemporaryFile).FullName
+    try {
+        mc.exe -o -tf="$tmp" $args
+        $cwd = Get-Content -LiteralPath $tmp -Encoding UTF8
+        if ($null -ne $cwd -and $cwd -ne $PWD.Path -and
+            (Test-Path -LiteralPath $cwd -PathType Container)) {
+            Set-Location -LiteralPath (Resolve-Path -LiteralPath $cwd).Path
+        }
+    } finally {
+        Remove-Item -LiteralPath $tmp
+    }
+}
+```
+
+Open a new PowerShell session, or reload the profile in your current session:
+
+```powershell
+. $PROFILE
+```
+
+If PowerShell blocks the profile or helper scripts, enable scripts for your account, then reload the profile:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+. $PROFILE
+```
+
+Launch mc with either:
+
+```powershell
+m
+m C:\projects C:\downloads
+```
+
+Browse to a directory, switch to the pane you want with `Tab`, and press `q`. Your calling PowerShell session is now in that pane's current directory, ready for your next command. `Q` (Shift+Q) quits without changing the shell directory. Quitting from an empty pane also leaves it unchanged.
+
+### Open Windows Terminal here with `t`
+
+`t.bat` is a shortcut for `wt -d .`: it opens Windows Terminal in the calling shell's current directory instead of relying on the terminal profile's default starting directory. Windows Terminal must be installed and `wt` available on `PATH`.
+
+Release archives include `t.bat`. Keep it in the extracted directory added to `PATH` above, or download it from the [scripts directory](https://github.com/Fiend3d/mc/tree/master/scripts) and add its containing directory to `PATH`. Then run:
+
+```powershell
+m  # Browse to a directory, then press q to cd there
+t  # Open Windows Terminal in that directory
+```
+
+### Set up your tools
+
+In mc, press `gC` to save the default configuration, then `gc` to open its directory. Edit `$env:APPDATA\mc\config.toml` to configure your F-key tools; put the tools you use on `PATH`.
+
+For other helpers, including `pp.ps1` to save clipboard images, see the [scripts directory and setup instructions](https://github.com/Fiend3d/mc/tree/master/scripts).
 
 ### Requirements and optional tools
 
@@ -76,7 +138,7 @@ The file manager runs on **Windows**. External tools are optional and needed onl
 | `deps` | Default F2 dependency viewer |
 | `lazygit` on `PATH` | Default F9 Git interface |
 
-All F-key tools are configurable. `bat` with `less` can be configured as an alternative viewer. For the intended mouse and icon experience, use Windows Terminal and a Nerd Font such as JetBrainsMonoNL Nerd Font.
+All F-key tools are configurable. `bat` with `less` can be configured as an alternative viewer. For the intended mouse and icon experience, use Windows Terminal and a [Nerd Font](https://www.nerdfonts.com/font-downloads) such as **JetBrainsMonoNL Nerd Font**. Install the font, then select it in your Windows Terminal profile settings.
 
 ## Reference
 

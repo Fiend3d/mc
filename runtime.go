@@ -22,6 +22,8 @@ type delivered struct {
 func run(m *model) (err error) {
 	defer term.RecoverAndRestore()
 	defer m.saveTabs()
+	title := newTerminalTitleState(readConsoleTitle, writeConsoleTitle)
+	defer title.restore()
 	var terminal *catatui.Terminal
 	var restore func()
 	var reader *term.EventReader
@@ -38,6 +40,7 @@ func run(m *model) (err error) {
 			return e
 		}
 		reader = term.NewEventReader(os.Stdin, os.Stdout)
+		title.update(m.currentDir())
 		return nil
 	}
 	stop := func() {
@@ -242,6 +245,7 @@ func run(m *model) (err error) {
 			return nil
 		case event.ProcessMsg:
 			stop()
+			title.restore()
 			v.Command.Stdin = os.Stdin
 			v.Command.Stdout = os.Stdout
 			v.Command.Stderr = os.Stderr
@@ -276,6 +280,7 @@ func run(m *model) (err error) {
 		if ack != nil {
 			close(ack)
 		}
+		title.update(m.currentDir())
 		dirty = true
 	}
 }

@@ -1,37 +1,52 @@
-# How to edit PowerShell's config
+# PowerShell wrapper: cd on exit
 
-I like using Helix for this. You should use whatever you prefer.
+Add the directory containing `mc.exe` to your user `PATH`, then open a new PowerShell session. Create and open your profile:
 
 ```powershell
-hx $profile
-````
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $PROFILE) | Out-Null
+if (-not (Test-Path -LiteralPath $PROFILE)) {
+    New-Item -ItemType File -Path $PROFILE | Out-Null
+}
+notepad $PROFILE
+```
 
-Paste this there:
+Paste this function into the profile and save it:
 
 ```powershell
 function m {
-	$tmp = (New-TemporaryFile).FullName                                 # create a temp file
-	mc.exe $args -o -tf="$tmp"                                          # launch mc with output enabled
-	$cwd = Get-Content -Path $tmp -Encoding UTF8                        # grab the path
-	if ($cwd -ne $null -and `
-		$cwd -ne $PWD.Path -and `                                       # check if the path is ok
-		(Test-Path -LiteralPath $cwd -PathType Container)) {            
-		Set-Location -LiteralPath (Resolve-Path -LiteralPath $cwd).Path # cd!
-	}
-	Remove-Item -Path $tmp                                              # remove the file
+    $tmp = (New-TemporaryFile).FullName
+    try {
+        mc.exe -o -tf="$tmp" $args
+        $cwd = Get-Content -LiteralPath $tmp -Encoding UTF8
+        if ($null -ne $cwd -and $cwd -ne $PWD.Path -and
+            (Test-Path -LiteralPath $cwd -PathType Container)) {
+            Set-Location -LiteralPath (Resolve-Path -LiteralPath $cwd).Path
+        }
+    } finally {
+        Remove-Item -LiteralPath $tmp
+    }
 }
 ```
 
-And it doesn't work `¯\_(ツ)_/¯` You need to enable powershell for some reason:
+Reload your profile with `. $PROFILE`, or open a new PowerShell session. If PowerShell blocks scripts, run:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+. $PROFILE
 ```
 
-Now you can just type `m` in the terminal and it will launch **mc**. When you quit, it will `cd` to the selected directory.
+Run `m` to launch mc, or pass directories with `m C:\projects C:\downloads`. Browse, focus the pane whose directory you want, and press `q` to change the calling shell to that pane's current directory. `Q` (Shift+Q) quits without changing directory; an empty focused pane also returns no directory. Running `mc.exe` directly cannot change the parent shell's directory.
 
 # t.bat
-A useful script that launches Windows Terminal in the current working directory. By default, Windows Terminal doesn't do this. Simply typing `t` is convenient and easy to remember.
+
+`t.bat` runs `wt -d .` to open Windows Terminal in the calling shell's current directory, instead of relying on the terminal profile's default starting directory. Windows Terminal must be installed and `wt` available on `PATH`.
+
+Release archives include `t.bat`. Add its containing directory to your user `PATH` and open a new shell to invoke it as `t`. Without PATH setup, use `& C:\path\to\t.bat`.
+
+```powershell
+m  # Browse to a directory, then press q to cd there
+t  # Open Windows Terminal in that directory
+```
 
 # zz
 `zz` is a zip bomb detector. It safely unzips archives using `7z` (https://www.7-zip.org/download.html).
