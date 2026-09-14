@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"syscall"
@@ -19,8 +20,8 @@ func clipboardWrite(text string) error {
 		return err
 	}
 
-	clipboard.Write(clipboard.FmtText, []byte(text))
-	return nil
+	_, err = clipboard.Write(context.TODO(), clipboard.FmtText, []byte(text))
+	return err
 }
 
 const (
