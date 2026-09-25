@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"github.com/fsnotify/fsnotify"
 	"golang.org/x/sys/windows"
 	"os"
 	"path/filepath"
@@ -13,6 +15,48 @@ import (
 	"unicode"
 	"unsafe"
 )
+
+func TestWatchUpdatesFollowVisibleDirectories(t *testing.T) {
+	first, second := t.TempDir(), t.TempDir()
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer watcher.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	updates := make(chan map[string]bool, 1)
+	done := make(chan struct{})
+	go func() { runWatchUpdates(ctx, watcher, updates); close(done) }()
+	wait := func(want map[string]bool) {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) {
+			got := watcher.WatchList()
+			if len(got) == len(want) {
+				all := true
+				for _, dir := range got {
+					all = all && want[dir]
+				}
+				if all {
+					return
+				}
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+		t.Fatalf("watches = %q, want %v", watcher.WatchList(), want)
+	}
+	updates <- map[string]bool{first: true}
+	wait(map[string]bool{first: true})
+	updates <- map[string]bool{second: true}
+	wait(map[string]bool{second: true})
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("watch worker did not stop")
+	}
+}
 
 // This helper runs in a real Windows pseudoconsole, including terminal restore
 // and a child process reading from stdin. No desktop window is created.
@@ -33,6 +77,16 @@ func TestConPTYChild(t *testing.T) {
 	os.Stdin, os.Stdout, os.Stderr = input, output, output
 
 	m := initialModel([]string{os.Getenv("MC_TEST_LEFT"), os.Getenv("MC_TEST_RIGHT")})
+	if gate := os.Getenv("MC_TEST_WATCH_GATE"); gate != "" {
+		newWatcher = func() (*fsnotify.Watcher, error) {
+			for {
+				if _, err := os.Stat(gate); err == nil {
+					return fsnotify.NewWatcher()
+				}
+				time.Sleep(10 * time.Millisecond)
+			}
+		}
+	}
 	executable, _ := os.Executable()
 	m.cfg.F4 = &ToolConfig{Command: executable, Type: "none", Args: []string{"-test.run=^TestConPTYTool$"}}
 	if os.Getenv("MC_TEST_TOOL_KIND") == "powershell" {
@@ -90,6 +144,11 @@ func testConPTYHandoff(t *testing.T) {
 	t.Setenv("MC_TEST_CHILD", "1")
 	t.Setenv("MC_TEST_LEFT", left)
 	t.Setenv("MC_TEST_RIGHT", right)
+	watchGate := ""
+	if os.Getenv("MC_TEST_TOOL_KIND") == "powershell" {
+		watchGate = filepath.Join(t.TempDir(), "allow-watcher")
+		t.Setenv("MC_TEST_WATCH_GATE", watchGate)
+	}
 	result, toolResult := filepath.Join(dir, "result"), filepath.Join(dir, "tool-result")
 	t.Setenv("MC_TEST_RESULT", result)
 	t.Setenv("MC_TEST_TOOL_RESULT", toolResult)
@@ -123,6 +182,7 @@ func testConPTYHandoff(t *testing.T) {
 	executable, _ := os.Executable()
 	command, _ := windows.UTF16PtrFromString(windows.ComposeCommandLine([]string{executable, "-test.run=^TestConPTYChild$"}))
 	var process windows.ProcessInformation
+	started := time.Now()
 	if err = windows.CreateProcess(nil, command, nil, nil, false, windows.EXTENDED_STARTUPINFO_PRESENT, nil, nil, &startup.StartupInfo, &process); err != nil {
 		t.Fatal(err)
 	}
@@ -173,6 +233,12 @@ func testConPTYHandoff(t *testing.T) {
 		}
 	}
 	wait("first frame", contains("sample.txt"))
+	t.Logf("first populated frame after %s", time.Since(started))
+	if watchGate != "" {
+		if err := os.WriteFile(watchGate, nil, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// A host that parses win32-input-mode key records announces it on startup.
 	// Older hosts, such as the Windows 10 inbox conhost, drop the records.
 	if !contains("\x1b[?9001h")() {
@@ -193,7 +259,7 @@ func testConPTYHandoff(t *testing.T) {
 		wait("initial Vibe load", contains("matches HEAD"))
 		vibeWrite(t, left, "nested/vibe-live.txt", "automatic refresh\n")
 		wait("automatic repository refresh", contains("vibe-live.txt"))
-		send("]")
+		send("\x1b[93;0;93;1;0;1_\x1b[93;0;93;0;0;1_")   // ] to select the hunk
 		send("\x1b[114;61;0;1;0;1_\x1b[114;61;0;0;0;1_") // F3 on the hunk
 	} else {
 		send("\x1b[115;62;0;1;0;1_\x1b[115;62;0;0;0;1_") // F4 down/up

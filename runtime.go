@@ -6,6 +6,7 @@ import (
 	"github.com/Fiend3d/catatui"
 	"github.com/Fiend3d/catatui/term"
 	"github.com/fsnotify/fsnotify"
+	"maps"
 	"mc/internal/event"
 	"os"
 	"path/filepath"
@@ -17,6 +18,41 @@ import (
 type delivered struct {
 	msg event.Msg
 	ack chan struct{}
+}
+
+type watcherReadyMsg struct{ watcher *fsnotify.Watcher }
+
+var newWatcher = fsnotify.NewWatcher
+
+// A watch registration can block on a slow volume, so only this worker calls
+// Add and Remove. Filesystem events still reach the UI loop directly.
+func runWatchUpdates(ctx context.Context, watcher *fsnotify.Watcher, updates <-chan map[string]bool) {
+	registered := make(map[string]bool)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case wanted := <-updates:
+			for dir := range registered {
+				if !wanted[dir] {
+					_ = watcher.Remove(dir)
+					delete(registered, dir)
+				}
+			}
+			live := make(map[string]bool)
+			for _, dir := range watcher.WatchList() {
+				live[dir] = true
+			}
+			for dir := range wanted {
+				if ctx.Err() != nil {
+					return
+				}
+				if !registered[dir] || !live[dir] {
+					registered[dir] = watcher.Add(dir) == nil
+				}
+			}
+		}
+	}
 }
 
 func run(m *model) (err error) {
@@ -136,15 +172,13 @@ func run(m *model) (err error) {
 			execute(m.readTab(t))
 		}
 	}
-	watcher, watchErr := fsnotify.NewWatcher()
-	if watchErr == nil {
-		defer watcher.Close()
-	}
+	var watcher *fsnotify.Watcher
+	var watchUpdates chan map[string]bool
 	watched := make(map[string]bool)
 	pendingRefresh := make(refreshQueue)
 	lastFallback := time.Now()
 	reconcileWatches := func(retry bool) {
-		if watcher == nil {
+		if watchUpdates == nil {
 			return
 		}
 		wanted := make(map[string]bool)
@@ -157,25 +191,21 @@ func run(m *model) (err error) {
 		}
 		for dir := range watched {
 			if !wanted[dir] {
-				_ = watcher.Remove(dir)
-				delete(watched, dir)
 				delete(pendingRefresh, dir)
 			}
 		}
-		registered := make(map[string]bool)
-		for _, dir := range watcher.WatchList() {
-			registered[dir] = true
+		if !retry && maps.Equal(watched, wanted) {
+			return
 		}
-		for dir := range wanted {
-			if watched[dir] && !registered[dir] {
-				watched[dir] = false
-			}
-			if working, ok := watched[dir]; !ok || (!working && retry) {
-				watched[dir] = watcher.Add(dir) == nil
-			}
+		watched = wanted
+		select {
+		case watchUpdates <- wanted:
+		default:
+			<-watchUpdates
+			watchUpdates <- wanted
 		}
 	}
-	reconcileWatches(true)
+	watcherStarted := false
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	dirty := true
@@ -189,6 +219,13 @@ func run(m *model) (err error) {
 				return err
 			}
 			dirty = false
+		}
+		if !watcherStarted {
+			watcherStarted = true
+			execute(func() event.Msg {
+				w, _ := newWatcher()
+				return watcherReadyMsg{watcher: w}
+			})
 		}
 		var msg event.Msg
 		var ack chan struct{}
@@ -238,6 +275,18 @@ func run(m *model) (err error) {
 		}
 
 		switch v := msg.(type) {
+		case watcherReadyMsg:
+			if v.watcher != nil {
+				watcher = v.watcher
+				defer watcher.Close()
+				watchUpdates = make(chan map[string]bool, 1)
+				workers.Add(1)
+				go func() {
+					defer workers.Done()
+					runWatchUpdates(ctx, watcher, watchUpdates)
+				}()
+				reconcileWatches(true)
+			}
 		case event.QuitMsg:
 			if ack != nil {
 				close(ack)

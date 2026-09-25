@@ -1073,13 +1073,15 @@ func TestPathModeIsVisibleInAnEmptyPane(t *testing.T) {
 func TestPathModeStillCompletesInsideADirectory(t *testing.T) {
 	dir := t.TempDir()
 	wd, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(wd) }) // path mode chdirs; release the temp dir
 	if err := os.MkdirAll(filepath.Join(dir, "childdir"), 0755); err != nil {
 		t.Fatal(err)
 	}
 	m := testModel(t, dir, t.TempDir())
 	keyEvent(m, "g")
 	keyEvent(m, "g")
+	if got, _ := os.Getwd(); got != wd {
+		t.Fatalf("path mode changed process directory to %q", got)
+	}
 	if m.pathInput.Value() != dir {
 		t.Fatalf("path mode opened with %q", m.pathInput.Value())
 	}
@@ -1087,6 +1089,42 @@ func TestPathModeStillCompletesInsideADirectory(t *testing.T) {
 	want := filepath.Join(dir, "childdir")
 	if got := m.pathInput.CurrentSuggestion(); got != want {
 		t.Fatalf("suggestion = %q, want %q", got, want)
+	}
+}
+
+func TestDeleteDirectoryAfterLeavingInheritedWorkingDir(t *testing.T) {
+	parent := t.TempDir()
+	child := filepath.Join(parent, "child")
+	if err := os.Mkdir(child, 0755); err != nil {
+		t.Fatal(err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(wd) })
+	if err := os.Chdir(child); err != nil {
+		t.Fatal(err)
+	}
+	m := testModel(t, child)
+	_, cmd := m.Update(event.KeyMsg{Name: "h"})
+	applyEffect(m, cmd)
+	if !samePath(m.currentDir(), parent) {
+		t.Fatalf("navigated to %q, want %q", m.currentDir(), parent)
+	}
+	_, cmd = m.Update(event.KeyMsg{Name: "d"})
+	applyEffect(m, cmd)
+	if m.mode != confirmDialogMode {
+		t.Fatal("delete did not ask for confirmation")
+	}
+	_, cmd = m.Update(event.KeyMsg{Name: "y"})
+	applyEffect(m, cmd)
+	finishTasks(t, m)
+	if _, err := os.Stat(child); !os.IsNotExist(err) {
+		t.Fatalf("directory still exists after delete: %v", err)
+	}
+	if len(m.taskList) != 1 || m.taskList[0].state != "completed" {
+		t.Fatalf("delete task failed: %+v", m.taskList)
 	}
 }
 

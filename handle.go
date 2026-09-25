@@ -89,21 +89,63 @@ func (m *model) handleConfirm(msg event.Msg) (event.Model, event.Cmd) {
 			return m, nil
 		case "enter":
 			if m.yes {
-				m.mode = normalMode
-				m.addJob()
-				return m, m.addCommand(m.cmd)
+				return m.runConfirmedCommand()
 			} else {
 				m.mode = normalMode
 				return m, nil
 			}
 		case "y":
-			m.mode = normalMode
-			m.addJob()
-			return m, m.addCommand(m.cmd)
+			return m.runConfirmedCommand()
 		}
 	}
 
 	return m, nil
+}
+
+func (m *model) runConfirmedCommand() (event.Model, event.Cmd) {
+	m.mode = normalMode
+	if c, ok := m.cmd.(*deleteCommand); ok {
+		if err := releaseDeleteWorkingDir(c); err != nil {
+			return m, m.addMessage(msgError, fmt.Sprintf("cannot start delete: %s", err))
+		}
+	}
+	m.addJob()
+	return m, m.addCommand(m.cmd)
+}
+
+// Windows keeps the process working directory open. It may still be a folder
+// inherited at launch even after the pane has moved to its parent.
+func releaseDeleteWorkingDir(c *deleteCommand) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	inside := false
+	for _, path := range c.paths {
+		if shutil.Within(path, wd) {
+			inside = true
+			break
+		}
+	}
+	if !inside {
+		return nil
+	}
+	for _, candidate := range []string{c.dir, os.TempDir()} {
+		if candidate == "" {
+			continue
+		}
+		safe := true
+		for _, path := range c.paths {
+			if shutil.Within(path, candidate) {
+				safe = false
+				break
+			}
+		}
+		if safe && os.Chdir(candidate) == nil {
+			return nil
+		}
+	}
+	return fmt.Errorf("no accessible working directory outside the selected paths")
 }
 
 func (m *model) handlePaste(override bool) (event.Model, event.Cmd) {

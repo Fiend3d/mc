@@ -582,9 +582,6 @@ func (m *model) Update(msg event.Msg) (event.Model, event.Cmd) {
 			case "g":
 				m.mode = pathMode
 				dir := m.currentDir()
-				if dir != "" && !isUNCRoot(dir) { // these aren't valid directories
-					os.Chdir(dir)
-				}
 				m.pathInput.Reset()
 				m.pathInput.SetValue(dir)
 				m.pathInput.Focus()
