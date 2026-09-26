@@ -404,7 +404,9 @@ func (m *model) inputEvent(e term.Event) event.Msg {
 			}
 		}
 		if m.mode == vibeMode && e.MouseKind == term.MouseMove {
-			if x == m.screenWidth-1 {
+			m.syncVibeLayout()
+			_, leftWidth, _, _ := m.vibePaneLayout()
+			if x >= leftWidth-1 {
 				return event.MouseHoverMsg{Index: -1}
 			}
 			return event.MouseHoverMsg{Index: m.vibe.rowAtY(y, m.vibeHeight())}

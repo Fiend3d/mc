@@ -326,11 +326,11 @@ func TestVibeRenderingAndInputIsolation(t *testing.T) {
 		t.Fatal("Vibe input escaped to panes")
 	}
 	keyEvent(m, "w")
-	if m.taskView || m.mode != vibeMode || !m.vibe.noWrap {
+	if m.taskView || m.mode != vibeMode || !m.vibe.previewNoWrap {
 		t.Fatal("w didn't toggle wrapping")
 	}
 	keyEvent(m, "w")
-	if m.vibe.noWrap {
+	if m.vibe.previewNoWrap {
 		t.Fatal("w didn't restore wrapping")
 	}
 	keyEvent(m, "q")
@@ -434,6 +434,7 @@ func TestVibeUnavailableAndJumpModeBinding(t *testing.T) {
 func TestVibeWheelScrollKeepsSelectionThroughDrawAndRefresh(t *testing.T) {
 	m := testModel(t, t.TempDir())
 	m.mode = vibeMode
+	m.screenWidth = 80
 	m.screenHeight = 8
 	file := vibeFile{path: "file.txt", hunks: []vibeHunk{{header: "@@ -0,0 +1,30 @@"}}}
 	for i := 0; i < 30; i++ {
@@ -445,7 +446,7 @@ func TestVibeWheelScrollKeepsSelectionThroughDrawAndRefresh(t *testing.T) {
 	if m.vibe.cursor != 0 || m.vibe.start != 3 {
 		t.Fatal("wheel moved selection instead of viewport")
 	}
-	backend := catatui.NewTestBackend(100, 8)
+	backend := catatui.NewTestBackend(80, 8)
 	terminal, _ := catatui.NewTerminal(backend)
 	if err := terminal.Draw(m.draw); err != nil {
 		t.Fatal(err)
@@ -499,7 +500,7 @@ func TestVibeWrappedHoverAndClick(t *testing.T) {
 	file := vibeFile{path: "file", hunks: []vibeHunk{{header: "@@ -0,0 +1 @@", lines: []vibeLine{{kind: '+', new: 1, text: text}}}}}
 	m.vibe = vibeState{root: "repo", collapsed: map[string]bool{}, snapshot: vibeSnapshot{files: []vibeFile{file}}}
 	m.vibe.rebuild()
-	m.vibe.layout(40)
+	m.vibe.layout(38)
 	row := len(m.vibe.rows) - 1
 	position := m.vibe.rowPosition(row)
 	var rebuilt strings.Builder
@@ -597,10 +598,11 @@ func TestVibeHunkJumpRevealsContent(t *testing.T) {
 func TestVibeExpandCollapseAll(t *testing.T) {
 	m := testModel(t, t.TempDir())
 	m.mode = vibeMode
+	m.screenWidth = 80
 	file := vibeFile{path: "dir/file", hunks: []vibeHunk{{header: "hunk", lines: []vibeLine{{kind: '+', new: 1, text: "change"}}}}}
 	m.vibe = vibeState{root: "repo", collapsed: map[string]bool{}, snapshot: vibeSnapshot{files: []vibeFile{file}}}
 	m.vibe.rebuild()
-	m.vibe.layout(98)
+	m.vibe.layout(78)
 	count := len(m.vibe.rows)
 	m.vibe.cursor = count - 1
 	keyEvent(m, "c")
@@ -672,5 +674,162 @@ func TestVibeCursorOutranksHoverAndChromeFits(t *testing.T) {
 		if strings.Contains(line.String(), "…") {
 			t.Fatalf("row %d is clipped: %q", y, line.String())
 		}
+	}
+}
+
+func vibeSplitFixture(t *testing.T) *model {
+	t.Helper()
+	m := testModel(t, t.TempDir())
+	m.mode = vibeMode
+	m.screenWidth, m.screenHeight = 100, 12
+	first := vibeFile{path: "a.go", status: "M", hunks: []vibeHunk{{header: "@@ -1 +1,30 @@", new: 1}}}
+	for i := 0; i < 30; i++ {
+		first.hunks[0].lines = append(first.hunks[0].lines, vibeLine{kind: '+', new: i + 1, text: fmt.Sprintf("change %02d", i)})
+	}
+	first.hunks = append(first.hunks, vibeHunk{header: "@@ -40 +40 @@", new: 40, lines: []vibeLine{{kind: '-', old: 40, text: "old value"}, {kind: '+', new: 40, text: "new value"}}})
+	files := []vibeFile{first, {path: "binary.dat", status: "M", note: "binary diff unavailable"}}
+	for i := 0; i < 15; i++ {
+		files = append(files, vibeFile{path: fmt.Sprintf("extra%02d.go", i), status: "M", hunks: []vibeHunk{{header: "@@ -1 +1 @@", new: 1, lines: []vibeLine{{kind: '+', new: 1, text: "other"}}}}})
+	}
+	m.vibe = vibeState{root: "repo", collapsed: map[string]bool{}, snapshot: vibeSnapshot{branch: "main", files: files}}
+	m.vibe.rebuild()
+	m.syncVibeLayout()
+	return m
+}
+
+func TestVibeSplitPreviewAndNarrowFallback(t *testing.T) {
+	m := vibeSplitFixture(t)
+	if !m.vibe.split {
+		t.Fatal("100-column Vibe did not split")
+	}
+	for _, row := range m.vibe.rows {
+		if row.kind == 'l' || row.kind == 'i' {
+			t.Fatal("changed lines or notes remained in wide tree")
+		}
+	}
+	m.vibe.cursor = 1 // first file
+	backend := catatui.NewTestBackend(100, 12)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	_, leftWidth, rightX, _ := m.vibePaneLayout()
+	var left, right strings.Builder
+	for y := 3; y < 11; y++ {
+		for x := 0; x < leftWidth; x++ {
+			left.WriteString(backend.Buffer().CellAt(uint16(x), uint16(y)).Symbol)
+		}
+		for x := rightX; x < 100; x++ {
+			right.WriteString(backend.Buffer().CellAt(uint16(x), uint16(y)).Symbol)
+		}
+	}
+	if strings.Contains(left.String(), "change 00") || !strings.Contains(right.String(), "change 00") {
+		t.Fatal("diff was not confined to right pane")
+	}
+	for i, row := range m.vibe.rows {
+		if row.id == "f:binary.dat" {
+			m.vibe.cursor = i
+			break
+		}
+	}
+	m.syncVibePreview()
+	if len(m.vibe.previewRows) != 1 || !strings.Contains(m.vibe.previewRows[0].text, "binary diff unavailable") {
+		t.Fatal("file note missing from preview")
+	}
+	m.vibe.cursor = 0
+	m.syncVibePreview()
+	if !strings.Contains(m.vibe.previewRows[0].text, "Select a file") {
+		t.Fatal("directory prompt missing")
+	}
+	m.screenWidth = 99
+	m.syncVibeLayout()
+	if m.vibe.split || len(m.vibe.rows) <= len(m.vibe.snapshot.files) {
+		t.Fatal("narrow Vibe did not restore combined tree")
+	}
+	foundLine := false
+	for i, row := range m.vibe.rows {
+		if row.kind == 'l' {
+			m.vibe.cursor = i
+			foundLine = true
+			break
+		}
+	}
+	if !foundLine {
+		t.Fatal("narrow view lost changed lines")
+	}
+	m.screenWidth = 100
+	m.syncVibeLayout()
+	if m.vibe.current().kind != 'h' {
+		t.Fatal("wide resize did not retain the selected line's hunk")
+	}
+}
+
+func TestVibeSplitIndependentScrollingAndFocus(t *testing.T) {
+	m := vibeSplitFixture(t)
+	m.vibe.cursor = 1
+	m.syncVibePreview()
+	_, leftWidth, rightX, _ := m.vibePaneLayout()
+	m.Update(m.inputEvent(term.Event{Kind: term.EventMouse, MouseKind: term.MouseScrollDown, X: uint16(rightX + 3), Y: 5}))
+	if m.vibe.previewStart != 3 || m.vibe.start != 0 || m.vibe.cursor != 1 {
+		t.Fatal("right wheel did not scroll preview independently")
+	}
+	m.Update(event.MouseWheelMsg{X: 3, Y: 5, Button: event.MouseWheelDown})
+	if m.vibe.start != 3 || m.vibe.previewStart != 3 {
+		t.Fatal("left wheel did not scroll tree independently")
+	}
+	keyEvent(m, "tab")
+	keyEvent(m, "j")
+	if !m.vibe.previewFocus || m.vibe.previewStart != 4 || m.vibe.cursor != 1 {
+		t.Fatal("Tab focus did not route keys to preview")
+	}
+	m.Update(event.MouseClickMsg{X: 99, Y: 3, Button: event.MouseLeft})
+	if !m.vibe.previewDragging {
+		t.Fatal("right scrollbar did not capture drag")
+	}
+	m.Update(event.MouseDragMsg{X: 99, Y: 10, Button: event.MouseLeft})
+	if m.vibe.previewStart != len(m.vibe.previewRows)-m.vibePreviewHeight() || m.vibe.cursor != 1 {
+		t.Fatal("right scrollbar drag missed bottom or moved tree selection")
+	}
+	m.Update(event.MouseUpMsg{X: 99, Y: 10, Button: event.MouseLeft})
+	if m.vibe.previewDragging {
+		t.Fatal("right scrollbar drag did not end")
+	}
+	keyEvent(m, "]")
+	m.syncVibePreview()
+	if m.vibe.current().kind != 'h' || m.vibe.previewStart != 0 || !m.vibe.previewFocus {
+		t.Fatal("hunk jump did not update preview while focused right")
+	}
+	for _, row := range m.vibe.previewRows {
+		if strings.Contains(row.text, "new value") {
+			t.Fatal("hunk preview included another hunk")
+		}
+	}
+	m.vibe.previewStart = 5
+	m.vibe.replace(m.vibe.snapshot, m.vibeHeight())
+	m.syncVibePreview()
+	if m.vibe.previewStart != 5 {
+		t.Fatal("refresh lost preview scroll for surviving selection")
+	}
+	keyEvent(m, "]")
+	m.syncVibePreview()
+	if m.vibe.current().hunk != 1 || m.vibe.previewStart != 0 {
+		t.Fatal("next hunk did not reset preview to its top")
+	}
+	keyEvent(m, "tab")
+	if m.vibe.previewFocus {
+		t.Fatal("Tab did not return focus to tree")
+	}
+	m.Update(event.MouseClickMsg{X: leftWidth - 2, Y: 3, Button: event.MouseLeft})
+	if m.vibe.previewFocus {
+		t.Fatal("left click did not focus tree")
+	}
+	m.Update(m.inputEvent(term.Event{Kind: term.EventMouse, MouseKind: term.MouseMove, X: uint16(rightX + 3), Y: 4}))
+	if m.vibe.hover != "" {
+		t.Fatal("right hover highlighted a tree row")
+	}
+	m.screenWidth = 99
+	m.syncVibeLayout()
+	if m.vibe.previewFocus || m.vibe.previewDragging {
+		t.Fatal("hidden right pane retained focus or drag")
 	}
 }

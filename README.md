@@ -225,7 +225,7 @@ UTF-8 text (including BOM) up to 5 MiB per file gets detailed comparison. Whites
 
 ### Vibe Mode
 
-Press **v** in Normal mode anywhere inside a Git working tree. Vibe opens a live tree rooted at the **Git repository root**, even when your pane is in a subdirectory:
+Press **v** in Normal mode anywhere inside a Git working tree. Vibe opens a live tree rooted at the **Git repository root**, even when your pane is in a subdirectory. At 100 terminal columns or wider, directories, files and hunks appear on the left, and the selected file or hunk's diff appears on the right. Below 100 columns, Vibe uses the combined full-width view illustrated here:
 
 ```text
 repository/
@@ -239,14 +239,15 @@ repository/
              14    14   context
 ```
 
-The tree contains only changed files and their parent directories. Files expand into diff hunks with three surrounding context lines. A hunk is labelled by the lines it spans in the current file, its added and deleted counts, and the enclosing function when Git can tell. Added lines are green, deleted lines red; the two line-number columns refer to the baseline and current file. Folders, files and hunks start expanded.
+The tree contains only changed files and their parent directories. Files expand into diff hunks with three surrounding context lines. A hunk is labelled by the lines it spans in the current file, its added and deleted counts, and the enclosing function when Git can tell. Added lines are green, deleted lines red; the two line-number columns refer to the baseline and current file. In the wide view, selecting a file shows all its hunks on the right; selecting a hunk shows just that hunk. Selecting a directory prompts you to select a file. Folders and files start expanded.
 
 Vibe compares the working files against **HEAD**, combining staged and unstaged changes. Edits that cancel out relative to HEAD have no net diff. Untracked files appear individually as additions; ignored files are excluded. Before the first commit, the baseline is empty. Git must be on PATH and `git = true` enabled in config.toml.
 
 | Key | Action |
 |---|---|
 | `j/k`, Up/Down | Move through visible rows |
-| Mouse wheel | Scroll the view without moving the selection |
+| Mouse wheel | Scroll the pane under the pointer without moving the selection |
+| `Tab` | In the wide view, switch keyboard focus between the tree and diff |
 | `PgUp/PgDn`, `Home/End` | Page or jump to the first/last row |
 | `h/Left` | Collapse a branch, or select its parent |
 | `l/Right` | Expand a branch, or enter it |
@@ -264,9 +265,9 @@ Click selects a row. Double-click toggles a branch or views a line. F3 on a file
 
 **Automatic updates:** Vibe refreshes every two seconds while visible, including changes to files, the index, branch and HEAD. Refreshes run in the background; repeated requests coalesce. The tree preserves expansion, selection and scroll position where possible. If the selected row disappears, selection moves to a surviving parent. A refresh failure retains the previous tree and retries. Polling pauses during external viewing and refreshes immediately on return. F5 requests an immediate refresh.
 
-Long tree labels and diff text wrap to the available width. Continuation lines retain the outer tree branches and belong to the same selectable row. Mouse hover highlights the entire row, including its wrapped lines. The mouse wheel scrolls screen lines without changing selection.
+Long tree labels and diff text wrap to the available width. In the narrow view, continuation lines retain the outer tree branches and belong to the same selectable row. Mouse hover highlights the entire tree row, including its wrapped lines. In the wide view, navigation keys scroll the focused pane, while `[` and `]` select hunks from either pane. Clicking a pane focuses it.
 
-Press `w` to toggle wrapping; the footer shows its state. A scrollbar on the right shows your position and supports clicking and dragging, like the F1 help scrollbar.
+Press `w` to toggle wrapping; in the wide view it controls the diff. Each wide pane has its own scrollbar, which supports clicking and dragging. Mouse wheel scrolling follows the pointer even when keyboard focus is in the other pane.
 
 Vibe is read-only. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes appear as summaries. Text previews are limited to 5 MiB per file; patches are bounded at 32 MiB and displayed diff lines at 100,000 per refresh. Current files remain viewable from summary rows. Vibe complements the Git tally lists (files grouped by status) and Compare mode (two cursor files from the panes).
 

@@ -342,11 +342,12 @@ func viewHelp(m *model) string {
 		{"Esc / q", "Close Compare and return to the panes."},
 	}, m)
 	vibeDocs := newHelpTopic("Vibe Mode", [][]string{
-		{"", "Press v in Normal mode anywhere inside a Git working tree. Vibe shows the repository root, its directories, changed files, hunks, and numbered diff lines with three lines of context. Green + lines are additions; red - lines are deletions. Both old and new line numbers are shown. Folder branches include only changed descendants."},
+		{"", "Press v in Normal mode anywhere inside a Git working tree. At 100 columns or wider, Vibe shows directories, files and hunks on the left and the selected diff on the right. Below 100 columns it shows the original combined tree. Green + lines are additions; red - lines are deletions. Both old and new line numbers are shown."},
 		{"", "The diff combines staged and unstaged work against HEAD, plus individual untracked files. Changes that cancel out against HEAD disappear; ignored files are excluded. A repository with no commits uses an empty baseline. Git must be on PATH and git = true must be enabled."},
 		{"", "Vibe refreshes automatically every two seconds while visible. Refreshes run in the background and preserve the cursor, scroll position and collapsed branches where possible. If a row disappears, selection returns to a surviving parent. A failed refresh retains the previous tree and retries. Polling pauses for external viewers and resumes immediately when they close."},
-		{"j/k, Up/Down", "Move through visible rows. PgUp/PgDn move a page; Home/End go to the first/last row."},
-		{"Mouse wheel", "Scroll the view without moving the selected row. Keyboard navigation brings the selection back into view."},
+		{"Tab", "In the wide view, switch keyboard focus between the tree and diff. Clicking a pane also focuses it."},
+		{"j/k, Up/Down", "Move through tree rows or scroll the focused diff. PgUp/PgDn move a page; Home/End go to the first/last row or diff line."},
+		{"Mouse wheel", "Scroll the pane under the pointer without moving the tree selection, regardless of keyboard focus."},
 		{"", "Long labels and diff text wrap. Hover highlights the whole row, including continuation lines; clicking any continuation selects its original row."},
 		{"h/l, Left/Right", "Collapse/select the parent, or expand/enter a branch."},
 		{"Space", "Toggle the selected branch. Click selects; double-click toggles a branch or views a line."},
@@ -355,8 +356,8 @@ func viewHelp(m *model) string {
 		{"Enter / F3", "View the first change in a file/hunk or the selected line. Enter on a directory toggles it. Only the current working file is opened: a deleted line opens where it used to be, at its replacement or the next surviving line. An entirely deleted file has nothing to open."},
 		{"", "F3 honors your configured viewer. Koneko receives mc's theme and a grapheme-based line selection. Other viewers receive the file."},
 		{"F5", "Refresh now. Repeated requests coalesce while a refresh is running."},
-		{"w", "Toggle word wrap, enabled initially. The footer shows its current state."},
-		{"Scrollbar", "The right scrollbar shows the viewport position; click or drag it to scroll without moving selection."},
+		{"w", "Toggle word wrap, enabled initially. In the wide view it controls the diff; in the narrow view it controls the combined tree."},
+		{"Scrollbars", "Each wide pane has its own scrollbar. Click or drag one to scroll that pane without moving selection."},
 		{"Esc / q", "Close Vibe, keeping the underlying pane state."},
 		{"", "Vibe is read-only: it does not stage, revert or edit. Binary, oversized, conflicted, symbolic-link, submodule and metadata-only changes remain visible as summaries. Text previews are limited to 5 MiB per file, patches to 32 MiB and diff lines to 100,000 per refresh. Current files can still be opened in the viewer from a summary."},
 	}, m)

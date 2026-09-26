@@ -28,6 +28,11 @@ type vibeState struct {
 	rowOffsets                         []int
 	layoutWidth                        int
 	noWrap, scrollbarDragging          bool
+	split, previewFocus                bool
+	previewNoWrap, previewDragging     bool
+	previewStart, previewWidth         int
+	previewTarget                      string
+	previewRows                        []vibePreviewRow
 	hover                              string
 	all                                []vibeRow
 	collapsed                          map[string]bool
@@ -184,6 +189,7 @@ func (v *vibeState) replace(snapshot vibeSnapshot, height int) {
 	offset := v.rowPosition(v.cursor) - v.start
 	v.snapshot = snapshot
 	v.rebuild()
+	v.previewRows = nil
 	index := -1
 	for i, r := range v.rows {
 		if r.id == old.id {
@@ -305,10 +311,21 @@ func (v *vibeState) visible() {
 	v.rows = nil
 	hiddenDepth := -1
 	for _, row := range v.all {
+		if v.split && (row.kind == 'l' || row.kind == 'i') {
+			continue
+		}
 		if hiddenDepth >= 0 && row.depth > hiddenDepth {
 			continue
 		}
 		hiddenDepth = -1
+		if v.split {
+			switch row.kind {
+			case 'h':
+				row.branch = false
+			case 'f':
+				row.branch = len(v.snapshot.files[row.file].hunks) > 0
+			}
+		}
 		v.rows = append(v.rows, row)
 		if row.branch && v.collapsed[row.id] {
 			hiddenDepth = row.depth
@@ -326,6 +343,7 @@ func (v *vibeState) toggle(height int) {
 	}
 }
 func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
+	m.syncVibeLayout()
 	v := &m.vibe
 	h := m.vibeHeight()
 	row := v.current()
@@ -341,25 +359,70 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 		m.mode = normalMode
 	case "f5":
 		return m, m.refreshVibe()
+	case "tab":
+		if v.split {
+			v.previewFocus = !v.previewFocus
+			v.hover = ""
+		}
 	case "w":
-		v.toggleWrap(h)
+		if v.split {
+			v.previewNoWrap = !v.previewNoWrap
+			v.previewRows = nil
+		} else {
+			v.toggleWrap(h)
+		}
 	case "j", "down":
-		v.move(1, h)
+		if v.split && v.previewFocus {
+			m.syncVibePreview()
+			v.scrollPreview(1, m.vibePreviewHeight())
+		} else {
+			v.move(1, h)
+		}
 	case "k", "up":
-		v.move(-1, h)
+		if v.split && v.previewFocus {
+			m.syncVibePreview()
+			v.scrollPreview(-1, m.vibePreviewHeight())
+		} else {
+			v.move(-1, h)
+		}
 	case "pgdown":
-		v.page(h, h)
+		if v.split && v.previewFocus {
+			m.syncVibePreview()
+			v.scrollPreview(m.vibePreviewHeight(), m.vibePreviewHeight())
+		} else {
+			v.page(h, h)
+		}
 	case "pgup":
-		v.page(-h, h)
+		if v.split && v.previewFocus {
+			m.syncVibePreview()
+			v.scrollPreview(-m.vibePreviewHeight(), m.vibePreviewHeight())
+		} else {
+			v.page(-h, h)
+		}
 	case "home":
-		v.cursor = 0
-		v.keep(h)
+		if v.split && v.previewFocus {
+			v.previewStart = 0
+		} else {
+			v.cursor = 0
+			v.keep(h)
+		}
 	case "end":
-		v.cursor = len(v.rows) - 1
-		v.keep(h)
+		if v.split && v.previewFocus {
+			m.syncVibePreview()
+			v.previewStart = max(0, len(v.previewRows)-m.vibePreviewHeight())
+		} else {
+			v.cursor = len(v.rows) - 1
+			v.keep(h)
+		}
 	case "space":
+		if v.split && v.previewFocus {
+			break
+		}
 		v.toggle(h)
 	case "e":
+		if v.split && v.previewFocus {
+			break
+		}
 		selected := ""
 		if row != nil {
 			selected = row.id
@@ -374,6 +437,9 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 		}
 		v.keep(h)
 	case "c":
+		if v.split && v.previewFocus {
+			break
+		}
 		for _, r := range v.all {
 			if r.branch {
 				v.collapsed[r.id] = true
@@ -383,6 +449,9 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 		v.cursor, v.start = 0, 0
 		v.hover = ""
 	case "h", "left":
+		if v.split && v.previewFocus {
+			break
+		}
 		if row != nil {
 			if row.branch && !v.collapsed[row.id] {
 				v.toggle(h)
@@ -397,6 +466,9 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 			}
 		}
 	case "l", "right":
+		if v.split && v.previewFocus {
+			break
+		}
 		if row != nil && row.branch {
 			if v.collapsed[row.id] {
 				v.toggle(h)
@@ -405,9 +477,7 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 			}
 		}
 	case "]", "[":
-		if v.layoutWidth != max(1, m.screenWidth-2) {
-			v.layout(max(1, m.screenWidth-2))
-		}
+		m.syncVibeLayout()
 		step := 1
 		if key == "[" {
 			step = -1
@@ -476,6 +546,8 @@ func (m *model) updateVibe(msg event.Msg) (bool, event.Cmd) {
 	if m.mode != vibeMode {
 		return false, nil
 	}
+	m.syncVibeLayout()
+	split, leftWidth, rightX, rightWidth := m.vibePaneLayout()
 	switch e := msg.(type) {
 	case event.KeyMsg:
 		_, cmd := m.handleVibe(e.String())
@@ -487,12 +559,31 @@ func (m *model) updateVibe(msg event.Msg) (bool, event.Cmd) {
 			if e.Button == event.MouseWheelUp {
 				steps = -3
 			}
-			m.vibe.scroll(steps, m.vibeHeight())
+			if split && e.X >= rightX {
+				m.syncVibePreview()
+				m.vibe.scrollPreview(steps, m.vibePreviewHeight())
+			} else if !split || e.X < leftWidth {
+				m.vibe.scroll(steps, m.vibeHeight())
+			}
 		}
 		return true, nil
 	case event.MouseClickMsg:
 		if !m.taskView && !m.quitting && e.Button == event.MouseLeft {
-			if e.X == m.screenWidth-1 && e.Y >= 2 && e.Y < 2+m.vibeHeight() {
+			if split && e.X >= rightX {
+				m.vibe.previewFocus = true
+				m.vibe.hover = ""
+				if e.X == rightX+rightWidth-1 && e.Y >= 3 && e.Y < 3+m.vibePreviewHeight() {
+					m.syncVibePreview()
+					m.vibe.previewDragging = true
+					m.vibe.previewScrollbarTo(e.Y-3, m.vibePreviewHeight())
+				}
+				return true, nil
+			}
+			if split && e.X >= leftWidth {
+				return true, nil
+			}
+			m.vibe.previewFocus = false
+			if e.X == leftWidth-1 && e.Y >= 2 && e.Y < 2+m.vibeHeight() {
 				m.vibe.scrollbarDragging = true
 				m.vibe.scrollbarTo(e.Y-2, m.vibeHeight())
 				return true, nil
@@ -522,10 +613,13 @@ func (m *model) updateVibe(msg event.Msg) (bool, event.Cmd) {
 	case event.MouseDragMsg:
 		if m.vibe.scrollbarDragging {
 			m.vibe.scrollbarTo(e.Y-2, m.vibeHeight())
+		} else if m.vibe.previewDragging {
+			m.vibe.previewScrollbarTo(e.Y-3, m.vibePreviewHeight())
 		}
 		return true, nil
 	case event.MouseUpMsg:
 		m.vibe.scrollbarDragging = false
+		m.vibe.previewDragging = false
 		return true, nil
 	case event.MouseTabMsg, event.PasteMsg:
 		return true, nil
