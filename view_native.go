@@ -309,7 +309,13 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 				}
 				if drive, ok := it.(*driveItem); ok {
 					footer = fmt.Sprintf("%s free / %s · %s", humanize.Bytes(drive.free), humanize.Bytes(drive.total), drive.driveType)
+					if drive.label != "" {
+						footer = style.Foreground(m.theme.grayColor).Render(drive.label) + " " + footer
+					}
 				}
+				pos := style.Foreground(m.theme.grayColor).Render(fmt.Sprintf(" [%d/%d]", settings.cursor+1, len(items)))
+				room := max(0, int(a.Width) - paint.Width(pos))
+				footer = paint.Truncate(footer, room) + strings.Repeat(" ", max(0, room-paint.Width(footer))) + pos
 			}
 		}
 	}
