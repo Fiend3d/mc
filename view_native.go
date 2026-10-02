@@ -303,7 +303,7 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 				footer = m.log[len(m.log)-1].render(m.theme, false)
 			} else if len(items) > 0 {
 				it := items[settings.cursor]
-				footer = it.getName() + "  " + it.getExtra()
+				footer = it.getName() + "  " + style.Foreground(m.theme.grayColor).Render(it.getExtra())
 				if file, ok := it.(*filepathItem); ok && file.git != gitNone {
 					footer += "  " + file.git.name()
 				}
