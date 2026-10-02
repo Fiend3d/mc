@@ -12,6 +12,15 @@ import (
 	"strings"
 )
 
+// driveBarCells is the width of the free-space gauge drawn before a drive's
+// size text in the listing.
+const driveBarCells = 10
+
+// driveSizeCells is the width of one humanized byte figure in a drive's size
+// text. humanize.Bytes never renders wider than this, so padding each figure
+// to it keeps the gauge and the slash in a column across the drive listing.
+const driveSizeCells = 7
+
 func textAt(f *catatui.Frame, area catatui.Rect, s string) {
 	f.RenderWidget(widgets.NewParagraphFromText(catatui.NewText(paint.Lines(s)...)), area)
 }
@@ -240,6 +249,15 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 				if it.isDirectory() {
 					if file, ok := it.(*filepathItem); ok && file.sizeStr != "" {
 						metadata = " " + file.sizeStr
+					} else if d, ok := it.(*driveItem); ok {
+						if d.total > 0 {
+							used := int(float64(d.total-d.free)/float64(d.total)*driveBarCells+0.5)
+							used = min(driveBarCells, max(0, used))
+							metadata = s.Foreground(m.theme.greenColor).Render(strings.Repeat("█", used)) + s.Foreground(m.theme.grayColor).Render(strings.Repeat("░", driveBarCells-used))
+							free := fmt.Sprintf("%*s", driveSizeCells, humanize.Bytes(d.free))
+							total := fmt.Sprintf("%*s", driveSizeCells, humanize.Bytes(d.total))
+							metadata += s.Foreground(m.theme.greenColor).Render(" " + free) + s.Foreground(m.theme.grayColor).Render(" / " + total)
+						}
 					} else {
 						metadata = " <DIR>"
 					}
@@ -248,7 +266,9 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 				}
 			}
 			if a.Width >= 65 {
-				metadata += s.Foreground(m.theme.grayColor).Render(" " + it.getModTime().Format("02.01.06 15:04"))
+				if _, ok := it.(*driveItem); !ok {
+					metadata += s.Foreground(m.theme.grayColor).Render(" " + it.getModTime().Format("02.01.06 15:04"))
+				}
 			}
 			nameWidth := max(1, int(a.Width)-3-paint.Width(git)-paint.Width(metadata))
 			line = action + cursor + mark + git + paint.PlaceHorizontal(nameWidth, paint.Left, truncate(name, nameWidth)) + metadata
