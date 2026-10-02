@@ -10,6 +10,8 @@
 
 Version info is injected via ldflags at build time (`Version`, `GitCommit`, `BuildTime`). Binary is force-deleted before each build to avoid stale version strings.
 
+**Before a `dist` build, update the sibling `deps` and `koneko` checkouts to the latest upstream version** — `build.ps1 dist` rebuilds them from their current local sources but never pulls Git updates, so a release otherwise ships stale tools. See `DEPS.md` for the exact steps.
+
 ## CLI Flags
 
 | Flag | Purpose |
