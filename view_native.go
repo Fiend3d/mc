@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"image/color"
 
-	"github.com/Fiend3d/catatui"
-	"github.com/Fiend3d/catatui/widgets"
-	"github.com/dustin/go-humanize"
 	"mc/internal/paint"
 	"mc/shutil"
 	"strings"
+
+	"github.com/Fiend3d/catatui"
+	"github.com/Fiend3d/catatui/widgets"
+	"github.com/dustin/go-humanize"
 )
 
 // driveBarCells is the width of the free-space gauge drawn before a drive's
@@ -251,12 +252,12 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 						metadata = " " + file.sizeStr
 					} else if d, ok := it.(*driveItem); ok {
 						if d.total > 0 {
-							used := int(float64(d.total-d.free)/float64(d.total)*driveBarCells+0.5)
+							used := int(float64(d.total-d.free)/float64(d.total)*driveBarCells + 0.5)
 							used = min(driveBarCells, max(0, used))
-							metadata = s.Foreground(m.theme.greenColor).Render(strings.Repeat("█", used)) + s.Foreground(m.theme.grayColor).Render(strings.Repeat("░", driveBarCells-used))
+							metadata = s.Foreground(m.theme.grayColor).Render(strings.Repeat("█", used)) + s.Foreground(m.theme.grayColor).Render(strings.Repeat("░", driveBarCells-used))
 							free := fmt.Sprintf("%*s", driveSizeCells, humanize.Bytes(d.free))
 							total := fmt.Sprintf("%*s", driveSizeCells, humanize.Bytes(d.total))
-							metadata += s.Foreground(m.theme.greenColor).Render(" " + free) + s.Foreground(m.theme.grayColor).Render(" / " + total)
+							metadata += s.Foreground(m.theme.greenColor).Render(" "+free) + s.Foreground(m.theme.grayColor).Render(" / "+total)
 						}
 					} else {
 						metadata = " <DIR>"
