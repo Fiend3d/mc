@@ -301,6 +301,8 @@ func viewSearch(m *model) string {
 			actualIndex, lineIndex := m.search.mapIndex(index)
 			item := m.search.items[actualIndex]
 			line := item.lines[lineIndex]
+			const branchIndent = 1
+			s.WriteString(style.Render(strings.Repeat(" ", branchIndent)))
 			if lineIndex != len(item.lines)-1 {
 				s.WriteString(style.Foreground(m.theme.grayColor).Render("├─"))
 			} else {
@@ -309,7 +311,7 @@ func viewSearch(m *model) string {
 			lineNumber := strconv.Itoa(line.lineNumber)
 			s.WriteString(style.Foreground(m.theme.greenColor).Render(lineNumber))
 			s.WriteString(style.Render(":"))
-			lineLength := 7 + len(lineNumber)
+			lineLength := 7 + branchIndent + len(lineNumber)
 			token1 := line.line[:line.start]
 			token2 := line.line[line.start:line.end]
 			token3 := line.line[line.end:]

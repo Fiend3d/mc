@@ -13,7 +13,7 @@ import (
 	"github.com/dustin/go-humanize"
 )
 
-// driveBarCells is the width of the free-space gauge drawn before a drive's
+// driveBarCells is the width of the usage gauge drawn before a drive's
 // size text in the listing.
 const driveBarCells = 10
 
@@ -252,9 +252,16 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 						metadata = " " + file.sizeStr
 					} else if d, ok := it.(*driveItem); ok {
 						if d.total > 0 {
-							used := int(float64(d.total-d.free)/float64(d.total)*driveBarCells + 0.5)
+							ratio := float64(d.total-min(d.free, d.total)) / float64(d.total)
+							used := int(ratio*driveBarCells + 0.5)
 							used = min(driveBarCells, max(0, used))
-							metadata = s.Foreground(m.theme.grayColor).Render(strings.Repeat("█", used)) + s.Foreground(m.theme.grayColor).Render(strings.Repeat("░", driveBarCells-used))
+							barColor := m.theme.greenColor
+							if ratio >= 0.9 {
+								barColor = m.theme.redColor
+							} else if ratio >= 0.75 {
+								barColor = m.theme.accentColor4
+							}
+							metadata = s.Foreground(barColor).Render(strings.Repeat("━", used)) + s.Foreground(m.theme.grayColor).Render(strings.Repeat("─", driveBarCells-used))
 							free := fmt.Sprintf("%*s", driveSizeCells, humanize.Bytes(d.free))
 							total := fmt.Sprintf("%*s", driveSizeCells, humanize.Bytes(d.total))
 							metadata += s.Foreground(m.theme.greenColor).Render(" "+free) + s.Foreground(m.theme.grayColor).Render(" / "+total)
@@ -305,7 +312,7 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 				it := items[settings.cursor]
 				footer = it.getName() + "  " + style.Foreground(m.theme.grayColor).Render(it.getExtra())
 				if file, ok := it.(*filepathItem); ok && file.git != gitNone {
-					footer += "  " + file.git.name()
+					footer += "  " + style.Foreground(m.gitColor(file.git)).Render(file.git.name())
 				}
 				if drive, ok := it.(*driveItem); ok {
 					footer = fmt.Sprintf("%s free / %s · %s", humanize.Bytes(drive.free), humanize.Bytes(drive.total), drive.driveType)
@@ -314,7 +321,7 @@ func (m *model) drawPane(f *catatui.Frame, a catatui.Rect, p *pane, paneIndex in
 					}
 				}
 				pos := style.Foreground(m.theme.grayColor).Render(fmt.Sprintf(" [%d/%d]", settings.cursor+1, len(items)))
-				room := max(0, int(a.Width) - paint.Width(pos))
+				room := max(0, int(a.Width)-paint.Width(pos))
 				footer = paint.Truncate(footer, room) + strings.Repeat(" ", max(0, room-paint.Width(footer))) + pos
 			}
 		}
