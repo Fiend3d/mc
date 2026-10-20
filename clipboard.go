@@ -14,7 +14,8 @@ import (
 
 var mutex sync.Mutex
 
-func clipboardWrite(text string) error {
+// Tests replace clipboardWrite so they never touch the real clipboard.
+var clipboardWrite = func(text string) error {
 	err := clipboard.Init()
 	if err != nil {
 		return err

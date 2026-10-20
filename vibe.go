@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
 	"strings"
 
 	"mc/internal/event"
+	"mc/internal/paint"
 )
 
 type vibeRow struct {
@@ -33,12 +35,17 @@ type vibeState struct {
 	previewStart, previewWidth         int
 	previewTarget                      string
 	previewRows                        []vibePreviewRow
-	hover                              string
-	all                                []vibeRow
-	collapsed                          map[string]bool
-	cursor, start                      int
-	err                                string
-	viewerErr                          string
+	// The tally colours baked into the laid-out text, the theme they came from,
+	// and whether that text still needs rebuilding.
+	tallyKey                 string
+	tallyDirty               bool
+	addedStyle, deletedStyle paint.Style
+	hover                    string
+	all                      []vibeRow
+	collapsed                map[string]bool
+	cursor, start            int
+	err                      string
+	viewerErr                string
 }
 type vibeDoneMsg struct {
 	generation uint64
@@ -131,6 +138,26 @@ func (v *vibeState) current() *vibeRow {
 	}
 	return &v.rows[v.cursor]
 }
+
+// rowTarget maps a row to the working tree path it stands for. A directory row
+// yields itself; file, hunk, line and note rows yield the file and its folder.
+func (v *vibeState) rowTarget(row *vibeRow) (path, dir string, ok bool) {
+	if row == nil {
+		return "", "", false
+	}
+	if row.kind == 'd' {
+		path = v.root
+		if row.path != "" {
+			path = filepath.Join(v.root, filepath.FromSlash(row.path))
+		}
+		return path, path, true
+	}
+	if row.file < 0 || row.file >= len(v.snapshot.files) {
+		return "", "", false
+	}
+	path = filepath.Join(v.root, filepath.FromSlash(v.snapshot.files[row.file].path))
+	return path, filepath.Dir(path), true
+}
 func (v *vibeState) keep(height int) {
 	v.cursor = min(max(0, v.cursor), max(0, len(v.rows)-1))
 	position := v.rowPosition(v.cursor)
@@ -143,6 +170,29 @@ func (v *vibeState) keep(height int) {
 	v.clampView(height)
 }
 func (v *vibeState) move(delta, height int) { v.cursor += delta; v.keep(height) }
+
+// keepRow reselects a row that survived a change of shape, or its nearest
+// surviving ancestor. The root is never hidden, so a known id always lands.
+func (v *vibeState) keepRow(id string, height int) bool {
+	for id != "" {
+		for i, r := range v.rows {
+			if r.id == id {
+				v.cursor = i
+				v.keep(height)
+				return true
+			}
+		}
+		next := ""
+		for _, r := range v.all {
+			if r.id == id {
+				next = r.parent
+				break
+			}
+		}
+		id = next
+	}
+	return false
+}
 
 func (v *vibeState) clampView(height int) {
 	v.cursor = min(max(0, v.cursor), max(0, len(v.rows)-1))
@@ -436,18 +486,30 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 			}
 		}
 		v.keep(h)
-	case "c":
+	case "c", "C":
 		if v.split && v.previewFocus {
 			break
 		}
+		// c folds the diffs away and keeps the folder tree readable, keeping the
+		// selection where it was; C folds every branch beneath the root.
+		selected := ""
+		if row != nil {
+			selected = row.id
+		}
 		for _, r := range v.all {
+			if key == "c" && r.kind == 'd' {
+				continue
+			}
 			if r.branch {
 				v.collapsed[r.id] = true
 			}
 		}
 		v.visible()
-		v.cursor, v.start = 0, 0
 		v.hover = ""
+		if key == "c" && v.keepRow(selected, h) {
+			return m, nil
+		}
+		v.cursor, v.start = 0, 0
 	case "h", "left":
 		if v.split && v.previewFocus {
 			break
@@ -523,8 +585,120 @@ func (m *model) handleVibe(key string) (event.Model, event.Cmd) {
 		}
 	case "f3":
 		return m, m.viewVibe()
+	case "y":
+		return m.copyVibeMention()
+	case "f2", "f4", "f6", "f7", "f8", "f9", "f10", "f11", "f12":
+		return m.runVibeTool(key)
 	}
 	return m, nil
+}
+
+// vibeMention renders a row as the @path form a coding agent understands:
+// repository-relative with forward slashes, carrying the working-file line
+// numbers a hunk or line sits at. A hunk that only removes lines names the
+// position the removal happened at instead, because its own lines are gone.
+func (m *model) vibeMention(row *vibeRow) string {
+	v := &m.vibe
+	if row == nil {
+		return ""
+	}
+	if row.kind == 'd' {
+		if row.path == "" {
+			return "@."
+		}
+		return "@" + row.path
+	}
+	if row.file < 0 || row.file >= len(v.snapshot.files) {
+		return ""
+	}
+	f := v.snapshot.files[row.file]
+	mention := "@" + f.path
+	if row.kind == 'f' || row.kind == 'i' || row.hunk < 0 || row.hunk >= len(f.hunks) {
+		return mention
+	}
+	h := f.hunks[row.hunk]
+	if row.kind == 'l' {
+		return fmt.Sprintf("%s:%d", mention, vibeViewLine(h, row.line).new)
+	}
+	// The range covers the added lines, which is what an agent should read.
+	// A hunk with nothing added reports the working-file line its removals
+	// followed instead, or the bare path when they opened the file.
+	start, end, before, gap := 0, 0, 0, 0
+	for _, l := range h.lines {
+		if l.kind == '-' {
+			if gap == 0 {
+				gap = before
+			}
+			continue
+		}
+		before = l.new
+		if l.kind == '+' {
+			if start == 0 {
+				start = l.new
+			}
+			end = l.new
+		}
+	}
+	switch {
+	case start > 0 && start == end:
+		return fmt.Sprintf("%s:%d", mention, start)
+	case start > 0:
+		return fmt.Sprintf("%s:%d-%d", mention, start, end)
+	case gap > 0:
+		return fmt.Sprintf("%s:%d", mention, gap)
+	default:
+		return mention
+	}
+}
+
+// copyVibeMention puts the selected row's mention on the clipboard, ready to
+// paste into a coding agent prompt.
+func (m *model) copyVibeMention() (event.Model, event.Cmd) {
+	v := &m.vibe
+	row := v.current()
+	if row != nil && row.kind != 'd' && row.file >= 0 && row.file < len(v.snapshot.files) {
+		if f := v.snapshot.files[row.file]; f.status == "D" {
+			return m, m.addMessage(msgWarning, compareLiteral(f.path)+" was deleted; there is no path to copy")
+		}
+	}
+	mention := m.vibeMention(row)
+	if mention == "" {
+		return m, m.addMessage(msgWarning, "nothing is selected")
+	}
+	if err := clipboardWrite(mention); err != nil {
+		return m, m.addMessage(msgError, fmt.Sprintf("failed to set clipboard: %s", err))
+	}
+	return m, m.addMessage(msgInfo, fmt.Sprintf("%s copied", compareLiteral(mention)))
+}
+
+// runVibeTool applies a configured F-key tool to the file or directory under
+// the cursor. F3 keeps its own line-aware viewer above; F5 is a refresh.
+func (m *model) runVibeTool(key string) (event.Model, event.Cmd) {
+	t := toolForKey(m.cfg, key)
+	if t == nil {
+		return m, m.addMessage(msgWarning, "undefined tool")
+	}
+	v := &m.vibe
+	row := v.current()
+	path, dir, ok := v.rowTarget(row)
+	if !ok {
+		return m, m.addMessage(msgWarning, "nothing is selected")
+	}
+	if row.kind != 'd' && v.snapshot.files[row.file].status == "D" {
+		return m, m.addMessage(msgWarning, compareLiteral(v.snapshot.files[row.file].path)+" was deleted; there is no current file to open")
+	}
+	var paths []string
+	if t.Type == "path" {
+		paths = []string{path}
+	}
+	cmd, err := toolCommand(t, m.cfg.Theme, paths, dir)
+	if err != nil {
+		if errors.Is(err, errNoToolSelection) {
+			return m, m.addMessage(msgWarning, err.Error())
+		}
+		return m, m.addMessage(msgError, err.Error())
+	}
+	return m, runCmd(cmd, dir)
 }
 
 func (m *model) updateVibe(msg event.Msg) (bool, event.Cmd) {
@@ -623,6 +797,10 @@ func (m *model) updateVibe(msg event.Msg) (bool, event.Cmd) {
 		return true, nil
 	case event.MouseTabMsg, event.PasteMsg:
 		return true, nil
+	case processDoneMsg:
+		// A tool that owned the terminal may have changed the tree, so refresh
+		// Vibe alongside the pane re-read that processDoneMsg normally does.
+		return true, event.Batch(m.update(e.dir), m.refreshVibe())
 	}
 	return false, nil
 }

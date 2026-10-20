@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -503,57 +504,77 @@ func (m *model) handleClipboardCopy(action clipboardCopy, forward bool) (event.M
 	return m, m.addMessage(msgError, "lol?")
 }
 
-func (m *model) handleTool(key string) (event.Model, event.Cmd) {
-	var t *ToolConfig
+// errNoToolSelection marks a path tool that was asked to run without a path.
+var errNoToolSelection = errors.New("nothing is selected")
+
+// toolForKey maps an F-key to its configured tool. F5 is refresh, not a tool.
+func toolForKey(cfg *Config, key string) *ToolConfig {
 	switch key {
 	case "f2":
-		t = m.cfg.F2
+		return cfg.F2
 	case "f3":
-		t = m.cfg.F3
+		return cfg.F3
 	case "f4":
-		t = m.cfg.F4
+		return cfg.F4
 	case "f6":
-		t = m.cfg.F6
+		return cfg.F6
 	case "f7":
-		t = m.cfg.F7
+		return cfg.F7
 	case "f8":
-		t = m.cfg.F8
+		return cfg.F8
 	case "f9":
-		t = m.cfg.F9
+		return cfg.F9
 	case "f10":
-		t = m.cfg.F10
+		return cfg.F10
 	case "f11":
-		t = m.cfg.F11
+		return cfg.F11
 	case "f12":
-		t = m.cfg.F12
+		return cfg.F12
 	}
+	return nil
+}
 
-	if t == nil {
-		return m, m.addMessage(msgWarning, "undefined tool")
-	}
+// toolCommand builds the command for a configured tool. paths are the target
+// files of a "path" tool; dir is the working directory, and also the argument
+// of a "dir" tool.
+func toolCommand(t *ToolConfig, theme string, paths []string, dir string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	switch t.Type {
 	case "path":
-		paths := m.getPaths()
 		if len(paths) == 0 {
-			return m, m.addMessage(msgWarning, "nothing is selected")
+			return nil, errNoToolSelection
 		}
 		var args []string
 		if t.Command == "koneko" {
-			args = append(args, fmt.Sprintf("-theme=%s", m.cfg.Theme))
+			args = append(args, fmt.Sprintf("-theme=%s", theme))
 		}
 		args = append(args, t.Args...)
 		args = append(args, paths...)
 		cmd = exec.Command(t.Command, args...)
 	case "dir":
-		args := append(slices.Clone(t.Args), m.getTab().dir)
+		args := append(slices.Clone(t.Args), dir)
 		cmd = exec.Command(t.Command, args...)
 	case "none": // why?
 		cmd = exec.Command(t.Command, t.Args...)
 	default:
-		return m, m.addMessage(msgError, "unknown type of tool (not path/dir/none)")
+		return nil, fmt.Errorf("unknown type of tool (not path/dir/none)")
+	}
+	cmd.Dir = dir
+	return cmd, nil
+}
+
+func (m *model) handleTool(key string) (event.Model, event.Cmd) {
+	t := toolForKey(m.cfg, key)
+	if t == nil {
+		return m, m.addMessage(msgWarning, "undefined tool")
 	}
 	dir := m.getTab().dir
-	cmd.Dir = dir
+	cmd, err := toolCommand(t, m.cfg.Theme, m.getPaths(), dir)
+	if err != nil {
+		if errors.Is(err, errNoToolSelection) {
+			return m, m.addMessage(msgWarning, err.Error())
+		}
+		return m, m.addMessage(msgError, err.Error())
+	}
 	return m, runCmd(cmd, dir)
 }

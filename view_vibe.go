@@ -32,9 +32,26 @@ func (m *model) vibePaneLayout() (split bool, leftWidth, rightX, rightWidth int)
 	return true, leftWidth, leftWidth + 1, w - leftWidth - 1
 }
 
+// vibeTallyStyles refreshes the colours the added/deleted counts are drawn in.
+// They are baked into the laid-out text, so a theme change has to force a
+// relayout or the old colours would stay on screen.
+func (m *model) vibeTallyStyles() {
+	v, t := &m.vibe, m.theme
+	key := fmt.Sprintf("%v|%v", t.greenColor, t.redColor)
+	if key == v.tallyKey {
+		return
+	}
+	v.tallyKey, v.tallyDirty = key, true
+	// Foreground only: the row's own style, including any cursor highlight,
+	// is what frames these runs.
+	v.addedStyle = paint.NewStyle().Foreground(t.greenColor)
+	v.deletedStyle = paint.NewStyle().Foreground(t.redColor)
+}
+
 // Keep the row model and the drawn geometry in step before keys or mouse input.
 func (m *model) syncVibeLayout() {
 	v := &m.vibe
+	m.vibeTallyStyles()
 	split, leftWidth, _, _ := m.vibePaneLayout()
 	if v.split != split {
 		old := v.current()
@@ -65,7 +82,11 @@ func (m *model) syncVibeLayout() {
 	if v.layoutWidth != width {
 		v.layout(width)
 		v.keep(m.vibeHeight())
+	} else if v.tallyDirty {
+		// Same geometry, new colours: rebuild the text without moving the view.
+		v.layout(width)
 	}
+	v.tallyDirty = false
 }
 
 func (m *model) vibePreviewHeight() int { return max(1, m.vibeHeight()-1) }
@@ -113,6 +134,7 @@ func vibePreviewText(raw string) string {
 
 func (m *model) syncVibePreview() {
 	v := &m.vibe
+	m.vibeTallyStyles()
 	if !v.split {
 		return
 	}
@@ -132,8 +154,9 @@ func (m *model) syncVibePreview() {
 	}
 	v.previewTarget, v.previewWidth = target, contentWidth
 	v.previewRows = make([]vibePreviewRow, 0)
-	add := func(prefix, raw string, kind byte) {
-		text := vibePreviewText(raw)
+	// add takes finished text: the hunk label already carries its own colours and
+	// must not be escaped again.
+	add := func(prefix, text string, kind byte) {
 		available := max(1, contentWidth-ansi.StringWidth(prefix))
 		lines := []string{text}
 		if !v.previewNoWrap {
@@ -156,13 +179,13 @@ func (m *model) syncVibePreview() {
 			if note == "" {
 				note = "No detailed diff available"
 			}
-			add(" ", note, 'i')
+			add(" ", compareLiteral(note), 'i')
 		} else {
 			for hi, hunk := range file.hunks {
 				if row.kind == 'h' && hi != row.hunk {
 					continue
 				}
-				add(" @@ ", vibeHunkLabel(hunk), 'h')
+				add(" @@ ", vibeHunkLabelPainted(hunk, m.vibe.addedStyle, m.vibe.deletedStyle), 'h')
 				for _, line := range hunk.lines {
 					old, newLine := "", ""
 					if line.old > 0 {
@@ -171,7 +194,7 @@ func (m *model) syncVibePreview() {
 					if line.new > 0 {
 						newLine = fmt.Sprint(line.new)
 					}
-					add(fmt.Sprintf("%5s %5s %c ", old, newLine, line.kind), line.text, line.kind)
+					add(fmt.Sprintf("%5s %5s %c ", old, newLine, line.kind), vibePreviewText(line.text), line.kind)
 				}
 			}
 		}
@@ -257,12 +280,12 @@ func (v *vibeState) layout(width int) {
 		switch r.kind {
 		case 'f':
 			f := v.snapshot.files[r.file]
-			text = fmt.Sprintf("[%s] %s  +%d −%d", f.status, text, f.added, f.deleted)
+			text = fmt.Sprintf("[%s] %s  ", f.status, text) + vibeTally(f.added, f.deleted, v.addedStyle, v.deletedStyle)
 			if f.oldPath != "" && f.oldPath != f.path {
 				text += " ← " + compareLiteral(f.oldPath)
 			}
 		case 'h':
-			text = vibeHunkLabel(v.snapshot.files[r.file].hunks[r.hunk])
+			text = vibeHunkLabelPainted(v.snapshot.files[r.file].hunks[r.hunk], v.addedStyle, v.deletedStyle)
 		case 'l':
 			l := v.snapshot.files[r.file].hunks[r.hunk].lines[r.line]
 			old, newLine := "", ""
@@ -311,6 +334,23 @@ func (v *vibeState) layout(width int) {
 // than by its raw "@@ -a,b +c,d @@" header. A pure deletion has no current
 // lines, so it is placed after the line that precedes it.
 func vibeHunkLabel(h vibeHunk) string {
+	return vibeHunkLabelPainted(h, paint.Style{}, paint.Style{})
+}
+
+// vibeTally writes the added/deleted counts, coloured when the styles carry a
+// foreground. Plain styles keep the text unstyled, as the tests and any
+// non-terminal use expect.
+func vibeTally(added, deleted int, addStyle, delStyle paint.Style) string {
+	if addStyle.GetForeground() == nil && delStyle.GetForeground() == nil {
+		return fmt.Sprintf("+%d −%d", added, deleted)
+	}
+	return addStyle.Render(fmt.Sprintf("+%d", added)) + " " + delStyle.Render(fmt.Sprintf("−%d", deleted))
+}
+
+// vibeHunkLabelPainted is vibeHunkLabel with the tally run through the theme's
+// green and red. The SGR spans survive wrapping and truncation, and the row's
+// own style still frames them.
+func vibeHunkLabelPainted(h vibeHunk, addStyle, delStyle paint.Style) string {
 	current, added, deleted := 0, 0, 0
 	for _, l := range h.lines {
 		switch l.kind {
@@ -334,7 +374,7 @@ func vibeHunkLabel(h vibeHunk) string {
 	default:
 		text = fmt.Sprintf("Lines %d–%d", h.new, h.new+current-1)
 	}
-	text += fmt.Sprintf("  +%d −%d", added, deleted)
+	text += "  " + vibeTally(added, deleted, addStyle, delStyle)
 	// Git appends the enclosing function or section after the closing @@.
 	if _, rest, ok := strings.Cut(strings.TrimPrefix(h.header, "@@"), "@@"); ok {
 		if context := strings.TrimSpace(rest); context != "" {
@@ -460,9 +500,11 @@ func (m *model) drawVibe(f *catatui.Frame, area catatui.Rect) {
 	}
 	// Same shape as the bookmarks, tabs and Git list key lines. Keys are listed
 	// by importance and dropped whole from the end when the row is too narrow.
+	// The configurable F2 to F12 tools are deliberately absent: they mean
+	// whatever the user put in config.toml, and Help documents them.
 	gray := base.Foreground(t.grayColor)
 	footer, used := gray.Render(" Keys:"), len(" Keys:")
-	keys := [][2]string{{"F3", "view"}, {"[ ]", "prev/next hunk"}, {"space", "toggle"}, {"e", "expand all"}, {"c", "collapse all"}, {"w", "wrap:" + wrap}, {"Esc", "close"}}
+	keys := [][2]string{{"enter", "view"}, {"y", "copy"}, {"[ ]", "hunks"}, {"space", "toggle"}, {"e", "expand"}, {"c", "fold"}, {"C", "collapse"}, {"w", "wrap:" + wrap}, {"Esc", "close"}}
 	if split {
 		keys = append([][2]string{{"Tab", "pane"}}, keys...)
 	}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"image/color"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -296,7 +297,7 @@ func TestVibeRenderingAndInputIsolation(t *testing.T) {
 					t.Fatal(err)
 				}
 				text := backend.Buffer().String()
-				for _, want := range []string{"Vibe", "src", "deep", "F3"} {
+				for _, want := range []string{"Vibe", "src", "deep", "enter"} {
 					if !strings.Contains(text, want) {
 						t.Fatalf("missing %q in %s", want, text)
 					}
@@ -606,6 +607,22 @@ func TestVibeExpandCollapseAll(t *testing.T) {
 	count := len(m.vibe.rows)
 	m.vibe.cursor = count - 1
 	keyEvent(m, "c")
+	// c folds the diffs and leaves the folders alone, keeping the selection.
+	if len(m.vibe.rows) != 3 || m.vibe.current().id != "f:dir/file" {
+		t.Fatalf("fold hunks left %d rows and %v", len(m.vibe.rows), m.vibe.current())
+	}
+	for _, r := range m.vibe.all {
+		if !r.branch {
+			continue
+		}
+		if r.kind == 'd' && m.vibe.collapsed[r.id] {
+			t.Fatal("c collapsed a directory")
+		}
+		if r.kind != 'd' && !m.vibe.collapsed[r.id] {
+			t.Fatal("diff stayed open")
+		}
+	}
+	keyEvent(m, "C")
 	if len(m.vibe.rows) != 2 || m.vibe.cursor != 0 || m.vibe.start != 0 {
 		t.Fatal("collapse all did not select root")
 	}
@@ -831,5 +848,307 @@ func TestVibeSplitIndependentScrollingAndFocus(t *testing.T) {
 	m.syncVibeLayout()
 	if m.vibe.previewFocus || m.vibe.previewDragging {
 		t.Fatal("hidden right pane retained focus or drag")
+	}
+}
+
+// F2 to F12 (F3 aside, which has its own line-aware viewer) run the configured
+// tool on whatever the Vibe cursor is on.
+func TestVibeToolsRunOnSelectedRow(t *testing.T) {
+	root := vibeRepo(t)
+	vibeWrite(t, root, "src/deep/main.go", "one\ntwo\n")
+	vibeWrite(t, root, "gone.txt", "gone\n")
+	vibeCommit(t, root)
+	vibeWrite(t, root, "src/deep/main.go", "one\nchanged\n")
+	vibeWrite(t, root, "new.txt", "new\n")
+	if err := os.Remove(filepath.Join(root, "gone.txt")); err != nil {
+		t.Fatal(err)
+	}
+	m := testModel(t, root)
+	m.screenWidth = 99 // the combined tree keeps hunk and line rows
+	m.syncVibeLayout()
+	m.cfg.F2 = &ToolConfig{Command: "path-tool", Args: []string{"-flag"}, Type: "path"}
+	m.cfg.F4 = &ToolConfig{Command: "editor", Type: "path"}
+	m.cfg.F6 = &ToolConfig{Command: "folder-tool", Type: "dir"}
+	m.cfg.F9 = &ToolConfig{Command: "anywhere", Args: []string{"-x"}, Type: "none"}
+	_, cmd := m.openVibe()
+	applyEffect(m, cmd)
+
+	selectRow := func(id string) {
+		t.Helper()
+		for i, r := range m.vibe.rows {
+			if r.id == id {
+				m.vibe.cursor = i
+				return
+			}
+		}
+		t.Fatalf("missing row %q in %v", id, m.vibe.rows)
+	}
+	tool := func(key string) *exec.Cmd {
+		t.Helper()
+		_, c := m.handleVibe(key)
+		process, ok := c().(event.ProcessMsg)
+		if !ok {
+			t.Fatalf("%s produced %T instead of a process", key, c())
+		}
+		return process.Command
+	}
+	refused := func(key string) string {
+		t.Helper()
+		_, c := m.handleVibe(key)
+		if c != nil {
+			if _, ok := c().(event.ProcessMsg); ok {
+				t.Fatalf("%s launched a process", key)
+			}
+			applyEffect(m, c)
+		}
+		if len(m.log) == 0 {
+			t.Fatalf("%s said nothing", key)
+		}
+		return m.log[len(m.log)-1].message
+	}
+
+	main := filepath.Join(root, "src", "deep", "main.go")
+	selectRow("f:src/deep/main.go")
+	if got := tool("f2"); !slices.Equal(got.Args, []string{"path-tool", "-flag", main}) || got.Dir != filepath.Dir(main) {
+		t.Fatalf("F2 on a file = %v in %s", got.Args, got.Dir)
+	}
+	// Hunk and line rows belong to their file.
+	for i, r := range m.vibe.rows {
+		if r.kind == 'h' && r.path == "src/deep/main.go" {
+			m.vibe.cursor = i
+			break
+		}
+	}
+	if got := tool("f4"); !slices.Equal(got.Args, []string{"editor", main}) {
+		t.Fatalf("F4 on a hunk = %v", got.Args)
+	}
+	selectRow("f:new.txt")
+	for i, r := range m.vibe.rows {
+		if r.kind == 'l' && r.path == "new.txt" {
+			m.vibe.cursor = i
+			break
+		}
+	}
+	if got := tool("f4"); !slices.Equal(got.Args, []string{"editor", filepath.Join(root, "new.txt")}) {
+		t.Fatalf("F4 on a line = %v", got.Args)
+	}
+	// A directory row is its own target; dir tools use the folder holding the row.
+	selectRow("d:src")
+	dir := filepath.Join(root, "src")
+	if got := tool("f4"); !slices.Equal(got.Args, []string{"editor", dir}) || got.Dir != dir {
+		t.Fatalf("F4 on a directory = %v in %s", got.Args, got.Dir)
+	}
+	selectRow("f:src/deep/main.go")
+	if got := tool("f6"); !slices.Equal(got.Args, []string{"folder-tool", filepath.Dir(main)}) || got.Dir != filepath.Dir(main) {
+		t.Fatalf("F6 = %v in %s", got.Args, got.Dir)
+	}
+	// The repository root row, and a tool that wants no path at all.
+	selectRow("d:")
+	if got := tool("f4"); !slices.Equal(got.Args, []string{"editor", root}) {
+		t.Fatalf("F4 on the root = %v", got.Args)
+	}
+	if got := tool("f9"); !slices.Equal(got.Args, []string{"anywhere", "-x"}) || got.Dir != root {
+		t.Fatalf("F9 = %v in %s", got.Args, got.Dir)
+	}
+	// Koneko keeps receiving mc's theme.
+	m.cfg.F7 = &ToolConfig{Command: "koneko", Type: "path"}
+	selectRow("f:new.txt")
+	if got := tool("f7"); !slices.Contains(got.Args, "-theme="+m.cfg.Theme) {
+		t.Fatalf("koneko theme missing from %v", got.Args)
+	}
+	// A deleted file has nothing to open, and an unconfigured key says so.
+	selectRow("f:gone.txt")
+	if msg := refused("f4"); !strings.Contains(msg, "deleted") {
+		t.Fatalf("F4 on a deleted file: %q", msg)
+	}
+	if msg := refused("f11"); !strings.Contains(msg, "undefined tool") {
+		t.Fatalf("F11: %q", msg)
+	}
+	// Closing a tool refreshes the tree along with the pane underneath it.
+	_, done := m.Update(processDoneMsg{dir: root})
+	if done == nil {
+		t.Fatal("tool completion requested nothing")
+	}
+	applyEffect(m, done)
+	if m.vibe.loading || m.vibe.err != "" {
+		t.Fatalf("refresh after tool: loading %v err %q", m.vibe.loading, m.vibe.err)
+	}
+}
+
+// y copies the row as an @mention a coding agent can read.
+func TestVibeMentionCopiesAgentPath(t *testing.T) {
+	root := vibeRepo(t)
+	vibeWrite(t, root, "src/deep/main.go", "one\ntwo\nthree\n")
+	vibeWrite(t, root, "tail.txt", strings.Repeat("keep\n", 6))
+	vibeWrite(t, root, "gone.txt", "gone\n")
+	vibeCommit(t, root)
+	vibeWrite(t, root, "src/deep/main.go", "one\nCHANGED\nthree\nfour\n")
+	vibeWrite(t, root, "tail.txt", "keep\nkeep\nkeep\n")
+	if err := os.Remove(filepath.Join(root, "gone.txt")); err != nil {
+		t.Fatal(err)
+	}
+
+	var copied string
+	previous := clipboardWrite
+	t.Cleanup(func() { clipboardWrite = previous })
+	clipboardWrite = func(text string) error { copied = text; return nil }
+
+	m := testModel(t, root)
+	m.screenWidth = 99 // the combined tree keeps hunk and line rows
+	m.syncVibeLayout()
+	_, cmd := m.openVibe()
+	applyEffect(m, cmd)
+
+	selectRow := func(want func(vibeRow) bool, what string) {
+		t.Helper()
+		for i, r := range m.vibe.rows {
+			if want(r) {
+				m.vibe.cursor = i
+				return
+			}
+		}
+		t.Fatalf("no %s row in %v", what, m.vibe.rows)
+	}
+	press := func(key string) string {
+		t.Helper()
+		copied = ""
+		_, c := m.handleVibe(key)
+		applyEffect(m, c)
+		return copied
+	}
+	want := func(row func(vibeRow) bool, what, expect string) {
+		t.Helper()
+		selectRow(row, what)
+		if got := press("y"); got != expect {
+			t.Fatalf("y on the %s row copied %q, want %q", what, got, expect)
+		}
+	}
+
+	want(func(r vibeRow) bool { return r.id == "f:src/deep/main.go" }, "file", "@src/deep/main.go")
+	want(func(r vibeRow) bool { return r.kind == 'h' && r.path == "src/deep/main.go" }, "hunk", "@src/deep/main.go:2-4")
+	want(func(r vibeRow) bool { return r.kind == 'l' && r.path == "src/deep/main.go" && r.text == "+four" }, "added line", "@src/deep/main.go:4")
+	want(func(r vibeRow) bool { return r.kind == 'l' && r.path == "src/deep/main.go" && r.text == "-two" }, "deleted line", "@src/deep/main.go:2")
+	want(func(r vibeRow) bool { return r.kind == 'h' && r.path == "tail.txt" }, "removal-only hunk", "@tail.txt:3")
+	want(func(r vibeRow) bool { return r.id == "d:src/deep" }, "directory", "@src/deep")
+	want(func(r vibeRow) bool { return r.id == "d:" }, "repository root", "@.")
+
+	// A deleted file has no working path to name.
+	selectRow(func(r vibeRow) bool { return r.id == "f:gone.txt" }, "deleted file")
+	if got := press("y"); got != "" || !strings.Contains(m.log[len(m.log)-1].message, "deleted") {
+		t.Fatalf("y on a deleted file copied %q with %q", got, m.log[len(m.log)-1].message)
+	}
+	// The mention is what the key line promises, and Help documents it.
+	backend := catatui.NewTestBackend(99, 24)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(backend.Buffer().String(), "y - copy") {
+		t.Fatal("key line lost the copy hint")
+	}
+}
+
+// The added/deleted counts carry the theme's green and red, in the tree, in the
+// preview and in the plain-text label they come from.
+func TestVibeTallyColours(t *testing.T) {
+	m := testModel(t, t.TempDir())
+	m.mode = vibeMode
+	m.screenWidth, m.screenHeight = 60, 12
+	hunk := vibeHunk{header: "@@ -1,2 +1,2 @@ func main() {", new: 1, lines: []vibeLine{
+		{kind: '-', old: 1, text: "gone"},
+		{kind: '+', new: 1, text: "here"},
+	}}
+	file := vibeFile{path: "file", status: "M", added: 1, deleted: 1, hunks: []vibeHunk{hunk}}
+	m.vibe = vibeState{root: "repo", collapsed: map[string]bool{}, snapshot: vibeSnapshot{files: []vibeFile{file}}}
+	m.vibe.rebuild()
+	m.syncVibeLayout()
+
+	tally := vibeTally(1, 1, m.vibe.addedStyle, m.vibe.deletedStyle)
+	if m.vibe.addedStyle.GetForeground() == nil || m.vibe.deletedStyle.GetForeground() == nil {
+		t.Fatal("the theme gave the tally no colours")
+	}
+	textOf := func(kind byte) string {
+		t.Helper()
+		var built strings.Builder
+		for i, r := range m.vibe.rows {
+			if r.kind != kind {
+				continue
+			}
+			for _, segment := range m.vibe.visual {
+				if segment.row == i {
+					built.WriteString(segment.text)
+				}
+			}
+		}
+		if built.Len() == 0 {
+			t.Fatalf("no %c row", kind)
+		}
+		return built.String()
+	}
+	if got := textOf('f'); !strings.Contains(got, tally) {
+		t.Fatalf("file row tally = %q, want %q", got, tally)
+	}
+	if got := textOf('h'); !strings.Contains(got, tally) {
+		t.Fatalf("hunk row tally = %q, want %q", got, tally)
+	}
+	if strings.Contains(vibeHunkLabel(hunk), "\x1b") {
+		t.Fatal("the plain hunk label carries styling")
+	}
+
+	backend := catatui.NewTestBackend(60, 12)
+	terminal, _ := catatui.NewTerminal(backend)
+	if err := terminal.Draw(m.draw); err != nil {
+		t.Fatal(err)
+	}
+	hex := func(c color.Color) string {
+		r, g, b, _ := c.RGBA()
+		return fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+	}
+	green, red := hex(m.theme.greenColor), hex(m.theme.redColor)
+	seen := map[string]int{}
+	for y := 2; y < 11; y++ {
+		for x := 0; x < 60; x++ {
+			cell := backend.Buffer().CellAt(uint16(x), uint16(y))
+			switch cell.Symbol {
+			case "+":
+				seen[cellForeground(cell)]++
+			case "−":
+				seen[cellForeground(cell)]++
+			}
+		}
+	}
+	if seen[green] < 2 || seen[red] < 2 {
+		t.Fatalf("tally colours = %v, want %s and %s on both rows", seen, green, red)
+	}
+
+	// A theme change rebuilds the text instead of leaving the old colours up.
+	m.theme = newTheme("nord")
+	m.syncVibeLayout()
+	if got := textOf('h'); !strings.Contains(got, vibeTally(1, 1, m.vibe.addedStyle, m.vibe.deletedStyle)) {
+		t.Fatalf("after a theme change the tally is %q", got)
+	}
+
+	// The wide layout's preview pane paints the same tally.
+	m.screenWidth = 120
+	m.dimensions()
+	m.syncVibeLayout()
+	m.vibe.cursor = func() int {
+		for i, r := range m.vibe.rows {
+			if r.kind == 'h' {
+				return i
+			}
+		}
+		t.Fatal("no hunk row")
+		return 0
+	}()
+	m.syncVibePreview()
+	found := false
+	for _, segment := range m.vibe.previewRows {
+		if segment.kind == 'h' && strings.Contains(segment.text, vibeTally(1, 1, m.vibe.addedStyle, m.vibe.deletedStyle)) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("the preview lost the coloured tally")
 	}
 }
