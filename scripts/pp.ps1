@@ -1,10 +1,37 @@
-# Paste picture: save a clipboard image in the current directory without overwriting.
-# Usage: pp [name[.png|.jpg|.jpeg|.bmp]]
+# Paste picture or text: save a clipboard image or text file in the current directory without overwriting.
+# Usage: pp [name[.png|.jpg|.jpeg|.bmp|.txt]]
+# What is not an image is text: without an explicit .txt name, an image is saved as an
+# image and anything else on the clipboard is saved as text (.txt).
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
     [string]$Name = 'image'
 )
+
+function New-UniqueFile {
+    param(
+        [string]$FileName,
+        [string]$Directory
+    )
+    $stem = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    $extension = [System.IO.Path]::GetExtension($FileName)
+    $suffix = 0
+    while ($true) {
+        $candidate = if ($suffix -eq 0) { $FileName } else { "$stem$suffix$extension" }
+        $path = Join-Path $Directory $candidate
+        try {
+            $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::CreateNew,
+                [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            return [pscustomobject]@{ Stream = $stream; Path = $path }
+        } catch [System.IO.IOException], [System.UnauthorizedAccessException] {
+            if ([System.IO.File]::Exists($path) -or [System.IO.Directory]::Exists($path)) {
+                $suffix++
+            } else {
+                throw
+            }
+        }
+    }
+}
 
 try {
     if ($PWD.Provider.Name -ne 'FileSystem') {
@@ -27,8 +54,12 @@ try {
         '.jpg' { 'Jpeg' }
         '.jpeg' { 'Jpeg' }
         '.bmp' { 'Bmp' }
-        default { throw "Unsupported image extension '$extension'. Use .png, .jpg, .jpeg or .bmp." }
+        '.txt' { 'Text' }
+        default { throw "Unsupported extension '$extension'. Use .png, .jpg, .jpeg, .bmp or .txt." }
     }
+    # An explicit .txt name asks for text; otherwise the clipboard decides and text falls
+    # back to .txt so a text clipboard is never rejected.
+    $isText = $formatName -eq 'Text'
 
     # Windows Forms clipboard APIs require STA. Keep shell state and arguments intact.
     if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA') {
@@ -43,45 +74,50 @@ try {
     }
 
     Add-Type -AssemblyName System.Windows.Forms -ErrorAction Stop
-    Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-    $image = [System.Windows.Forms.Clipboard]::GetImage()
-    if ($null -eq $image) {
-        throw 'The clipboard does not contain an image.'
+    $image = $null
+    $text = $null
+    if ($isText) {
+        $text = [System.Windows.Forms.Clipboard]::GetText()
+        if ([string]::IsNullOrEmpty($text)) {
+            throw 'The clipboard does not contain text.'
+        }
+    } else {
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        $image = [System.Windows.Forms.Clipboard]::GetImage()
+        if ($null -eq $image) {
+            $text = [System.Windows.Forms.Clipboard]::GetText()
+            if ([string]::IsNullOrEmpty($text)) {
+                throw 'The clipboard contains neither an image nor text.'
+            }
+            $isText = $true
+            $Name = [System.IO.Path]::GetFileNameWithoutExtension($Name) + '.txt'
+        }
     }
 
-    $stream = $null
-    $createdPath = $null
+    $created = $null
     $saved = $false
     try {
-        $stem = [System.IO.Path]::GetFileNameWithoutExtension($Name)
-        $suffix = 0
-        while ($null -eq $stream) {
-            $candidate = if ($suffix -eq 0) { $Name } else { "$stem$suffix$extension" }
-            $path = Join-Path $PWD.Path $candidate
-            try {
-                $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::CreateNew,
-                    [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
-                $createdPath = $path
-            } catch [System.IO.IOException], [System.UnauthorizedAccessException] {
-                if ([System.IO.File]::Exists($path) -or [System.IO.Directory]::Exists($path)) {
-                    $suffix++
-                } else {
-                    throw
-                }
-            }
+        $created = New-UniqueFile -FileName $Name -Directory $PWD.Path
+        if ($isText) {
+            $writer = New-Object System.IO.StreamWriter($created.Stream, (New-Object System.Text.UTF8Encoding($false)))
+            $writer.Write($text)
+            $writer.Flush()
+            $writer.Dispose()
+            $created.Stream = $null
+        } else {
+            $format = [System.Drawing.Imaging.ImageFormat]::$formatName
+            $image.Save($created.Stream, $format)
+            $created.Stream.Flush()
         }
-        $format = [System.Drawing.Imaging.ImageFormat]::$formatName
-        $image.Save($stream, $format)
-        $stream.Flush()
         $saved = $true
     } finally {
-        if ($null -ne $stream) { $stream.Dispose() }
-        $image.Dispose()
-        if (-not $saved -and $null -ne $createdPath) {
-            Remove-Item -LiteralPath $createdPath -ErrorAction Stop
+        if ($null -ne $created -and $null -ne $created.Stream) { $created.Stream.Dispose() }
+        if ($null -ne $image) { $image.Dispose() }
+        if (-not $saved -and $null -ne $created -and $null -ne $created.Path) {
+            Remove-Item -LiteralPath $created.Path -ErrorAction Stop
         }
     }
-    Write-Output $createdPath
+    Write-Output $created.Path
 } catch {
     Write-Error -Message "pp: $($_.Exception.Message)" -ErrorAction Continue
 }

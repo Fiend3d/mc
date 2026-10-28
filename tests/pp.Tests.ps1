@@ -11,7 +11,19 @@ if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
 $testDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('mc-pp-tests-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $testDirectory | Out-Null
 $mockImage = '$image = New-Object System.Drawing.Bitmap 3, 2'
-$script = [scriptblock]::Create($source.Replace('$image = [System.Windows.Forms.Clipboard]::GetImage()', $mockImage))
+$mockNoImage = '$image = $null'
+$mockNoText = '$text = $null'
+$mockText = '$text = "line one" + [Environment]::NewLine + "line two"'
+$expectedText = "line one" + [Environment]::NewLine + "line two"
+$imageLine = '$image = [System.Windows.Forms.Clipboard]::GetImage()'
+$textLine = '$text = [System.Windows.Forms.Clipboard]::GetText()'
+function Get-PatchedSource([string]$ImageMock, [string]$TextMock) {
+    return $source.Replace($imageLine, $ImageMock).Replace($textLine, $TextMock)
+}
+function New-Script([string]$ImageMock, [string]$TextMock) {
+    return [scriptblock]::Create((Get-PatchedSource $ImageMock $TextMock))
+}
+$script = New-Script $mockImage $mockNoText
 function Assert-Image($Path, $Format) {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing image: $Path" }
     $image = [System.Drawing.Image]::FromFile((Join-Path $PWD.Path $Path))
@@ -20,6 +32,19 @@ function Assert-Image($Path, $Format) {
             throw "Wrong image contents or format: $Path"
         }
     } finally { $image.Dispose() }
+}
+function Assert-Text($Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Missing text file: $Path" }
+    $bytes = [System.IO.File]::ReadAllBytes((Join-Path $PWD.Path $Path))
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        throw "Text file has a BOM: $Path"
+    }
+    if ([System.Text.Encoding]::UTF8.GetString($bytes) -ne $expectedText) { throw "Wrong text contents: $Path" }
+}
+function Invoke-ExpectedError([scriptblock]$Script, [string]$Label, [string[]]$Arguments = @()) {
+    $errors = @()
+    & $Script @Arguments -ErrorVariable errors 2>$null
+    if (-not $errors.Count) { throw "Expected error: $Label" }
 }
 Push-Location -LiteralPath $testDirectory
 try {
@@ -44,33 +69,56 @@ try {
     }
     & $script 'photo.jpg' | Out-Null
     Assert-Image 'photo1.jpg' ([System.Drawing.Imaging.ImageFormat]::Jpeg)
+
+    # Text clipboard: explicit .txt names and collisions.
+    $textScript = New-Script $mockImage $mockText
+    & $textScript 'note.txt' | Out-Null
+    Assert-Text 'note.txt'
+    & $textScript 'note.txt' | Out-Null
+    Assert-Text 'note1.txt'
+    New-Item -ItemType Directory -Path 'blocked.txt' | Out-Null
+    & $textScript 'blocked.txt' | Out-Null
+    Assert-Text 'blocked1.txt'
+    & $textScript 'NOTES.TXT' | Out-Null
+    Assert-Text 'NOTES.TXT'
+
+    # What is not an image is text: a text clipboard saves .txt even for an image name.
+    $textOnly = New-Script $mockNoImage $mockText
+    & $textOnly | Out-Null
+    Assert-Text 'image.txt'
+    & $textOnly 'photo.jpg' | Out-Null
+    Assert-Text 'photo.txt'
+    & $textOnly 'clip.BMP' | Out-Null
+    Assert-Text 'clip.txt'
+
     $before = @(Get-ChildItem).Count
     foreach ($name in @('', ' ', 'CON', 'NUL.png', 'bad.', 'bad ', '../outside.png', 'bad:name', 'no.gif')) {
-        $errors = @()
-        & $script -Name $name -ErrorVariable errors 2>$null
-        if (-not $errors.Count) { throw "Expected invalid-name error: $name" }
+        Invoke-ExpectedError $script "invalid name $name" @($name)
     }
-    foreach ($replacement in @('$image = $null', 'throw "Clipboard unavailable"')) {
-        $noImage = [scriptblock]::Create($source.Replace('$image = [System.Windows.Forms.Clipboard]::GetImage()', $replacement))
-        $errors = @()
-        & $noImage -ErrorVariable errors 2>$null
-        if (-not $errors.Count) { throw 'Expected clipboard error' }
+    foreach ($replacement in @($mockNoImage, 'throw "Clipboard unavailable"')) {
+        Invoke-ExpectedError (New-Script $replacement $mockNoText) 'missing image'
     }
+    # An explicit .txt name still requires clipboard text.
+    Invoke-ExpectedError (New-Script $mockImage $mockNoText) 'explicit .txt without text' @('note.txt')
+    Invoke-ExpectedError (New-Script $mockNoImage 'throw "Clipboard unavailable"') 'text clipboard failure'
     $failureImage = '$image = New-Object PSObject; $image | Add-Member ScriptMethod Save { throw "Save failed" }; $image | Add-Member ScriptMethod Dispose {}'
-    $failure = [scriptblock]::Create($source.Replace('$image = [System.Windows.Forms.Clipboard]::GetImage()', $failureImage))
     $errors = @()
-    & $failure 'failed' -ErrorVariable errors 2>$null
+    & (New-Script $failureImage $mockNoText) 'failed' -ErrorVariable errors 2>$null
     if (-not $errors.Count -or (Test-Path 'failed.png')) { throw 'Failed save left partial output' }
     if (@(Get-ChildItem).Count -ne $before) { throw 'Error cases created files' }
 
-    # Run the real MTA delegation path, but with a synthetic image in the child.
-    $delegatePath = Join-Path $testDirectory 'delegate.ps1'
-    [System.IO.File]::WriteAllText($delegatePath, $source.Replace('$image = [System.Windows.Forms.Clipboard]::GetImage()', $mockImage))
+    # Run the real MTA delegation path, but with synthetic clipboard results in the child.
     $hostPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $delegatePath = Join-Path $testDirectory 'delegate.ps1'
+    [System.IO.File]::WriteAllText($delegatePath, (Get-PatchedSource $mockImage $mockNoText))
     & $hostPath -NoProfile -MTA -File $delegatePath -Name 'delegated image.png' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'MTA delegation failed' }
     Assert-Image 'delegated image.png' ([System.Drawing.Imaging.ImageFormat]::Png)
-    Write-Output 'pp tests passed (formats, collisions, validation, clipboard failures, cleanup, MTA delegation).'
+    [System.IO.File]::WriteAllText($delegatePath, (Get-PatchedSource $mockNoImage $mockText))
+    & $hostPath -NoProfile -MTA -File $delegatePath -Name 'delegated note.jpg' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'MTA text delegation failed' }
+    Assert-Text 'delegated note.txt'
+    Write-Output 'pp tests passed (image formats, text fallback, collisions, validation, clipboard failures, cleanup, MTA delegation).'
 } finally {
     Pop-Location
     $resolvedTestDirectory = [System.IO.Path]::GetFullPath($testDirectory)

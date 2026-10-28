@@ -53,9 +53,9 @@ t  # Open Windows Terminal in that directory
 
 There's no need to check the contents of an archive before unzipping.
 
-# pp — paste picture
+# pp — paste picture or text
 
-`pp.ps1` saves an image from the Windows clipboard into the current directory.
+`pp.ps1` saves an image or text from the Windows clipboard into the current directory.
 Add the directory containing `pp.ps1` to your `PATH` (release archives include it),
 then run it from PowerShell:
 
@@ -64,17 +64,23 @@ pp                 # image.png, image1.png, image2.png, ...
 pp screenshot      # screenshot.png
 pp "my screenshot" # my screenshot.png
 pp photo.jpg       # JPEG instead of PNG
+pp notes.txt       # clipboard text as notes.txt
 ```
 
 Without PATH setup, use `& C:\path\to\pp.ps1` instead of `pp`.
-PNG is the default; `.png`, `.jpg`, `.jpeg` and `.bmp` extensions choose the format.
+PNG is the default; `.png`, `.jpg`, `.jpeg` and `.bmp` extensions choose the image
+format. What is not an image is text: if the clipboard holds no image, `pp` saves its
+text as `.txt` instead, so `pp` gives `image.txt` and `pp photo.jpg` gives `photo.txt`.
+An explicit `.txt` name always asks for clipboard text. Text is written as UTF-8 without
+a BOM, exactly as copied.
 Existing files and directories are never overwritten: `pp photo.jpg` tries
 `photo1.jpg`, `photo2.jpg`, etc. if needed, choosing the first available name.
 Supply a filename only, not a path. Unsupported extensions and invalid Windows
 filenames are rejected.
 
-The saved file's full path is printed. If the clipboard contains only text,
-copied file paths or no image, nothing is created and a clear error is shown.
+The saved file's full path is printed, so a text clipboard saved under an image name
+shows the `.txt` file that was actually created. If the clipboard contains copied file
+paths or nothing usable, nothing is created and a clear error is shown.
 Clipboard and write failures are also reported without closing your shell.
 Works on Windows PowerShell 5.1 and PowerShell 7 on Windows; no external tools
 are needed. Non-STA hosts delegate clipboard access to Windows PowerShell.

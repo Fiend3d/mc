@@ -123,7 +123,7 @@ t  # Open Windows Terminal in that directory
 
 In mc, press `gC` to save the default configuration, then `gc` to open its directory. Edit `$env:APPDATA\mc\config.toml` to configure your F-key tools; put the tools you use on `PATH`.
 
-For other helpers, including `pp.ps1` to save clipboard images, see the [scripts directory and setup instructions](https://github.com/Fiend3d/mc/tree/master/scripts).
+For other helpers, including `pp.ps1` to save a clipboard image or clipboard text as a file, see the [scripts directory and setup instructions](https://github.com/Fiend3d/mc/tree/master/scripts).
 
 ### Requirements and optional tools
 
