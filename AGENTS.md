@@ -25,7 +25,7 @@ Pass directories as positional args to open them on launch.
 ## Setup Requirements
 
 - **OS**: Windows only (Win32 API, CF_HDROP clipboard, Netapi32)
-- **Go**: 1.27.0
+- **Go**: 1.27.3
 - **External deps**: `bat` + `less` (from Git), `hx` (helix), `code`
 - **Recommended**: Windows Terminal (for mouse support), JetBrainsMonoNL Nerd Font
 - **Config**: `$env:APPDATA\mc\config.toml` — theme, F-key tools

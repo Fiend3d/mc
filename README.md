@@ -383,7 +383,7 @@ Themes: dracula (default), autumn, base16, ferra, github, monokai, nord and toky
 
 ## Build from source
 
-Requires Windows and Go 1.27.0. The released catatui dependency is fetched through the Go module proxy; no sibling checkout is needed.
+Requires Windows and Go 1.27.3. The released catatui dependency is fetched through the Go module proxy; no sibling checkout is needed.
 
 ```powershell
 .\build.ps1
