@@ -64,19 +64,20 @@ pp                 # image.png, image1.png, image2.png, ...
 pp screenshot      # screenshot.png
 pp "my screenshot" # my screenshot.png
 pp photo.jpg       # JPEG instead of PNG
-pp notes.txt       # clipboard text as notes.txt
+pp main.rs         # clipboard text as main.rs
+pp notes.md        # clipboard text as notes.md
 ```
 
 Without PATH setup, use `& C:\path\to\pp.ps1` instead of `pp`.
 PNG is the default; `.png`, `.jpg`, `.jpeg` and `.bmp` extensions choose the image
-format. What is not an image is text: if the clipboard holds no image, `pp` saves its
-text as `.txt` instead, so `pp` gives `image.txt` and `pp photo.jpg` gives `photo.txt`.
-An explicit `.txt` name always asks for clipboard text. Text is written as UTF-8 without
-a BOM, exactly as copied.
+format and any other extension (`.rs`, `.md`, `.json`, `.toml`, `.ps1`, ...) saves the
+clipboard as a text file with that name. What is not an image is text: if the clipboard
+holds no image, `pp` saves its text as `.txt` instead, so `pp` gives `image.txt` and
+`pp photo.jpg` gives `photo.txt`. Text is written as UTF-8 without a BOM, exactly as
+copied.
 Existing files and directories are never overwritten: `pp photo.jpg` tries
 `photo1.jpg`, `photo2.jpg`, etc. if needed, choosing the first available name.
-Supply a filename only, not a path. Unsupported extensions and invalid Windows
-filenames are rejected.
+Supply a filename only, not a path. Invalid Windows filenames are rejected.
 
 The saved file's full path is printed, so a text clipboard saved under an image name
 shows the `.txt` file that was actually created. If the clipboard contains copied file

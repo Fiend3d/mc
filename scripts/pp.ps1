@@ -1,6 +1,7 @@
 # Paste picture or text: save a clipboard image or text file in the current directory without overwriting.
-# Usage: pp [name[.png|.jpg|.jpeg|.bmp|.txt]]
-# What is not an image is text: without an explicit .txt name, an image is saved as an
+# Usage: pp [name.ext]  (.png .jpg .jpeg .bmp save images, any other extension saves text,
+# no extension lets the clipboard decide)
+# What is not an image is text: without an explicit text name, an image is saved as an
 # image and anything else on the clipboard is saved as text (.txt).
 [CmdletBinding()]
 param(
@@ -45,20 +46,21 @@ try {
     }
 
     $extension = [System.IO.Path]::GetExtension($Name)
-    if (-not $extension) {
-        $extension = '.png'
-        $Name += $extension
-    }
+    # Image extensions save an image, every other extension saves text (.rs, .md, .json,
+    # .toml, ...). With no extension the clipboard decides: PNG for an image, .txt for text.
     $formatName = switch ($extension.ToLowerInvariant()) {
         '.png' { 'Png' }
         '.jpg' { 'Jpeg' }
         '.jpeg' { 'Jpeg' }
         '.bmp' { 'Bmp' }
-        '.txt' { 'Text' }
-        default { throw "Unsupported extension '$extension'. Use .png, .jpg, .jpeg, .bmp or .txt." }
+        '' { 'Auto' }
+        default { 'Text' }
     }
-    # An explicit .txt name asks for text; otherwise the clipboard decides and text falls
-    # back to .txt so a text clipboard is never rejected.
+    if ($formatName -eq 'Auto') {
+        $extension = '.png'
+        $formatName = 'Png'
+        $Name += $extension
+    }
     $isText = $formatName -eq 'Text'
 
     # Windows Forms clipboard APIs require STA. Keep shell state and arguments intact.
@@ -79,7 +81,7 @@ try {
     if ($isText) {
         $text = [System.Windows.Forms.Clipboard]::GetText()
         if ([string]::IsNullOrEmpty($text)) {
-            throw 'The clipboard does not contain text.'
+            throw 'The clipboard does not contain text. For a clipboard image, use .png, .jpg, .jpeg or .bmp.'
         }
     } else {
         Add-Type -AssemblyName System.Drawing -ErrorAction Stop

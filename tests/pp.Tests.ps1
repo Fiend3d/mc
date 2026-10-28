@@ -70,7 +70,7 @@ try {
     & $script 'photo.jpg' | Out-Null
     Assert-Image 'photo1.jpg' ([System.Drawing.Imaging.ImageFormat]::Jpeg)
 
-    # Text clipboard: explicit .txt names and collisions.
+    # Text clipboard: any non-image extension is a text file, with collisions.
     $textScript = New-Script $mockImage $mockText
     & $textScript 'note.txt' | Out-Null
     Assert-Text 'note.txt'
@@ -79,8 +79,11 @@ try {
     New-Item -ItemType Directory -Path 'blocked.txt' | Out-Null
     & $textScript 'blocked.txt' | Out-Null
     Assert-Text 'blocked1.txt'
-    & $textScript 'NOTES.TXT' | Out-Null
-    Assert-Text 'NOTES.TXT'
+    foreach ($name in @('NOTES.TXT', 'main.rs', 'notes.md', 'data.json', 'config.toml', 'script.ps1', 'UPPER.RS', 'no.gif')) {
+        & $textScript $name | Out-Null
+        $path = if ([System.IO.Path]::GetExtension($name)) { $name } else { "$name.txt" }
+        Assert-Text $path
+    }
 
     # What is not an image is text: a text clipboard saves .txt even for an image name.
     $textOnly = New-Script $mockNoImage $mockText
@@ -90,9 +93,11 @@ try {
     Assert-Text 'photo.txt'
     & $textOnly 'clip.BMP' | Out-Null
     Assert-Text 'clip.txt'
+    & $textOnly 'CHANGELOG' | Out-Null
+    Assert-Text 'CHANGELOG.txt'
 
     $before = @(Get-ChildItem).Count
-    foreach ($name in @('', ' ', 'CON', 'NUL.png', 'bad.', 'bad ', '../outside.png', 'bad:name', 'no.gif')) {
+    foreach ($name in @('', ' ', 'CON', 'NUL.png', 'bad.', 'bad ', '../outside.png', 'bad:name')) {
         Invoke-ExpectedError $script "invalid name $name" @($name)
     }
     foreach ($replacement in @($mockNoImage, 'throw "Clipboard unavailable"')) {

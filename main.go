@@ -9,7 +9,7 @@ import (
 
 var (
 	// Set by build flags
-	Version   = "2.2.3-dev"
+	Version   = "2.2.4-dev"
 	GitCommit = ""
 	BuildTime = ""
 )
